@@ -1,0 +1,32 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Client Detail - {{ client.name }} {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>{{ client.name }}</h1>
+    <p>Website: <a href="{{ client.website_url }}" target="_blank">{{ client.website_url }}</a></p>
+    <p>Status: {{ client.get_status_display }}</p>
+    <p>Group: {{ client.group.name|default:"No Group" }}</p>
+
+    <h2>SEO Data</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Traffic</th>
+                <th>Keywords</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for data in seo_data %}
+            <tr>
+                <td>{{ data.date }}</td>
+                <td>{{ data.traffic }}</td>
+                <td>{{ data.keywords }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock content %}

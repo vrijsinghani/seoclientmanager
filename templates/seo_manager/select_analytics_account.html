@@ -1,0 +1,65 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Select Analytics Account - {{ client.name }} {% endblock %}
+
+{% block stylesheets %}
+{{ block.super }}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>Select Google Analytics Account for {{ client.name }}</h6>
+        </div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+            <div class="form-group mt-3">
+              <label for="selected_account">Select an Analytics Account:</label>
+              <select class="js-example-basic-single" name="selected_account" id="selected_account" style="width: 100%" required>
+                <option value="">-- Select an account --</option>
+                {% for account in accounts %}
+                  <option value="{{ account.property_id }}">
+                    {{ account.account_name }} - {{ account.property_name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Add Selected Account</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  $(document).ready(function() {
+    $('#selected_account').select2({
+      placeholder: 'Start typing to search...',
+      allowClear: true,
+      width: '100%',
+      matcher: function(params, data) {
+        if ($.trim(params.term) === '') {
+          return data;
+        }
+        if (typeof data.text === 'undefined') {
+          return null;
+        }
+        if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
+          return data;
+        }
+        return null;
+      }
+    });
+  });
+</script>
+{% endblock javascripts %}

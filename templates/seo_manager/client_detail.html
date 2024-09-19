@@ -1,0 +1,189 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Client Detail - {{ client.name }} {% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>Client Details: {{ client.name }}</h6>
+        </div>
+        <div class="card-body px-0 pt-0 pb-2">
+          <div class="table-responsive p-0">
+            <table class="table align-items-center mb-0">
+              <tbody>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Website URL</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.website_url }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.get_status_display }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Group</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.group.name|default:"N/A" }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Created At</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.created_at|date:"F d, Y H:i" }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Last Updated</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.updated_at|date:"F d, Y H:i" }}</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>SEO Data</h6>
+        </div>
+        <div class="card-body px-0 pt-0 pb-2">
+          <div class="table-responsive p-0">
+            <table class="table align-items-center mb-0">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Date</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Traffic</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Keywords</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Rankings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for data in client.seo_data.all %}
+                <tr>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ data.date }}</p>
+                  </td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ data.traffic }}</p>
+                  </td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ data.keywords }}</p>
+                  </td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ data.rankings|json_script:"rankings-data" }}</p>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if client.ga_credentials %}
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+          <h6>Google Analytics Credentials</h6>
+          <a href="{% url 'seo_manager:remove_ga_credentials' client.id %}" class="btn btn-sm btn-danger">Remove Credentials</a>
+        </div>
+        <div class="card-body px-0 pt-0 pb-2">
+          <div class="table-responsive p-0">
+            <table class="table align-items-center mb-0">
+              <tbody>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">View ID</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.ga_credentials.view_id }}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">GA Client ID</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.ga_credentials.ga_client_id }}</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>Google Analytics Credentials</h6>
+        </div>
+        <div class="card-body">
+          <p>No Google Analytics credentials are set for this client.</p>
+          <a href="{% url 'seo_manager:add_ga_credentials_oauth' client.id %}" class="btn btn-primary">Add GA Credentials (OAuth)</a>
+          <a href="{% url 'seo_manager:add_ga_credentials_service_account' client.id %}" class="btn btn-secondary">Add GA Credentials (Service Account)</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Add this section after the Google Analytics Credentials section -->
+  {% if client.sc_credentials %}
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+          <h6>Search Console Credentials</h6>
+          <a href="{% url 'seo_manager:remove_sc_credentials' client.id %}" class="btn btn-sm btn-danger">Remove Credentials</a>
+        </div>
+        <div class="card-body px-0 pt-0 pb-2">
+          <div class="table-responsive p-0">
+            <table class="table align-items-center mb-0">
+              <tbody>
+                <tr>
+                  <td class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Property URL</td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ client.sc_credentials.property_url }}</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>Search Console Credentials</h6>
+        </div>
+        <div class="card-body">
+          <p>No Search Console credentials are set for this client.</p>
+          <a href="{% url 'seo_manager:add_sc_credentials' client.id %}" class="btn btn-primary">Add Search Console Credentials</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock content %}

@@ -1,0 +1,19 @@
+$darkblue:      #1a2c4c ;// EDIT for customization
+$darkbronze:    #af7657 ;// EDIT for customization
+$lightbronze:   #e1c08e ;// EDIT for customization
+$steelgrey:     #90a4ae ;// EDIT for customization
+$cream:         #f4edd5 ;// EDIT for customization
+$green:         #81E6D9 !default;
+$red:           #F56565 !default;
+
+$primary:       $darkblue !default; // EDIT for customization
+$secondary:     $steelgrey !default; // EDIT for customization
+$info:          $darkbronze !default; // EDIT for customization
+$success:       $green !default; // EDIT for customization
+// $warning:       #e1c08e !default; // EDIT for customization
+$danger:        $red !default; // EDIT for customization
+$light:         $steelgrey !default;
+$dark:          $darkblue !default;
+
+$primary-gradient: $darkblue !default;
+$primary-gradient-state: $darkbronze !default;

@@ -1,0 +1,13 @@
+modules = [ "python-3.12", "web", "nodejs-14"]
+run = "python manage.py runserver 0.0.0.0:3000"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "python manage.py runserver 0.0.0.0:3000"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
