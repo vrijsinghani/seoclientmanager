@@ -15,7 +15,7 @@ def get_analytics_service(credentials):
             service_account_info = json.loads(credentials.service_account_json)
             creds = service_account.Credentials.from_service_account_info(
                 service_account_info,
-                scopes=['https://www.googleapis.com/auth/analytics.readonly']
+                scopes=credentials.scopes if credentials.scopes else ['https://www.googleapis.com/auth/analytics.readonly']
             )
         else:
             logger.info(f"Using OAuth credentials for client {credentials.client.id}")
@@ -25,24 +25,24 @@ def get_analytics_service(credentials):
                 token_uri=credentials.token_uri,
                 client_id=credentials.ga_client_id,
                 client_secret=credentials.client_secret,
-                scopes=['https://www.googleapis.com/auth/analytics.readonly']
+                scopes=credentials.scopes if credentials.scopes else ['https://www.googleapis.com/auth/analytics.readonly']
             )
         return BetaAnalyticsDataClient(credentials=creds)
     except Exception as e:
         logger.error(f"Error creating analytics service: {str(e)}")
         raise
-
+        
 def get_analytics_data(client, property_id, start_date, end_date):
     request = RunReportRequest(
         property=f"properties/{property_id}",
         date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
         metrics=[Metric(name="activeUsers"), Metric(name="screenPageViews")],
-        dimensions=[Dimension(name="date")]
+        dimensions=[Dimension(name="date"), Dimension(name="sourceMedium")]
     )
     
     response = client.run_report(request)
     return response
-
+    
 def process_analytics_data(response):
     processed_data = []
     for row in response.rows:

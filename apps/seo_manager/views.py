@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from django.http import HttpResponse
 from google_auth_oauthlib.flow import Flow
 from django.urls import reverse
+from google.auth.exceptions import RefreshError
+from googleapiclient.errors import HttpError  # Add this import
 
 @login_required
 def dashboard(request):
@@ -38,38 +40,75 @@ def client_detail(request, client_id):
 
 @login_required
 def client_analytics(request, client_id):
-    client = get_object_or_404(Client, id=client_id)
-    ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
-    
-    service = get_analytics_service(ga_credentials)
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-    
-    analytics_data = get_analytics_data(service, ga_credentials.view_id, start_date, end_date)
-    
-    # Process the analytics_data to extract relevant information
-    processed_data = process_analytics_data(analytics_data)
-    
-    return render(request, 'seo_manager/client_analytics.html', {
-        'client': client,
-        'analytics_data': processed_data
-    })
+  client = get_object_or_404(Client, id=client_id)
+  ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
+  print("GA Credentials:", ga_credentials)
+  try:
+      analytics_client = get_analytics_service(ga_credentials, request)
+      print("Analytics Client:", analytics_client)
+      end_date = datetime.now().strftime('%Y-%m-%d')
+      start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+      print("Start Date:", start_date, "End Date:", end_date)
 
-def process_analytics_data(analytics_data):
-    # Extract and process the relevant data from the API response
-    # This is a simplified example, you may want to expand this based on your needs
-    processed_data = []
-    for report in analytics_data.get('reports', []):
-        for row in report.get('data', {}).get('rows', []):
-            date = row['dimensions'][0]
-            sessions = row['metrics'][0]['values'][0]
-            pageviews = row['metrics'][0]['values'][1]
-            processed_data.append({
-                'date': date,
-                'sessions': sessions,
-                'pageviews': pageviews
-            })
-    return processed_data
+      property_id = ga_credentials.view_id.replace('properties/', '')
+      print("Property ID:", property_id)
+
+      analytics_data = get_analytics_data(analytics_client, property_id, start_date, end_date)
+      print("Analytics Data:", analytics_data)
+
+      processed_data = process_analytics_data(analytics_data)
+      print("Processed Data:", processed_data)
+
+      # Convert processed_data to JSON for the template
+      json_data = json.dumps(processed_data)
+      
+      return render(request, 'seo_manager/client_analytics.html', {
+          'client': client,
+          'analytics_data': json_data,
+      })
+  except Exception as e:
+      print("Unexpected error:", str(e))
+      messages.error(request, "An unexpected error occurred.")
+      return redirect('seo_manager:client_detail', client_id=client.id)
+        
+def extract_source_data(analytics_data):
+  source_data = []
+  for row in analytics_data.rows:
+      # Assuming the dimensions are ordered as [date, source/medium]
+      # and metrics as [sessions, pageviews]
+      source_medium = row.dimension_values[1].value
+      sessions = int(row.metric_values[0].value)
+      
+      # Check if this source/medium already exists in our list
+      existing_entry = next((item for item in source_data if item['source_medium'] == source_medium), None)
+      
+      if existing_entry:
+          # If it exists, add to the sessions count
+          existing_entry['sessions'] += sessions
+      else:
+          # If it doesn't exist, create a new entry
+          source_data.append({
+              'source_medium': source_medium,
+              'sessions': sessions,
+          })
+  
+  # Sort the data by sessions in descending order
+  source_data.sort(key=lambda x: x['sessions'], reverse=True)
+  
+  return source_data
+
+def process_analytics_data(response):
+  processed_data = []
+  for row in response.rows:
+      date = row.dimension_values[0].value
+      sessions = int(row.metric_values[0].value)
+      page_views = int(row.metric_values[1].value)
+      processed_data.append({
+          'date': date,
+          'sessions': sessions,
+          'pageviews': page_views
+      })
+  return processed_data
 
 @login_required
 def client_search_console(request, client_id):

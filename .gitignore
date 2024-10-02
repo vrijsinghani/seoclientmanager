@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+client_secret*
+neuralamiai-*
 
 # C extensions
 *.so
@@ -129,9 +131,7 @@ ENV/
 env.bak/
 venv.bak/
 .env
-client_secret*
-neuralami-*
-
+ 
 # Spyder project settings
 .spyderproject
 .spyproject

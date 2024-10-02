@@ -55,10 +55,12 @@ class GoogleAnalyticsCredentials(models.Model):
     client_secret = models.CharField(max_length=100, blank=True, null=True)  # Allow null for service accounts
     use_service_account = models.BooleanField(default=False)
     service_account_json = models.TextField(blank=True, null=True)
+    user_email = models.EmailField()  # Add this field if it doesn't exist
+    # Add the scopes attribute with a default value
+    scopes = models.JSONField(default=list)
 
     def __str__(self):
         return f"GA Credentials for {self.client.name}"
-
 # Add this new model
 class SearchConsoleCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='sc_credentials')

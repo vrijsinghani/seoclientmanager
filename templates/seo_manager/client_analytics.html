@@ -1,0 +1,79 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Analytics - {{ client.name }} {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1>Analytics for {{ client.name }}</h1>
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h6>Google Analytics Data (Last 30 Days)</h6>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div id="analytics-line-chart" style="height: 350px;"></div>
+                </div>
+            </div>
+
+            {% if source_data %}
+            <!-- ... existing source_data table ... -->
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prepare data for the chart
+        const analyticsData = JSON.parse('{{ analytics_data|safe }}');
+        const dates = analyticsData.map(data => data.date);
+        const sessions = analyticsData.map(data => data.sessions);
+        const pageviews = analyticsData.map(data => data.pageviews);
+
+        // Chart options
+        const chartOptions = {
+            series: [{
+                name: 'Sessions',
+                data: sessions
+            }, {
+                name: 'Page Views',
+                data: pageviews
+            }],
+            chart: {
+                height: 350,
+                type: 'line',
+                zoom: {
+                    enabled: false
+                },
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'straight'
+            },
+            title: {
+                text: 'Google Analytics Data',
+                align: 'left'
+            },
+            grid: {
+                row: {
+                    colors: ['#f3f3f3', 'transparent'],
+                    opacity: 0.5
+                },
+            },
+            xaxis: {
+                categories: dates,
+            }
+        };
+
+        // Create and render the chart
+        const chart = new ApexCharts(document.querySelector("#analytics-line-chart"), chartOptions);
+        chart.render();
+    });
+</script>
+{% endblock extra_js %}
