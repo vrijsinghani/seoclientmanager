@@ -290,3 +290,40 @@ MESSAGE_TAGS = {
     messages.WARNING: 'alert-warning',
     messages.ERROR: 'alert-danger',
 }
+
+API_BASE_URL = os.environ.get('API_BASE_URL')
+LITELLM_MASTER_KEY= os.environ.get('LITELLM_MASTER_KEY')
+SERPAPI_API_KEY=os.environ.get('SERPAPI_API_KEY')
+OPENAI_API_KEY=os.environ.get('OPENAI_API_KEY')
+OPENAI_API_BASE=os.environ.get('OPENAI_API_BASE')
+ANTHROPIC_API_KEY=os.environ.get('ANTHROPIC_API_KEY')
+ALPHA_VANTAGE_API_KEY=os.environ.get('ALPHA_VANTAGE_API_KEY')
+DATAFORSEO_EMAIL = os.environ.get('DATAFORSEO_EMAIL')
+DATAFORSEO_PASSWORD = os.environ.get('DATAFORSEO_PASSWORD')
+
+SONNET=os.environ.get('SONNET')
+OPUS=os.environ.get('OPUS')
+HAIKU=os.environ.get('HAIKU')
+GENERAL_MODEL=os.environ.get('GENERAL_MODEL')
+TEXT_MODEL=os.environ.get('TEXT_MODEL')
+CODING_MODEL=os.environ.get('CODING_MODEL')
+GROQMIXTRAL=os.environ.get('GROQMIXTRAL')
+LOCAL_LONG=os.environ.get('LOCAL_LONG')
+SUMMARIZER=os.environ.get('SUMMARIZER')
+SUMMARIZER_MAX_TOKENS=int(os.environ.get('SUMMARIZER_MAX_TOKENS'))
+
+MIXTRAL=os.environ.get('MIXTRAL')
+MISTRAL=os.environ.get('MISTRAL')
+PHI3=os.environ.get('PHI3')
+QWEN32=os.environ.get('QWEN32')
+QWEN14=os.environ.get('QWEN14')
+QWEN2=os.environ.get('QWEN2_7b_8')
+YI=os.environ.get('YI')
+
+EMAIL_ADDRESS = os.environ.get('EMAIL_ADDRESS')
+COMPANY_NAME = os.environ.get('COMPANY_NAME')
+
+
+BROWSERLESS_API_KEY=os.environ.get('BROWSERLESS_API_KEY')
+BROWSERLESS_BASE_URL=os.environ.get('BROWSERLESS_BASE_URL')
+DOWNLOAD_FOLDER = os.environ.get('DOWNLOAD_FOLDER')

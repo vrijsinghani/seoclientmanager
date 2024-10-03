@@ -73,3 +73,16 @@ class SearchConsoleCredentials(models.Model):
 
     def __str__(self):
         return f"Search Console Credentials for {self.client.name}"
+
+class SummarizerUsage(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    query = models.TextField()
+    compressed_content = models.TextField()
+    response = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    duration = models.DurationField()
+    content_token_size = models.IntegerField()
+    content_character_count = models.IntegerField()
+    total_input_tokens = models.IntegerField()
+    total_output_tokens = models.IntegerField()
+    model_used = models.CharField(max_length=100)

@@ -83,3 +83,86 @@ def execute_script(self, data: dict):
         log_file = write_to_log_file(logs, script)
 
         return {"logs": logs, "input": script, "error": error, "output": "", "status": status, "log_file": log_file}
+    
+@app.task(bind=True, time_limit=3600)
+def summarize_content(self_task, query, user_id, model_name=settings.SUMMARIZER):
+    """
+    Summarize the given content 
+    :param self: Celery task instance
+    :param content: str, the text/url to be summarized
+    :return: str, the summary of the input text
+    """
+    start_time = timezone.now()
+    max_tokens = settings.SUMMARIZER_MAX_TOKENS
+    #logging.info(f"summarize_content, query: {query}, user_id: {user_id}, model_name: {model_name}, max_tokens: {max_tokens}")
+# Load Content
+    try:
+        user = User.objects.get(id=user_id)
+    except Exception as e:
+        user_id = 3
+        user=User.objects.get(id=user_id)
+    user=User.objects.get(id=user_id)
+
+    #logging.info(f"Loading content: {query}")
+    content_loader = ContentLoader()
+    content = content_loader.load_content(query)
+
+    input_tokens = 0
+    output_tokens = 0
+    path = f'{settings.DOWNLOAD_FOLDER}/summarizer/raw_content.txt'
+    if  not os.path.exists(os.path.dirname (path)):
+        try:
+             os.makedirs(os.path.dirname (path))
+        except FileExistsError:
+            pass
+            
+    with open(path, 'w') as f:
+        f.write(content)
+# Clean Text
+
+# Compress Text if necessary
+    compression_manager = CompressionManager(model_name, self_task)
+    compressed_content, comp_input_tokens, comp_output_tokens = compression_manager.compress_content(content, max_tokens)
+    with open(f'{settings.DOWNLOAD_FOLDER}/summarizer/compressed_content.txt', 'w') as f:
+        f.write(compressed_content)
+
+    input_tokens += comp_input_tokens
+    output_tokens += comp_output_tokens
+# Generate Summary
+    
+    summarization_manager = SummarizationManager(model_name, self_task)
+    summary, sum_input_tokens, sum_output_tokens = summarization_manager.summarize_content(compressed_content)
+    logging.info("finished compressing content")
+
+    with open(f'{settings.DOWNLOAD_FOLDER}/summarizer/summary.txt', 'w') as f:
+        f.write(summary)
+    logging.info("finished summarizing content")
+    input_tokens += sum_input_tokens
+    output_tokens += sum_output_tokens
+
+    result = summary + "\n\n--Detail-------------------\n\n" + compressed_content
+
+
+# save summarizationusage
+    end_time = timezone.now()
+    duration = end_time - start_time
+
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    content_tokens = tokenizer.encode(content)
+
+    usage = SummarizerUsage.objects.create(
+        user=user,
+        query=query,
+        compressed_content = compressed_content,
+        response=summary,
+        duration = duration,
+        content_token_size=len(content_tokens),
+        content_character_count=len(content),
+        total_input_tokens=input_tokens,
+        total_output_tokens=output_tokens,
+        model_used = model_name
+    )
+    usage.save()
+    logging.info(f"task summarize_content, user_id: {user_id}, model_name: {model_name}, max_tokens: {max_tokens}, content_tokens: {len(content_tokens)}, input_tokens: {input_tokens}, output_tokens: {output_tokens}, total_tokens: {input_tokens+output_tokens}, duration: {duration}")
+
+    return result
