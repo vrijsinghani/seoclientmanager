@@ -1,4 +1,4 @@
-{% extends 'layouts/base-general.html' %}
+{% extends 'layouts/base.html' %}
 {% load static %}
 
 {% block extra_styles %}
@@ -23,7 +23,7 @@
         <!-- Sidebar: Previous Summarizations -->
         <div class="col-md-3">
             <div class="container-fluid py-4">
-                <form id="summarize-form" data-model-selected-value="{{ model_selected_value }}" method="post" action="{% url 'summarize_view' %}" enctype="multipart/form-data">
+                <form id="summarize-form" data-model-selected-value="{{ model_selected_value }}" method="post" action="{% url 'seo_manager:summarize_view' %}" enctype="multipart/form-data">
                     {% csrf_token %}
                 {% if request.user.is_superuser %}
                 <div class="row">
@@ -170,7 +170,7 @@
             formData.append('query_text_value', document.getElementById('query-text').value);
 
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', '{% url "summarize_view" %}');
+            xhr.open('POST', '{% url "seo_manager:summarize_view" %}');
             {% comment %} xhr.setRequestHeader('Content-Type', 'multipart/form-data');
             xhr.setRequestHeader('X-CSRFToken', csrfToken); // Set the CSRF token header {% endcomment %}
             xhr.onload = function() {
@@ -200,7 +200,7 @@
         function checkTaskStatus(taskId) {
             var xhr = new XMLHttpRequest();
             
-            var taskStatusUrl = '{% url "task_status" task_id="TASK_ID" %}'.replace('TASK_ID', encodeURIComponent(taskId));
+            var taskStatusUrl = '{% url "seo_manager:task_status" task_id="TASK_ID" %}'.replace('TASK_ID', encodeURIComponent(taskId));
             xhr.open('GET', taskStatusUrl);
             xhr.onload = function() {
                 if (xhr.status === 200) {

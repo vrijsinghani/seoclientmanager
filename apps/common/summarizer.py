@@ -12,7 +12,7 @@ from langchain_community.document_loaders import YoutubeLoader
 import io
 from .browser_tool import BrowserTools
 from django.utils import timezone
-from apps.common.models import SummarizerUsage
+from apps.seo_manager.models import SummarizerUsage
 from langchain.text_splitter import TokenTextSplitter
 
 class Summarizer:

@@ -395,7 +395,7 @@ def error_500(request, exception=None):
 
 def logout_view(request):
   logout(request)
-  return redirect('/accounts/login/basic-login/')
+  return redirect('/accounts/login/illustration-login/')
 
 
 

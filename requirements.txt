@@ -38,7 +38,7 @@ google-analytics-data==0.8.12
 openai==1.13.3
 youtube-transcript-api==0.6.1
 tiktoken==0.5.2
-trafilatura==1.6.2
+trafilatura==1.12.2
 pydantic<3.0.0>=2.6.1
 exa_py==1.0.1
 geopy==2.4.1
@@ -55,3 +55,4 @@ langsmith==0.0.87
 Requests==2.32.3
 beautifulsoup4<5.0.0>=4.12.3
 mistune==3.0.2
+sec_edgar_downloader==5.0.2

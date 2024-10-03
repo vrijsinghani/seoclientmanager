@@ -4,8 +4,8 @@
   <div class="sidenav-header">
     <i class="fas fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute end-0 top-0 d-none d-xl-none" aria-hidden="true" id="iconSidenav"></i>
     <a class="navbar-brand m-0" href="/">
-      <img src="{% static 'assets/img/logo-ct-dark.png' %}" class="navbar-brand-img h-100" alt="main_logo">
-      <span class="ms-1 font-weight-bold">Django Soft PRO</span>
+      <img src="{% static 'assets/neuralami/logos/NeuralamiLogo51x51.png' %}" class="navbar-brand-img h-100" alt="main_logo">
+      <span class="ms-1 font-weight-bold">Neuralami Control Center</span>
     </a>
   </div>
   <hr class="horizontal dark mt-0">
@@ -20,9 +20,17 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link {% if request.resolver_match.url_name == 'summarize' %}active{% endif %}" href="{% url 'seo_manager:summarize_view' %}">
+          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+            <i class="ni ni-scissors text-primary text-sm opacity-10"></i>
+          </div>
+          <span class="nav-link-text ms-1">Summarize</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {% if request.resolver_match.url_name == 'client_list' %}active{% endif %}" href="{% url 'seo_manager:client_list' %}">
           <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
-            <i class="ni ni-briefcase-24 text-warning text-sm opacity-10"></i>
+            <i class="ni ni-briefcase-24 text-primary text-sm opacity-10"></i>
           </div>
           <span class="nav-link-text ms-1">Clients</span>
         </a>
@@ -52,7 +60,10 @@
       {% endif %}
     </ul>
   </div>
-  <div class="sidenav-footer mx-3 mt-3 pt-3">
+  <div class="collapse navbar-collapse  w-auto h-auto" id="sidenav-collapse-main">
+    {% include 'includes/menu-list.html' %}
+  </div>
+  {% comment %} <div class="sidenav-footer mx-3 mt-3 pt-3">
     <div class="card card-background shadow-none card-background-mask-secondary" id="sidenavCard">
       <div class="full-background" style="background-image: url('{% static 'assets/img/curved-images/white-curved.jpg' %}')"></div>
       <div class="card-body text-start p-3 w-100">
@@ -66,5 +77,5 @@
         </div>
       </div>
     </div>
-  </div>
+  </div> {% endcomment %}
 </aside>

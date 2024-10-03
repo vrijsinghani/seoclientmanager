@@ -25,3 +25,5 @@ class Sales(models.Model):
 	Refunded = models.CharField(max_length=20, choices=RefundedChoices.choices, default=RefundedChoices.NO)
 	Currency = models.CharField(max_length=10, choices=CurrencyChoices.choices, default=CurrencyChoices.USD)
 	Quantity = models.IntegerField(blank=True, null=True)
+ 
+ 

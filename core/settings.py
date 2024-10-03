@@ -42,7 +42,7 @@ INTERNAL_IPS = [
 ]
 
 # Add here your deployment HOSTS
-CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://localhost:5085', 'http://127.0.0.1:8000', 'http://127.0.0.1:5085', 'https://a36afd9c-6d6b-443f-af26-9f9eddab3ba1-00-12u9itbtcgrof.riker.replit.dev'] 
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://localhost:5085', 'http://127.0.0.1:8000', 'https://app.neuralami.com', 'http://127.0.0.1:5085', 'https://a36afd9c-6d6b-443f-af26-9f9eddab3ba1-00-12u9itbtcgrof.riker.replit.dev', 'https://manager.neuralami.com'] 
 
 
 # Application definition
@@ -211,6 +211,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 LOGIN_REDIRECT_URL = '/'
+LOGIN_URL = '/accounts/login/illustration-login/'
 
 # AllAuth
 ACCOUNT_EMAIL_VERIFICATION =  os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'none')
@@ -290,6 +291,12 @@ MESSAGE_TAGS = {
     messages.WARNING: 'alert-warning',
     messages.ERROR: 'alert-danger',
 }
+
+#SECURE_SSL_REDIRECT = True
+#SESSION_COOKIE_SECURE = True
+#CSRF_COOKIE_SECURE = True
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
+
 
 API_BASE_URL = os.environ.get('API_BASE_URL')
 LITELLM_MASTER_KEY= os.environ.get('LITELLM_MASTER_KEY')

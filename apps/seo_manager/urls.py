@@ -6,6 +6,7 @@ app_name = 'seo_manager'
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('summarize/', views_summarizer.summarize_view, name='summarize_view'),
+    path('task_status/<str:task_id>/', views_summarizer.task_status, name='task_status'),
     path('clients/', include([
         path('', views.client_list, name='client_list'),
         path('<int:client_id>/', include([
