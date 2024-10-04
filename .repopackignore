@@ -1,0 +1,41 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+__pycache__
+0downloads/
+apps/common/api/*
+apps/common/charts/*
+apps/common/migrations/*
+apps/common/file_manager/*
+apps/common/tables/*
+*/migrations/*
+locale/*
+media/*
+nginx/*
+paths/*
+project/*
+static/*
+staticfiles/*
+tasks_logs/*
+tasks_scripts/*
+.gitignore
+.cursorrules
+.env
+.replit
+.repopackignore
+build.sh
+celerybeat-schedule
+CHANGELOG.media
+dbsqlite3
+getapp.sh
+gulpfile.js
+gunicorn-cfg.py
+LICENSE.md 
+manage.py
+package-lock.json
+render.yaml
+replit.nix 
+repopack-output.txt
+repopack.config.json
+requirements copy.txt

@@ -1,4 +1,5 @@
 {% extends "layouts/base.html" %}
+{% load static %}
 
 {% block title %} Analytics - {{ client.name }} {% endblock %}
 
@@ -7,17 +8,61 @@
     <h1>Analytics for {{ client.name }}</h1>
     <div class="row">
         <div class="col-12">
+            {% if analytics_data %}
             <div class="card mb-4">
                 <div class="card-header pb-0">
-                    <h6>Google Analytics Data (Last 30 Days)</h6>
+                    <h6>Google Analytics Data</h6>
                 </div>
                 <div class="card-body px-0 pt-0 pb-2">
                     <div id="analytics-line-chart" style="height: 350px;"></div>
                 </div>
             </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <p class="text-warning">Google Analytics data is currently unavailable. This may be due to an authentication issue or an error in data retrieval.</p>
+                </div>
+            </div>
+            {% endif %}
 
-            {% if source_data %}
-            <!-- ... existing source_data table ... -->
+            {% if search_console_data %}
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h6>Search Console Performance Data</h6>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div class="table-responsive p-0">
+                        <table class="table table-flush" id="search-console-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Query</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Impressions</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Clicks</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">CTR</th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Position</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in search_console_data %}
+                                <tr>
+                                    <td class="text-sm font-weight-normal">{{ item.query }}</td>
+                                    <td class="text-sm font-weight-normal">{{ item.impressions }}</td>
+                                    <td class="text-sm font-weight-normal">{{ item.clicks }}</td>
+                                    <td class="text-sm font-weight-normal">{{ item.ctr|floatformat:2 }}%</td>
+                                    <td class="text-sm font-weight-normal">{{ item.position|floatformat:1 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <p class="text-warning">Search Console data is currently unavailable. This may be due to an authentication issue or an error in data retrieval.</p>
+                </div>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -26,15 +71,20 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Prepare data for the chart
+        {% if analytics_data %}
+        // Google Analytics chart
         const analyticsData = JSON.parse('{{ analytics_data|safe }}');
-        const dates = analyticsData.map(data => data.date);
-        const sessions = analyticsData.map(data => data.sessions);
-        const pageviews = analyticsData.map(data => data.pageviews);
+        const sessions = analyticsData.map(data => ({ x: new Date(data.date), y: data.sessions }));
+        const pageviews = analyticsData.map(data => ({ x: new Date(data.date), y: data.pageviews }));
 
-        // Chart options
+        const startDate = '{{ start_date }}';
+        const endDate = '{{ end_date }}';
+        const formattedStartDate = new Date(startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+        const formattedEndDate = new Date(endDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+
         const chartOptions = {
             series: [{
                 name: 'Sessions',
@@ -57,7 +107,7 @@
                 curve: 'straight'
             },
             title: {
-                text: 'Google Analytics Data',
+                text: `Google Analytics Data (${formattedStartDate} - ${formattedEndDate})`,
                 align: 'left'
             },
             grid: {
@@ -67,13 +117,38 @@
                 },
             },
             xaxis: {
-                categories: dates,
+                type: 'datetime',
+                labels: {
+                    formatter: function(value, timestamp) {
+                        return new Date(timestamp).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+                    }
+                }
+            },
+            yaxis: {
+                title: {
+                    text: 'Count'
+                }
+            },
+            legend: {
+                position: 'top',
+                horizontalAlign: 'right',
+                floating: true,
+                offsetY: -25,
+                offsetX: -5
             }
         };
 
-        // Create and render the chart
         const chart = new ApexCharts(document.querySelector("#analytics-line-chart"), chartOptions);
         chart.render();
+        {% endif %}
+
+        {% if search_console_data %}
+        // Initialize DataTable for Search Console data
+        const dataTableSearchConsole = new simpleDatatables.DataTable("#search-console-table", {
+            searchable: true,
+            fixedHeight: true
+        });
+        {% endif %}
     });
 </script>
 {% endblock extra_js %}

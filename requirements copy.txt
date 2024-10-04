@@ -37,9 +37,9 @@ google_auth_oauthlib==1.2.0
 google-api-python-client==2.147.0
 
 openai==1.13.3
-youtube-transcript-api
-str2bool
-tiktoken
+youtube-transcript-api==0.6.2
+str2bool==1.1
+tiktoken==0.7.0
 trafilatura
 pydantic
 exa_py

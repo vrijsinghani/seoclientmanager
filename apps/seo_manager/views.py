@@ -1,7 +1,8 @@
-import json  # Add this import at the top of the file
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
 from .models import Client, SEOData, GoogleAnalyticsCredentials, SearchConsoleCredentials
 from .services import get_analytics_service, get_analytics_data
 from .google_auth import get_google_auth_flow, get_analytics_accounts_oauth, get_analytics_accounts_service_account, get_search_console_properties
@@ -10,23 +11,37 @@ from django.http import HttpResponse
 from google_auth_oauthlib.flow import Flow
 from django.urls import reverse
 from google.auth.exceptions import RefreshError
-from googleapiclient.errors import HttpError  # Add this import
+from googleapiclient.errors import HttpError
+from .forms import ClientForm  # We'll create this form later
 
 @login_required
 def dashboard(request):
-    total_clients = Client.objects.count()
-    return render(request, 'seo_manager/dashboard.html', {'total_clients': total_clients})
+    clients = Client.objects.all().order_by('name')
+    return render(request, 'seo_manager/dashboard.html', {'clients': clients})
 
+@login_required
 def client_list(request):
-    clients = Client.objects.all()
+    clients = Client.objects.all().order_by('name').select_related('group')
     return render(request, 'seo_manager/client_list.html', {'clients': clients})
+
+@login_required
+def add_client(request):
+    if request.method == 'POST':
+        form = ClientForm(request.POST)
+        if form.is_valid():
+            client = form.save()
+            messages.success(request, f"Client '{client.name}' has been added successfully.")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    else:
+        form = ClientForm()
+    
+    return render(request, 'seo_manager/add_client.html', {'form': form})
 
 @login_required
 def client_detail(request, client_id):
     client = get_object_or_404(Client, id=client_id)
     seo_data = SEOData.objects.filter(client=client).order_by('-date')[:30]
     
-    # Clear all credential-related session data
     credential_keys = ['accounts', 'properties', 'access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret', 'service_account_json']
     for key in credential_keys:
         request.session.pop(key, None)
@@ -39,93 +54,104 @@ def client_detail(request, client_id):
     return render(request, 'seo_manager/client_detail.html', context)
 
 @login_required
+def delete_client(request, client_id):
+    if request.method == 'POST':
+        client = get_object_or_404(Client, id=client_id)
+        client.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
+
+@login_required
 def client_analytics(request, client_id):
-  client = get_object_or_404(Client, id=client_id)
-  ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
-  print("GA Credentials:", ga_credentials)
-  try:
-      analytics_client = get_analytics_service(ga_credentials, request)
-      print("Analytics Client:", analytics_client)
-      end_date = datetime.now().strftime('%Y-%m-%d')
-      start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-      print("Start Date:", start_date, "End Date:", end_date)
+    client = get_object_or_404(Client, id=client_id)
+    ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
+    sc_credentials = get_object_or_404(SearchConsoleCredentials, client=client)
+    
+    context = {
+        'client': client,
+        'analytics_data': None,
+        'search_console_data': None,
+        'start_date': None,
+        'end_date': None,
+    }
 
-      property_id = ga_credentials.view_id.replace('properties/', '')
-      print("Property ID:", property_id)
+    try:
+        analytics_client = get_analytics_service(ga_credentials, request)
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
-      analytics_data = get_analytics_data(analytics_client, property_id, start_date, end_date)
-      print("Analytics Data:", analytics_data)
+        property_id = ga_credentials.view_id.replace('properties/', '')
 
-      processed_data = process_analytics_data(analytics_data)
-      print("Processed Data:", processed_data)
+        analytics_data = get_analytics_data(analytics_client, property_id, start_date, end_date)
+        processed_data = process_analytics_data(analytics_data)
+        context['analytics_data'] = json.dumps(processed_data)
+        context['start_date'] = start_date
+        context['end_date'] = end_date
+    except RefreshError:
+        messages.error(request, "Google Analytics token has expired. Please re-authenticate.")
+    except Exception as e:
+        print("Unexpected error in Google Analytics:", str(e))
+        messages.error(request, "An error occurred while fetching Google Analytics data.")
 
-      # Convert processed_data to JSON for the template
-      json_data = json.dumps(processed_data)
-      
-      return render(request, 'seo_manager/client_analytics.html', {
-          'client': client,
-          'analytics_data': json_data,
-      })
-  except Exception as e:
-      print("Unexpected error:", str(e))
-      messages.error(request, "An unexpected error occurred.")
-      return redirect('seo_manager:client_detail', client_id=client.id)
+    try:
+        search_console_client = get_search_console_service(sc_credentials, request)
+        search_console_data = get_search_console_data(search_console_client, sc_credentials.property_url, start_date, end_date)
+        context['search_console_data'] = search_console_data
+    except RefreshError:
+        messages.error(request, "Search Console token has expired. Please re-authenticate.")
+    except Exception as e:
+        print("Unexpected error in Search Console:", str(e))
+        messages.error(request, "An error occurred while fetching Search Console data.")
+
+    return render(request, 'seo_manager/client_analytics.html', context)
         
 def extract_source_data(analytics_data):
-  source_data = []
-  for row in analytics_data.rows:
-      # Assuming the dimensions are ordered as [date, source/medium]
-      # and metrics as [sessions, pageviews]
-      source_medium = row.dimension_values[1].value
-      sessions = int(row.metric_values[0].value)
-      
-      # Check if this source/medium already exists in our list
-      existing_entry = next((item for item in source_data if item['source_medium'] == source_medium), None)
-      
-      if existing_entry:
-          # If it exists, add to the sessions count
-          existing_entry['sessions'] += sessions
-      else:
-          # If it doesn't exist, create a new entry
-          source_data.append({
-              'source_medium': source_medium,
-              'sessions': sessions,
-          })
-  
-  # Sort the data by sessions in descending order
-  source_data.sort(key=lambda x: x['sessions'], reverse=True)
-  
-  return source_data
+    source_data = []
+    for row in analytics_data.rows:
+        source_medium = row.dimension_values[1].value
+        sessions = int(row.metric_values[0].value)
+        
+        existing_entry = next((item for item in source_data if item['source_medium'] == source_medium), None)
+        
+        if existing_entry:
+            existing_entry['sessions'] += sessions
+        else:
+            source_data.append({
+                'source_medium': source_medium,
+                'sessions': sessions,
+            })
+    
+    source_data.sort(key=lambda x: x['sessions'], reverse=True)
+    
+    return source_data
 
 def process_analytics_data(response):
-  processed_data = []
-  for row in response.rows:
-      date = row.dimension_values[0].value
-      sessions = int(row.metric_values[0].value)
-      page_views = int(row.metric_values[1].value)
-      processed_data.append({
-          'date': date,
-          'sessions': sessions,
-          'pageviews': page_views
-      })
-  return processed_data
+    processed_data = []
+    for row in response.rows:
+        date = datetime.strptime(row.dimension_values[0].value, '%Y%m%d').strftime('%Y-%m-%d')
+        sessions = int(row.metric_values[0].value)
+        page_views = int(row.metric_values[1].value)
+        processed_data.append({
+            'date': date,
+            'sessions': sessions,
+            'pageviews': page_views
+        })
+    processed_data.sort(key=lambda x: x['date'])
+    return processed_data
 
 @login_required
 def client_search_console(request, client_id):
     client = get_object_or_404(Client, id=client_id)
-    # Implement Google Search Console data fetching here
     return render(request, 'seo_manager/client_search_console.html', {'client': client})
 
 @login_required
 def client_ads(request, client_id):
     client = get_object_or_404(Client, id=client_id)
-    # Implement Google Ads data fetching here
     return render(request, 'seo_manager/client_ads.html', {'client': client})
 
 @login_required
 def client_dataforseo(request, client_id):
     client = get_object_or_404(Client, id=client_id)
-    # Implement DataForSEO data fetching here
     return render(request, 'seo_manager/client_dataforseo.html', {'client': client})
 
 def test_view(request):
@@ -294,7 +320,6 @@ def add_sc_credentials(request, client_id):
                 )
                 messages.success(request, "Search Console credentials added successfully.")
                 
-                # Clear session data after successful addition
                 for key in ['properties', 'access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret']:
                     request.session.pop(key, None)
                 
@@ -310,7 +335,6 @@ def add_sc_credentials(request, client_id):
             'properties': request.session['properties'],
         })
     
-    # Check if credentials already exist
     if hasattr(client, 'sc_credentials'):
         messages.warning(request, "Search Console credentials already exist for this client. Remove them first to add new ones.")
         return redirect('seo_manager:client_detail', client_id=client.id)
@@ -337,8 +361,50 @@ def remove_sc_credentials(request, client_id):
     except Exception as e:
         messages.error(request, f"Error removing Search Console credentials: {str(e)}")
     
-    # Clear session data related to SC credentials
     for key in ['properties', 'access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret']:
         request.session.pop(key, None)
     
     return redirect('seo_manager:client_detail', client_id=client.id)
+
+def get_search_console_service(credentials, request):
+    from googleapiclient.discovery import build
+    from google.oauth2.credentials import Credentials
+    
+    creds = Credentials(
+        token=credentials.access_token,
+        refresh_token=credentials.refresh_token,
+        token_uri=credentials.token_uri,
+        client_id=credentials.sc_client_id,
+        client_secret=credentials.client_secret
+    )
+    
+    return build('searchconsole', 'v1', credentials=creds)
+
+def get_search_console_data(service, property_url, start_date, end_date):
+    try:
+        response = service.searchanalytics().query(
+            siteUrl=property_url,
+            body={
+                'startDate': start_date,
+                'endDate': end_date,
+                'dimensions': ['query'],
+                'rowLimit': 1000
+            }
+        ).execute()
+        
+        search_console_data = []
+        for row in response.get('rows', []):
+            search_console_data.append({
+                'query': row['keys'][0],
+                'clicks': row['clicks'],
+                'impressions': row['impressions'],
+                'ctr': row['ctr'] * 100,  # Convert to percentage
+                'position': row['position']
+            })
+        
+        search_console_data.sort(key=lambda x: x['impressions'], reverse=True)
+        
+        return search_console_data
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return []

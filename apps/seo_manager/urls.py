@@ -9,8 +9,10 @@ urlpatterns = [
     path('task_status/<str:task_id>/', views_summarizer.task_status, name='task_status'),
     path('clients/', include([
         path('', views.client_list, name='client_list'),
+        path('add/', views.add_client, name='add_client'),  # New URL pattern for adding a client
         path('<int:client_id>/', include([
             path('', views.client_detail, name='client_detail'),
+            path('delete/', views.delete_client, name='delete_client'),  # New URL pattern for deleting a client
             path('analytics/', views.client_analytics, name='client_analytics'),
             path('search-console/', views.client_search_console, name='client_search_console'),
             path('ads/', views.client_ads, name='client_ads'),

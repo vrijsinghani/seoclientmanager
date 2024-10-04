@@ -34,7 +34,7 @@ if not SECRET_KEY:
 DEBUG = str2bool(os.environ.get('DEBUG'))
 #print(' DEBUG -> ' + str(DEBUG) ) 
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', 'manager.neuralami.com']
 
 # Used by DEBUG-Toolbar 
 INTERNAL_IPS = [
@@ -232,6 +232,13 @@ SOCIALACCOUNT_PROVIDERS = {
         'APP':{
             'client_id': os.getenv('GOOGLE_CLIENT_ID', default=""),
             'secret': os.getenv('GOOGLE_SECRET_KEY', default=""),
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
         }
     },
     'github': {
@@ -292,11 +299,11 @@ MESSAGE_TAGS = {
     messages.ERROR: 'alert-danger',
 }
 
-#SECURE_SSL_REDIRECT = True
-#SESSION_COOKIE_SECURE = True
-#CSRF_COOKIE_SECURE = True
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
-
+DEFAULT_HTTP_PROTOCOL='https'
+HTTPS=True
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 API_BASE_URL = os.environ.get('API_BASE_URL')
 LITELLM_MASTER_KEY= os.environ.get('LITELLM_MASTER_KEY')
@@ -334,3 +341,24 @@ COMPANY_NAME = os.environ.get('COMPANY_NAME')
 BROWSERLESS_API_KEY=os.environ.get('BROWSERLESS_API_KEY')
 BROWSERLESS_BASE_URL=os.environ.get('BROWSERLESS_BASE_URL')
 DOWNLOAD_FOLDER = os.environ.get('DOWNLOAD_FOLDER')
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'allauth': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+    },
+}

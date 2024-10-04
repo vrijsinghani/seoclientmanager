@@ -143,7 +143,6 @@
   </div>
   {% endif %}
 
-  <!-- Add this section after the Google Analytics Credentials section -->
   {% if client.sc_credentials %}
   <div class="row mt-4">
     <div class="col-12">
@@ -184,6 +183,70 @@
     </div>
   </div>
   {% endif %}
+
+  <!-- Add Delete Client Button -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-body">
+          <button id="deleteClientBtn" class="btn btn-danger">Delete Client</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('deleteClientBtn').addEventListener('click', function() {
+    Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Send delete request to the server
+        fetch('{% url "seo_manager:delete_client" client.id %}', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            Swal.fire(
+              'Deleted!',
+              'The client has been deleted.',
+              'success'
+            ).then(() => {
+              // Redirect to the client list page
+              window.location.href = '{% url "seo_manager:client_list" %}';
+            });
+          } else {
+            Swal.fire(
+              'Error!',
+              'There was an error deleting the client.',
+              'error'
+            );
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          Swal.fire(
+            'Error!',
+            'There was an error deleting the client.',
+            'error'
+          );
+        });
+      }
+    });
+  });
+</script>
+{% endblock extra_js %}

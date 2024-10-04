@@ -9,8 +9,13 @@ import json
 def get_google_auth_flow(request):
     flow = Flow.from_client_secrets_file(
         settings.GOOGLE_CLIENT_SECRETS_FILE,
-        scopes=['https://www.googleapis.com/auth/analytics.readonly',
-                'https://www.googleapis.com/auth/webmasters.readonly'],
+        scopes=[
+            'https://www.googleapis.com/auth/analytics.readonly',
+            'https://www.googleapis.com/auth/webmasters.readonly',
+            'openid',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/userinfo.profile'
+        ],
         redirect_uri=request.build_absolute_uri('/google/login/callback/')
     )
     return flow

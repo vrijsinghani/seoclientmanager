@@ -1,4 +1,5 @@
 {% extends "layouts/base.html" %}
+{% load static %}
 
 {% block title %} Dashboard {% endblock %}
 
@@ -13,7 +14,7 @@
               <div class="numbers">
                 <p class="text-sm mb-0 text-capitalize font-weight-bold">Total Clients</p>
                 <h5 class="font-weight-bolder mb-0">
-                  {{ total_clients }}
+                  {{ clients.count }}
                 </h5>
               </div>
             </div>
@@ -28,26 +29,72 @@
     </div>
     <!-- Add more summary cards here -->
   </div>
+  
+  <!-- Clients Table -->
   <div class="row mt-4">
-    <div class="col-lg-7 mb-lg-0 mb-4">
+    <div class="col-12">
       <div class="card">
-        <div class="card-body p-3">
-          <div class="row">
-            <div class="col-lg-6">
-              <div class="d-flex flex-column h-100">
-                <p class="mb-1 pt-2 text-bold">SEO Manager Dashboard</p>
-                <h5 class="font-weight-bolder">Welcome to your SEO management platform</h5>
-                <p class="mb-5">Manage your clients' SEO performance efficiently.</p>
-                <a class="text-body text-sm font-weight-bold mb-0 icon-move-right mt-auto" href="{% url 'seo_manager:client_list' %}">
-                  View All Clients
-                  <i class="fas fa-arrow-right text-sm ms-1" aria-hidden="true"></i>
-                </a>
-              </div>
-            </div>
+        <!-- Card header -->
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Clients</h5>
+            <p class="text-sm mb-0">
+              View and manage your SEO clients.
+            </p>
           </div>
+          <a href="{% url 'seo_manager:add_client' %}" class="btn btn-primary btn-sm">Add Client</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-flush" id="clients-table">
+            <thead class="thead-light">
+              <tr>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Client Name</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Website URL</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Group</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Created</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for client in clients %}
+              <tr data-id="{{ client.id }}">
+                <td class="text-sm font-weight-normal">
+                  <a href="{% url 'seo_manager:client_detail' client.id %}">{{ client.name }}</a>
+                </td>
+                <td class="text-sm font-weight-normal">
+                  <a href="{{ client.website_url }}" target="_blank" rel="noopener noreferrer">{{ client.website_url }}</a>
+                </td>
+                <td class="text-sm font-weight-normal">{{ client.status }}</td>
+                <td class="text-sm font-weight-normal">{{ client.group }}</td>
+                <td class="text-sm font-weight-normal" data-order="{{ client.created_at|date:'Y-m-d' }}">
+                  {{ client.created_at|date:"Y-m-d" }}
+                </td>
+                <td class="text-sm font-weight-normal">
+                  <a href="{% url 'seo_manager:client_detail' client.id %}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit client">
+                    Edit
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   </div>
+
+  {% include 'includes/footer.html' %}
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+  <script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
+  <script>
+    const dataTableSearch = new simpleDatatables.DataTable("#clients-table", {
+      searchable: true,
+      fixedHeight: true,
+      perPage: 10
+    });
+  </script>
+{% endblock extra_js %}

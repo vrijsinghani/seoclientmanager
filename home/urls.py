@@ -1,11 +1,17 @@
-from django.urls import path
+from django.urls import path, include
+from django.views.generic import RedirectView
 from home import views
 from django.contrib.auth import views as auth_views
 
 
 urlpatterns = [
+  # Redirect root to seomanager dashboard
+  path('', RedirectView.as_view(pattern_name='seomanager:dashboard', permanent=False), name='index'),
+  
+  # Include seomanager URLs
+  path('seomanager/', include('apps.seo_manager.urls', namespace='seomanager')),
+
   # Dashboard
-  path('', views.default, name="index"),
   path('automotive', views.automotive, name="automotive"),
   path('smart-home', views.smart_home, name="smart_home"),
   path('crm', views.crm, name="crm"),
