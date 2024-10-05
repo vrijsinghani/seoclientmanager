@@ -29,30 +29,31 @@ psycopg2-binary==2.9.9
 
 # Data Processing and API
 pandas==2.2.0
-google-auth==2.26.2
-google_auth_oauthlib==1.2.0
-google-api-python-client==2.147.0
-google-analytics-data==0.8.12
+
+google-auth
+google_auth_oauthlib
+google-api-python-client
+google-analytics-data
 
 # AI and NLP
-openai==1.13.3
-youtube-transcript-api==0.6.1
-tiktoken==0.5.2
-trafilatura==1.12.2
-pydantic<3.0.0>=2.6.1
-exa_py==1.0.1
-geopy==2.4.1
-langchain<0.3.0>=0.2.16
-langchain_community==0.0.13
-langchain_core==0.1.10
-langchain_openai==0.0.2.post1
-crewai==0.65.2
+openai
+youtube-transcript-api
+tiktoken
+trafilatura
+pydantic
+exa_py
+geopy
+langchain
+langchain_community
+langchain_core
+langchain_openai
+crewai
 crewai_tools
-embedchain<0.2.0>=0.1.114
-langsmith==0.0.87
+embedchain
+langsmith
 
 # Web Scraping and Requests
-Requests==2.32.3
-beautifulsoup4<5.0.0>=4.12.3
-mistune==3.0.2
-sec_edgar_downloader==5.0.2
+Requests
+beautifulsoup4
+mistune
+sec_edgar_downloader

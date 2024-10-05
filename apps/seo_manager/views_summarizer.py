@@ -50,7 +50,7 @@ def summarize_view(request):
     return JsonResponse({'task_id': task.id})
   
   user = User.objects.get(id=request.user.id)
-  summarizations = SummarizerUsage .objects.filter(user=user).order_by('-created_at')
+  summarizations = SummarizerUsage.objects.filter(user=user).order_by('-created_at')
   
   for summ in summarizations:
     summ.html_result = mistune.html(summ.response + '\n\n---Detail---------\n\n'+summ.compressed_content)

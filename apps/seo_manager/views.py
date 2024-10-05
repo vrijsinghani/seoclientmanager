@@ -2,26 +2,36 @@ import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse
-from .models import Client, SEOData, GoogleAnalyticsCredentials, SearchConsoleCredentials
+from django.http import JsonResponse, HttpResponse
+from .models import Client, SEOData, GoogleAnalyticsCredentials, SearchConsoleCredentials, UserActivity
 from .services import get_analytics_service, get_analytics_data
 from .google_auth import get_google_auth_flow, get_analytics_accounts_oauth, get_analytics_accounts_service_account, get_search_console_properties
 from datetime import datetime, timedelta
-from django.http import HttpResponse
 from google_auth_oauthlib.flow import Flow
 from django.urls import reverse
 from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
-from .forms import ClientForm  # We'll create this form later
+from .forms import ClientForm, BusinessObjectiveForm
+
+def log_user_activity(user, category, action, client=None, details=None):
+    UserActivity.objects.create(
+        user=user,
+        client=client,
+        category=category,
+        action=action,
+        details=details
+    )
 
 @login_required
 def dashboard(request):
     clients = Client.objects.all().order_by('name')
+    #log_user_activity(request.user, 'view', 'Viewed dashboard')
     return render(request, 'seo_manager/dashboard.html', {'clients': clients})
 
 @login_required
 def client_list(request):
     clients = Client.objects.all().order_by('name').select_related('group')
+    #log_user_activity(request.user, 'view', 'Viewed client list')
     return render(request, 'seo_manager/client_list.html', {'clients': clients})
 
 @login_required
@@ -30,6 +40,7 @@ def add_client(request):
         form = ClientForm(request.POST)
         if form.is_valid():
             client = form.save()
+            log_user_activity(request.user, 'create', f"Added new client: {client.name}", client=client)
             messages.success(request, f"Client '{client.name}' has been added successfully.")
             return redirect('seo_manager:client_detail', client_id=client.id)
     else:
@@ -46,17 +57,108 @@ def client_detail(request, client_id):
     for key in credential_keys:
         request.session.pop(key, None)
     
+    if request.method == 'POST':
+        form = BusinessObjectiveForm(request.POST)
+        if form.is_valid():
+            new_objective = {
+                'goal': form.cleaned_data['goal'],
+                'metric': form.cleaned_data['metric'],
+                'target_date': form.cleaned_data['target_date'].isoformat(),
+                'status': form.cleaned_data['status'],
+                'date_created': datetime.now().isoformat(),
+                'date_last_modified': datetime.now().isoformat(),
+            }
+            client.business_objectives.append(new_objective)
+            client.save()
+            log_user_activity(request.user, 'create', f"Added business objective for client: {client.name}", client=client, details=new_objective)
+            messages.success(request, "Business objective added successfully.")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    else:
+        form = BusinessObjectiveForm()
+    
+    log_user_activity(request.user, 'view', f"Viewed client details: {client.name}", client=client)
+    
+    # Fetch client activities
+    client_activities = UserActivity.objects.filter(client=client).order_by('-timestamp')
+    
     context = {
         'client': client,
         'seo_data': seo_data,
+        'business_objectives': client.business_objectives,
+        'form': form,
+        'client_activities': client_activities,
     }
     
     return render(request, 'seo_manager/client_detail.html', context)
 
 @login_required
+def edit_client(request, client_id):
+    client = get_object_or_404(Client, id=client_id)
+    if request.method == 'POST':
+        form = ClientForm(request.POST, instance=client)
+        if form.is_valid():
+            form.save()
+            log_user_activity(request.user, 'update', f"Updated client details: {client.name}", client=client)
+            messages.success(request, f"Client '{client.name}' has been updated successfully.")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    else:
+        form = ClientForm(instance=client)
+    
+    return render(request, 'seo_manager/edit_client.html', {'form': form, 'client': client})
+
+@login_required
+def edit_business_objective(request, client_id, objective_index):
+    client = get_object_or_404(Client, id=client_id)
+    
+    if request.method == 'POST':
+        form = BusinessObjectiveForm(request.POST)
+        if form.is_valid():
+            updated_objective = {
+                'goal': form.cleaned_data['goal'],
+                'metric': form.cleaned_data['metric'],
+                'target_date': form.cleaned_data['target_date'].isoformat(),
+                'status': form.cleaned_data['status'],
+                'date_created': client.business_objectives[objective_index]['date_created'],
+                'date_last_modified': datetime.now().isoformat(),
+            }
+            client.business_objectives[objective_index] = updated_objective
+            client.save()
+            log_user_activity(request.user, 'update', f"Updated business objective for client: {client.name}", client=client, details=updated_objective)
+            messages.success(request, "Business objective updated successfully.")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    else:
+        objective = client.business_objectives[objective_index]
+        initial_data = {
+            'goal': objective['goal'],
+            'metric': objective['metric'],
+            'target_date': datetime.fromisoformat(objective['target_date']),
+            'status': objective['status'],
+        }
+        form = BusinessObjectiveForm(initial=initial_data)
+    
+    context = {
+        'client': client,
+        'form': form,
+        'objective_index': objective_index,
+    }
+    
+    return render(request, 'seo_manager/edit_business_objective.html', context)
+
+@login_required
+def delete_business_objective(request, client_id, objective_index):
+    if request.method == 'POST':
+        client = get_object_or_404(Client, id=client_id)
+        deleted_objective = client.business_objectives.pop(objective_index)
+        client.save()
+        log_user_activity(request.user, 'delete', f"Deleted business objective for client: {client.name}", client=client, details=deleted_objective)
+        messages.success(request, "Business objective deleted successfully.")
+    return redirect('seo_manager:client_detail', client_id=client_id)
+
+@login_required
 def delete_client(request, client_id):
     if request.method == 'POST':
         client = get_object_or_404(Client, id=client_id)
+        log_user_activity(request.user, 'delete', f"Deleted client: {client.name}", client=client)
         client.delete()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
@@ -103,6 +205,7 @@ def client_analytics(request, client_id):
         print("Unexpected error in Search Console:", str(e))
         messages.error(request, "An error occurred while fetching Search Console data.")
 
+    log_user_activity(request.user, 'view', f"Viewed analytics for client: {client.name}", client=client)
     return render(request, 'seo_manager/client_analytics.html', context)
         
 def extract_source_data(analytics_data):
@@ -142,16 +245,19 @@ def process_analytics_data(response):
 @login_required
 def client_search_console(request, client_id):
     client = get_object_or_404(Client, id=client_id)
+    log_user_activity(request.user, 'view', f"Viewed search console data for client: {client.name}", client=client)
     return render(request, 'seo_manager/client_search_console.html', {'client': client})
 
 @login_required
 def client_ads(request, client_id):
     client = get_object_or_404(Client, id=client_id)
+    log_user_activity(request.user, 'view', f"Viewed ads data for client: {client.name}", client=client)
     return render(request, 'seo_manager/client_ads.html', {'client': client})
 
 @login_required
 def client_dataforseo(request, client_id):
     client = get_object_or_404(Client, id=client_id)
+    log_user_activity(request.user, 'view', f"Viewed DataForSEO data for client: {client.name}", client=client)
     return render(request, 'seo_manager/client_dataforseo.html', {'client': client})
 
 def test_view(request):
@@ -179,6 +285,7 @@ def add_ga_credentials_oauth(request, client_id):
                         'view_id': account_data['property_id'],
                     }
                 )
+                log_user_activity(request.user, 'create', f"Added Google Analytics credentials (OAuth) for client: {client.name}", client=client)
                 messages.success(request, "Google Analytics credentials (OAuth) added successfully.")
                 return redirect('seo_manager:client_detail', client_id=client.id)
             else:
@@ -221,6 +328,7 @@ def add_ga_credentials_service_account(request, client_id):
                             'view_id': account_data['property_id'],
                         }
                     )
+                    log_user_activity(request.user, 'create', f"Added Google Analytics credentials (Service Account) for client: {client.name}", client=client)
                     messages.success(request, "Google Analytics credentials (Service Account) added successfully.")
                     return redirect('seo_manager:client_detail', client_id=client.id)
                 else:
@@ -296,6 +404,7 @@ def remove_ga_credentials(request, client_id):
     client = get_object_or_404(Client, id=client_id)
     if client.ga_credentials:
         client.ga_credentials.delete()
+        log_user_activity(request.user, 'delete', f"Removed Google Analytics credentials for client: {client.name}", client=client)
         messages.success(request, "Google Analytics credentials removed successfully.")
     return redirect('seo_manager:client_detail', client_id=client.id)
 
@@ -318,6 +427,7 @@ def add_sc_credentials(request, client_id):
                         'client_secret': request.session.get('client_secret', ''),
                     }
                 )
+                log_user_activity(request.user, 'create', f"Added Search Console credentials for client: {client.name}", client=client)
                 messages.success(request, "Search Console credentials added successfully.")
                 
                 for key in ['properties', 'access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret']:
@@ -355,6 +465,7 @@ def remove_sc_credentials(request, client_id):
     try:
         if hasattr(client, 'sc_credentials'):
             client.sc_credentials.delete()
+            log_user_activity(request.user, 'delete', f"Removed Search Console credentials for client: {client.name}", client=client)
             messages.success(request, "Search Console credentials removed successfully.")
         else:
             messages.warning(request, "No Search Console credentials found for this client.")
@@ -408,3 +519,9 @@ def get_search_console_data(service, property_url, start_date, end_date):
     except HttpError as error:
         print(f"An error occurred: {error}")
         return []
+
+@login_required
+def activity_log(request):
+    activities = UserActivity.objects.all().order_by('-timestamp')
+    log_user_activity(request.user, 'view', "Viewed activity log")
+    return render(request, 'seo_manager/activity_log.html', {'activities': activities})

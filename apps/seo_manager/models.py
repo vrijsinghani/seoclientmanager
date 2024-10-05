@@ -22,6 +22,8 @@ class Client(models.Model):
     group = models.ForeignKey(ClientGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='clients')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    business_objectives = models.JSONField(default=list, blank=True)
+    target_audience = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -62,7 +64,7 @@ class GoogleAnalyticsCredentials(models.Model):
 
     def __str__(self):
         return f"GA Credentials for {self.client.name}"
-# Add this new model
+
 class SearchConsoleCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='sc_credentials')
     property_url = models.URLField()
@@ -87,3 +89,26 @@ class SummarizerUsage(models.Model):
     total_input_tokens = models.IntegerField()
     total_output_tokens = models.IntegerField()
     model_used = models.CharField(max_length=100)
+
+class UserActivity(models.Model):
+    CATEGORY_CHOICES = [
+        ('login', 'Login'),
+        ('logout', 'Logout'),
+        ('view', 'View'),
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('export', 'Export'),
+        ('import', 'Import'),
+        ('other', 'Other'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, null=True, blank=True)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    action = models.CharField(max_length=255)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    details = models.JSONField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.category} - {self.action}"

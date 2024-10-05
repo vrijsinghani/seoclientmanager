@@ -1,0 +1,44 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Edit Client - {{ client.name }} {% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>Edit Client: {{ client.name }}</h6>
+        </div>
+        <div class="card-body px-0 pt-0 pb-2">
+          <form method="post" class="p-3">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                  <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Update Client</button>
+            <a href="{% url 'seo_manager:client_detail' client.id %}" class="btn btn-secondary">Cancel</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+  // Add any necessary JavaScript for the edit client form
+</script>
+{% endblock javascripts %}

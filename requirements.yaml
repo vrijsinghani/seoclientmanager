@@ -1,0 +1,74 @@
+name: seomanager
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pandas=2.2.0
+  - pip
+ 
+ # Core
+
+  - django-allauth==0.60.1
+  - PyJWT==2.8.0
+  - python-dotenv==1.0.1
+
+# Misc
+  - celery==5.3.4
+  - hiredis==2.2.3
+  - pillow==10.2.0
+
+# Tools
+  - django-celery-results==2.5.1
+  - djangorestframework==3.14.0
+  - django-debug-toolbar==4.2.0
+  - drf-spectacular==0.26.5
+
+# Deployment
+  - whitenoise==6.5.0
+  - gunicorn==21.2.0
+  - cryptography==43.0.1
+  - pyOpenSSL==24.2.1
+  - chardet
+
+# DB Layer
+  - psycopg2-binary==2.9.9
+
+# Data Processing and API
+  - pandas==2.2.0
+
+  - google-auth
+  - google-api-python-client
+
+# AI and NLP
+  - openai
+  - youtube-transcript-api
+  - tiktoken
+  - pydantic
+  - geopy
+  - langchain
+  - langsmith
+
+# Web Scraping and Requests
+  - Requests
+  - beautifulsoup4
+  - mistune
+
+  - pip:
+    - crewai
+    - crewai_tools
+    - django==4.2.9
+    - django-api-generator==1.0.17
+    - django-quill-editor==0.1.40
+    - embedchain
+    - exa_py
+    - google-analytics-data
+    - google_auth_oauthlib==1.2.1
+    - langchain_community
+    - langchain_core
+    - langchain_openai
+    - redis==5.0.1
+    - sec_edgar_downloader
+    - trafilatura
+    - str2bool==1.1

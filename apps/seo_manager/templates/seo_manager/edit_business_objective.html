@@ -1,0 +1,45 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Edit Business Objective - {{ client.name }} {% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6>Edit Business Objective for {{ client.name }}</h6>
+        </div>
+        <div class="card-body">
+          <form method="post" class="row g-3 align-items-center">
+            {% csrf_token %}
+            <div class="col-auto">
+              {{ form.goal }}
+            </div>
+            <div class="col-auto">
+              {{ form.metric }}
+            </div>
+            <div class="col-auto">
+              {{ form.target_date }}
+            </div>
+            <div class="col-auto">
+              <div class="form-check">
+                {{ form.status }}
+                <label class="form-check-label" for="{{ form.status.id_for_label }}">
+                  Active
+                </label>
+              </div>
+            </div>
+            <div class="col-auto">
+              <button type="submit" class="btn btn-primary">Update Objective</button>
+              <a href="{% url 'seo_manager:client_detail' client.id %}" class="btn btn-secondary">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}
