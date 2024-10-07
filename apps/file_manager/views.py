@@ -1,14 +1,15 @@
 import os
 import csv
 import uuid
+import zipfile
+import tempfile
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, Http404
 from django.conf import settings
 from .models import *
 from django.contrib.auth.decorators import login_required
-
-# Create your views here.
-
+from django.urls import reverse
+from urllib.parse import unquote
 
 def convert_csv_to_text(csv_file_path):
     with open(csv_file_path, 'r') as file:
@@ -21,35 +22,34 @@ def convert_csv_to_text(csv_file_path):
 
     return text
 
+def get_directory_contents(directory_path, user_id):
+    contents = []
+    if not os.path.exists(directory_path):
+        return contents
+    
+    for name in os.listdir(directory_path):
+        path = os.path.join(directory_path, name)
+        rel_path = os.path.relpath(path, os.path.join(settings.MEDIA_ROOT, user_id))
+        if os.path.isdir(path):
+            contents.append({
+                'name': name,
+                'type': 'directory',
+                'path': rel_path
+            })
+        else:
+            _, extension = os.path.splitext(name)
+            contents.append({
+                'name': name,
+                'type': 'file',
+                'path': rel_path,
+                'extension': extension[1:].lower()  # Remove the dot and convert to lowercase
+            })
 
-def get_files_from_directory(directory_path):
-    files = []
-    for filename in os.listdir(directory_path):
-        file_path = os.path.join(directory_path, filename)
-        if os.path.isfile(file_path):
-            try:
-                print( ' > file_path ' + file_path)
-                _, extension = os.path.splitext(filename)
-                if extension.lower() == '.csv':
-                    csv_text = convert_csv_to_text(file_path)
-                else:
-                    csv_text = ''
-
-                files.append({
-                    'file': file_path.split(os.sep + 'media' + os.sep)[1],
-                    'filename': filename,
-                    'file_path': file_path,
-                    'csv_text': csv_text
-                })
-            except Exception as e:
-                print( ' > ' +  str( e ) )   
-
-    return files
-
+    return sorted(contents, key=lambda x: (x['type'] == 'file', x['name'].lower()))
 
 @login_required(login_url='/accounts/login/basic-login/')
 def save_info(request, file_path):
-    path = file_path.replace('%slash%', '/')
+    path = unquote(file_path)
     if request.method == 'POST':
         FileInfo.objects.update_or_create(
             path=path,
@@ -61,7 +61,7 @@ def save_info(request, file_path):
     return redirect(request.META.get('HTTP_REFERER'))
 
 def get_breadcrumbs(request):
-    path_components = [component for component in request.path.split("/") if component]
+    path_components = [unquote(component) for component in request.path.split("/") if component]
     breadcrumbs = []
     url = ''
 
@@ -74,6 +74,22 @@ def get_breadcrumbs(request):
 
     return breadcrumbs
 
+def generate_nested_directory(root_path, current_path):
+    directory = {}
+    for name in os.listdir(current_path):
+        path = os.path.join(current_path, name)
+        rel_path = os.path.relpath(path, root_path)
+        if os.path.isdir(path):
+            directory[rel_path] = {
+                'type': 'directory',
+                'contents': generate_nested_directory(root_path, path)
+            }
+        else:
+            directory[rel_path] = {
+                'type': 'file'
+            }
+    return directory
+
 @login_required(login_url='/accounts/login/basic-login/')
 def file_manager(request, directory=''):
     user_id = str(request.user.id)
@@ -82,69 +98,83 @@ def file_manager(request, directory=''):
     if not os.path.exists(media_path):
         os.makedirs(media_path)
         
-    directories = generate_nested_directory(media_path, media_path)
-    selected_directory = directory
-
-    files = []
-    selected_directory_path = os.path.join(media_path, selected_directory)
-    if os.path.isdir(selected_directory_path):
-        files = get_files_from_directory(selected_directory_path)
+    directory_structure = generate_nested_directory(media_path, media_path)
+    
+    selected_directory_path = os.path.join(media_path, unquote(directory))
+    contents = get_directory_contents(selected_directory_path, user_id)
 
     breadcrumbs = get_breadcrumbs(request)
 
     context = {
-        'directories': directories, 
-        'files': files, 
-        'selected_directory': selected_directory,
+        'directory': directory_structure, 
+        'contents': contents,
+        'selected_directory': directory,
         'segment': 'file_manager',
         'parent': 'apps',
         'breadcrumbs': breadcrumbs,
-        'user_id': str(request.user.id),
+        'user_id': user_id,
     }
     return render(request, 'pages/apps/file-manager.html', context)
 
-
-def generate_nested_directory(root_path, current_path):
-    directories = []
-    for name in os.listdir(current_path):
-        if os.path.isdir(os.path.join(current_path, name)):
-            unique_id = str(uuid.uuid4())
-            nested_path = os.path.join(current_path, name)
-            nested_directories = generate_nested_directory(root_path, nested_path)
-            directories.append({'id': unique_id, 'name': name, 'path': os.path.relpath(nested_path, root_path), 'directories': nested_directories})
-    return directories
-
 @login_required(login_url='/accounts/login/basic-login/')
 def delete_file(request, file_path):
-    path = file_path.replace('%slash%', '/')
-    absolute_file_path = os.path.join(settings.MEDIA_ROOT, path)
-    os.remove(absolute_file_path)
-    print("File deleted", absolute_file_path)
+    user_id = str(request.user.id)
+    path = unquote(file_path)
+    absolute_file_path = os.path.join(settings.MEDIA_ROOT, user_id, path)
+    if os.path.exists(absolute_file_path):
+        if os.path.isdir(absolute_file_path):
+            import shutil
+            shutil.rmtree(absolute_file_path)
+        else:
+            os.remove(absolute_file_path)
+        print("File/Directory deleted", absolute_file_path)
     return redirect(request.META.get('HTTP_REFERER'))
 
 @login_required(login_url='/accounts/login/basic-login/')
 def download_file(request, file_path):
-    path = file_path.replace('%slash%', '/')
-    absolute_file_path = os.path.join(settings.MEDIA_ROOT, path)
+    user_id = str(request.user.id)
+    path = unquote(file_path)
+    absolute_file_path = os.path.join(settings.MEDIA_ROOT, user_id, path)
     if os.path.exists(absolute_file_path):
-        with open(absolute_file_path, 'rb') as fh:
-            response = HttpResponse(fh.read(), content_type="application/vnd.ms-excel")
-            response['Content-Disposition'] = 'inline; filename=' + os.path.basename(absolute_file_path)
+        if os.path.isdir(absolute_file_path):
+            # Create a temporary zip file
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                with zipfile.ZipFile(temp_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    for root, dirs, files in os.walk(absolute_file_path):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.relpath(file_path, absolute_file_path)
+                            zip_file.write(file_path, arcname)
+
+            # Read the temporary file and create the response
+            with open(temp_file.name, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='application/zip')
+                response['Content-Disposition'] = f'attachment; filename="{os.path.basename(absolute_file_path)}.zip"'
+
+            # Delete the temporary file
+            os.unlink(temp_file.name)
+
             return response
+        else:
+            with open(absolute_file_path, 'rb') as fh:
+                response = HttpResponse(fh.read(), content_type="application/octet-stream")
+                response['Content-Disposition'] = 'attachment; filename=' + os.path.basename(absolute_file_path)
+                return response
     raise Http404
 
 @login_required(login_url='/accounts/login/basic-login/')
 def upload_file(request):
-    media_path = os.path.join(settings.MEDIA_ROOT)
-    user_subdirectory = str(request.user.id)
-    media_user_path = os.path.join(media_path, user_subdirectory)
+    user_id = str(request.user.id)
+    media_user_path = os.path.join(settings.MEDIA_ROOT, user_id)
 
-    # Create the user-specific subdirectory if it doesn't exist
     if not os.path.exists(media_user_path):
         os.makedirs(media_user_path)
 
-    selected_directory = request.POST.get('directory', '')
+    selected_directory = unquote(request.POST.get('directory', ''))
     selected_directory_path = os.path.join(media_user_path, selected_directory)
+
+    if not os.path.exists(selected_directory_path):
+        os.makedirs(selected_directory_path)
 
     if request.method == 'POST':
         file = request.FILES.get('file')

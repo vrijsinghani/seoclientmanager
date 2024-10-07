@@ -4,11 +4,13 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest
+from google.auth.transport.requests import Request
 import json
 
 logger = logging.getLogger(__name__)
 
 def get_analytics_service(credentials):
+    logger.info("Entering get_analytics_service")
     try:
         if credentials.use_service_account:
             logger.info(f"Using service account for client {credentials.client.id}")
@@ -27,21 +29,36 @@ def get_analytics_service(credentials):
                 client_secret=credentials.client_secret,
                 scopes=credentials.scopes if credentials.scopes else ['https://www.googleapis.com/auth/analytics.readonly']
             )
-        return BetaAnalyticsDataClient(credentials=creds)
+        
+        logger.info("Credentials created, refreshing...")
+        request = Request()
+        creds.refresh(request)
+        logger.info("Credentials refreshed successfully")
+        
+        analytics_client = BetaAnalyticsDataClient(credentials=creds)
+        logger.info("Analytics client created successfully")
+        return analytics_client
     except Exception as e:
-        logger.error(f"Error creating analytics service: {str(e)}")
+        logger.error(f"Error creating analytics service: {str(e)}", exc_info=True)
         raise
         
 def get_analytics_data(client, property_id, start_date, end_date):
-    request = RunReportRequest(
-        property=f"properties/{property_id}",
-        date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
-        metrics=[Metric(name="activeUsers"), Metric(name="screenPageViews")],
-        dimensions=[Dimension(name="date"), Dimension(name="sourceMedium")]
-    )
-    
-    response = client.run_report(request)
-    return response
+    logger.info("Entering get_analytics_data")
+    logger.info(f"Fetching analytics data for Property ID: {property_id}, Start Date: {start_date}, End Date: {end_date}")
+    try:
+        request = RunReportRequest(
+            property=f"properties/{property_id}",
+            date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
+            metrics=[Metric(name="activeUsers"), Metric(name="screenPageViews")],
+            dimensions=[Dimension(name="date"), Dimension(name="sourceMedium")]
+        )
+        
+        response = client.run_report(request)
+        logger.info("Analytics data fetched successfully")
+        return response
+    except Exception as e:
+        logger.error(f"Error fetching analytics data: {str(e)}", exc_info=True)
+        raise
     
 def process_analytics_data(response):
     processed_data = []
@@ -82,7 +99,7 @@ def get_analytics_accounts(service_account_json):
         logger.info(f"Retrieved {len(accounts)} accounts")
         return accounts
     except Exception as e:
-        logger.error(f"Error in get_analytics_accounts: {str(e)}")
+        logger.error(f"Error in get_analytics_accounts: {str(e)}", exc_info=True)
         raise
 
 def get_analytics_accounts_oauth(credentials):
@@ -110,5 +127,5 @@ def get_analytics_accounts_oauth(credentials):
         logger.info(f"Retrieved {len(accounts)} accounts via OAuth")
         return accounts
     except Exception as e:
-        logger.error(f"Error in get_analytics_accounts_oauth: {str(e)}")
+        logger.error(f"Error in get_analytics_accounts_oauth: {str(e)}", exc_info=True)
         raise

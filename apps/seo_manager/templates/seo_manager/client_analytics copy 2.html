@@ -1,0 +1,319 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %} Analytics - {{ client.name }} {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Analytics for {{ client.name }}</h1>
+        <div>
+            <button class="btn btn-primary" id="exportBtn">Export</button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    Time Range
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" data-range="7">Last 7 days</a></li>
+                    <li><a class="dropdown-item" href="#" data-range="30">Last 30 days</a></li>
+                    <li><a class="dropdown-item" href="#" data-range="90">Last 90 days</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+            <div class="card">
+                <div class="card-body p-3">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Users</p>
+                                <h5 class="font-weight-bolder mb-0">
+                                    {{ users }}
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                                <i class="ni ni-single-02 text-lg opacity-10" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+            <div class="card">
+                <div class="card-body p-3">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">New Users</p>
+                                <h5 class="font-weight-bolder mb-0">
+                                    {{ new_users }}
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                                <i class="ni ni-user-run text-lg opacity-10" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+            <div class="card">
+                <div class="card-body p-3">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Sessions</p>
+                                <h5 class="font-weight-bolder mb-0">
+                                    {{ sessions }}
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                                <i class="ni ni-chart-bar-32 text-lg opacity-10" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6">
+            <div class="card">
+                <div class="card-body p-3">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Page Views</p>
+                                <h5 class="font-weight-bolder mb-0">
+                                    {{ page_views }}
+                                </h5>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                                <i class="ni ni-world text-lg opacity-10" aria-hidden="true"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h6>Traffic Channels</h6>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div id="traffic-channels-chart" style="height: 350px;">
+                        <div id="chart-loading" class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h6>Search Console Performance Data</h6>
+                </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                    <div id="search-console-loading" class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    {% if search_console_data %}
+                    <div class="table-responsive p-0">
+                        <table class="table table-flush table-striped text-xs table-sm" id="search-console-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Query</th>
+                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Impressions</th>
+                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Clicks</th>
+                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">CTR</th>
+                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Position</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in search_console_data %}
+                                <tr>
+                                    <td class="text-xs font-weight-normal">{{ item.query }}</td>
+                                    <td class="text-xs font-weight-normal">{{ item.impressions }}</td>
+                                    <td class="text-xs font-weight-normal">{{ item.clicks }}</td>
+                                    <td class="text-xs font-weight-normal">{{ item.ctr|floatformat:2 }}%</td>
+                                    <td class="text-xs font-weight-normal">{{ item.position|floatformat:1 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-warning">Search Console data is currently unavailable. This may be due to an authentication issue or an error in data retrieval.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let analyticsData = [];
+        try {
+            analyticsData = JSON.parse('{{ analytics_data|safe }}');
+        } catch (error) {
+            console.error('Error parsing analytics data:', error);
+            document.querySelector("#traffic-channels-chart").innerHTML = '<p class="text-danger">Error parsing analytics data. Please try refreshing the page or contact support if the issue persists.</p>';
+        }
+
+        const chartContainer = document.querySelector("#traffic-channels-chart");
+        const loadingIndicator = document.querySelector("#chart-loading");
+
+        if (analyticsData && analyticsData.length > 0) {
+            loadingIndicator.style.display = 'none';
+            const series = analyticsData.map(channel => ({
+                name: channel.channel,
+                data: channel.data.map(item => item.sessions)
+            }));
+            const categories = analyticsData[0].data.map(item => item.date);
+
+            const chartOptions = {
+                series: series,
+                chart: {
+                    height: 350,
+                    type: 'line',
+                    zoom: {
+                        enabled: false
+                    },
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                stroke: {
+                    curve: 'straight'
+                },
+                title: {
+                    text: 'Traffic Channels',
+                    align: 'left'
+                },
+                grid: {
+                    row: {
+                        colors: ['#f3f3f3', 'transparent'],
+                        opacity: 0.5
+                    },
+                },
+                xaxis: {
+                    categories: categories,
+                },
+                yaxis: {
+                    title: {
+                        text: 'Sessions'
+                    }
+                },
+            };
+
+            const chart = new ApexCharts(chartContainer, chartOptions);
+            chart.render();
+        } else {
+            loadingIndicator.style.display = 'none';
+            chartContainer.innerHTML = '<p class="text-warning">No analytics data available for the selected date range.</p>';
+        }
+
+        {% if search_console_data %}
+        // Initialize DataTable for Search Console data
+        const dataTableSearchConsole = new simpleDatatables.DataTable("#search-console-table", {
+            searchable: true,
+            perPageSelect: [10,25,50,100,200],
+            fixedHeight: true,
+            classes: {}
+        });
+        document.querySelector("#search-console-loading").style.display = 'none';
+        {% endif %}
+
+        // Export button functionality
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            const csvContent = [
+                ['Date Range', '{{ start_date }} - {{ end_date }}'],
+                ['Users', '{{ users }}'],
+                ['New Users', '{{ new_users }}'],
+                ['Sessions', '{{ sessions }}'],
+                ['Page Views', '{{ page_views }}'],
+                [],
+                ['Traffic Channels'],
+                ['Channel', 'Date', 'Sessions'],
+                ...(analyticsData ? analyticsData.flatMap(channel => 
+                    channel.data.map(item => [channel.channel, item.date, item.sessions])
+                ) : []),
+                [],
+                ['Search Console Performance'],
+                ['Query', 'Impressions', 'Clicks', 'CTR', 'Position'],
+                {% for item in search_console_data %}
+                ['{{ item.query }}', '{{ item.impressions }}', '{{ item.clicks }}', '{{ item.ctr|floatformat:2 }}%', '{{ item.position|floatformat:1 }}'],
+                {% endfor %}
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `analytics_export_{{ client.name }}_{{ start_date }}_{{ end_date }}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+
+        // Time range selection functionality
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const range = parseInt(this.getAttribute('data-range'));
+                const endDate = new Date();
+                const startDate = new Date(endDate);
+                startDate.setDate(endDate.getDate() - range);
+                
+                const formatDate = (date) => {
+                    return date.toISOString().split('T')[0];
+                };
+
+                window.location.href = `?start_date=${formatDate(startDate)}&end_date=${formatDate(endDate)}`;
+            });
+        });
+    });
+</script>
+{% endblock extra_js %}

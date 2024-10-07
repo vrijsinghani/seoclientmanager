@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import views, views_summarizer
+from . import views, views_summarizer, views_analytics
 
 app_name = 'seo_manager'
 
@@ -12,9 +12,9 @@ urlpatterns = [
         path('add/', views.add_client, name='add_client'),
         path('<int:client_id>/', include([
             path('', views.client_detail, name='client_detail'),
-            path('edit/', views.edit_client, name='edit_client'),  # New URL pattern for edit_client
+            path('edit/', views.edit_client, name='edit_client'),
             path('delete/', views.delete_client, name='delete_client'),
-            path('analytics/', views.client_analytics, name='client_analytics'),
+            path('analytics/', views_analytics.client_analytics, name='client_analytics'),
             path('search-console/', views.client_search_console, name='client_search_console'),
             path('ads/', views.client_ads, name='client_ads'),
             path('dataforseo/', views.client_dataforseo, name='client_dataforseo'),

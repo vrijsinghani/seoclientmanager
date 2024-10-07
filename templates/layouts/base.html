@@ -47,6 +47,25 @@
     {% include 'includes/fixed-plugin.html' %}
   {% endblock fixed_plugin %}
 
+  <!-- Toast Container -->
+  {% if messages %}
+  <div aria-live="polite" aria-atomic="true" class="position-relative">
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+      {% for message in messages %}
+      <div class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+          <strong class="me-auto">Notification</strong>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body {{ message.tags }}">
+          {{ message|safe }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {% include 'includes/scripts.html' %}
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -62,8 +81,19 @@
         initialDarkMode();
       });
     }
+
+    // Initialize and show toasts
+    document.addEventListener('DOMContentLoaded', function() {
+      var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+      var toastList = toastElList.map(function(toastEl) {
+        return new bootstrap.Toast(toastEl, {
+          autohide: true,
+          delay: 5000
+        });
+      });
+      toastList.forEach(toast => toast.show());
+    });
   </script>
-  
 
 </body>
 </html>

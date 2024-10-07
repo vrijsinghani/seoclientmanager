@@ -21,60 +21,6 @@ class Summarizer:
         self.llm_tokens_r=0
         self.encoder=tiktoken.get_encoding("gpt2")
 
-    # def summarize_nlp(self, text):
-    #     """
-    #     Summarize a given text using TextRank algorithm.
-
-    #     Args:
-    #         text (str): Input text to be summarized.
-    #         num_sentences (int, optional): Number of sentences to include in the summary. Defaults to 5.
-
-    #     Returns:
-    #         str: Summarized text.
-    #     """
-    #     # Preprocessing
-    #     lemmatizer = WordNetLemmatizer()
-    #     stop_words = set(stopwords.words('english'))
-
-    #     tokens = word_tokenize(text.lower())
-    #     tokens = [lemmatizer.lemmatize(token) for token in tokens if token not in stop_words]
-    #     text = ' '.join(tokens)
-
-    #     # Sentence tokenization
-    #     sentences = sent_tokenize(text)
-
-    #     # Calculate sentence similarity using TF-IDF and cosine similarity
-    #     vectorizer = TfidfVectorizer()
-    #     tfidf_matrix = vectorizer.fit_transform(sentences)
-    #     similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-    #     # Build graph using sentence similarity
-    #     graph = DiGraph()
-    #     for i in range(len(sentences)):
-    #         for j in range(i+1, len(sentences)):
-    #             graph.add_edge(i, j, weight=similarity_matrix[i, j])
-
-    #     # Calculate sentence scores using TextRank
-    #     scores = {}
-    #     for node in graph.nodes():
-    #         scores[node] = 0
-    #         for neighbor in graph.neighbors(node):
-    #             scores[node] += graph[node][neighbor]['weight']
-    #     for node in scores:
-    #         neighbors = list(graph.neighbors(node))
-    #         degree = len(neighbors) or 1  # default to 1 if degree is zero
-    #         scores[node] /= degree
-
-    #     # Select top-scoring sentences for summary
-    #     summary_sentences = sorted(scores, key=scores.get, reverse=True)
-
-    #     # Create summary
-    #     summary = ' '.join([sentences[i] for i in summary_sentences])
-
-    #     return summary
-
-
-
 def is_pdf_url(url: str) -> bool:
     """
     Returns True if the URL points to a PDF, False otherwise.
@@ -353,14 +299,4 @@ def is_pdf_url(url: str) -> bool:
         usage.save()
         return result
 
-    #     prompt = ChatPromptTemplate.from_messages([
-    #     ("system", 
-    #     """# MISSION
-    # You are a Sparse Priming Representation (SPR) writer. An SPR is a particular kind of use of language for advanced NLP, NLU, and NLG tasks. You will be given information by the USER which you are to render as an SPR.
-
-    # # THEORY
-    # LLMs are a kind of deep neural network. They have been demonstrated to embed knowledge, abilities, and concepts, ranging from reasoning to planning, and even to theory of mind. These are called latent abilities and latent content, collectively referred to as latent space. The latent space of an LLM can be activated with the correct series of words as inputs, which will create a useful internal state of the neural network. This is not unlike how the right shorthand cues can prime a human mind to think in a certain way. Like human minds, LLMs are associative, meaning you only need to use the correct associations to "prime" another model to think in the same way.
-
-    # # METHODOLOGY
-    # Render the conversation as a distilled list of succinct statements, assertions, associations, concepts, analogies, and metaphors. The idea is to capture as much, conceptually, as possible but with as few words as possible. Write it in a way that makes sense to you. Use complete sentences."""
-    #     ),
+ 

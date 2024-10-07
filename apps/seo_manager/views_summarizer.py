@@ -1,4 +1,3 @@
-
 from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
 from home.forms import RegistrationForm, LoginForm, UserPasswordResetForm, UserSetPasswordForm, UserPasswordChangeForm
@@ -19,8 +18,9 @@ from django.http import JsonResponse
 from celery.result import AsyncResult
 import logging
 from apps.common.utils import get_models
+from apps.common.tools.user_activity_tool import user_activity_tool  # Add this import
 
-import json  # Add this import at the top of the file
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -32,21 +32,28 @@ from django.http import HttpResponse
 from google_auth_oauthlib.flow import Flow
 from django.urls import reverse
 from google.auth.exceptions import RefreshError
-from googleapiclient.errors import HttpError  # Add this import
+from googleapiclient.errors import HttpError
 
 
 @login_required
 def summarize_view(request):
-
   models = get_models()
   logging.info(f'request.user.id: {request.user.id}')
   model_selected = settings.SUMMARIZER
-  #logging.info ("Model selected: " + model_selected)
+  
   if request.method == 'POST':
-
     text_to_summarize = request.POST.get('query_text_value')
     model_selected = request.POST.get('model_selected_value')
     task = summarize_content.delay(text_to_summarize, request.user.id, model_selected)
+    
+    # Log user activity
+    user_activity_tool.run(
+      user=request.user,
+      category='summarize',
+      action=f"Used summarizer with model: {model_selected}",
+      details={"text_length": len(text_to_summarize)}
+    )
+    
     return JsonResponse({'task_id': task.id})
   
   user = User.objects.get(id=request.user.id)
@@ -65,15 +72,21 @@ def summarize_view(request):
     'models': models,
     'model_selected': model_selected
   }
+  
+  # Log user activity for viewing summarize page
+  user_activity_tool.run(
+    user=request.user,
+    category='view',
+    action="Viewed summarize page"
+  )
+  
   return render(request, 'pages/apps/summarize.html', context)
 
 def task_status(request, task_id):
     current_chunk = 0
     total_chunks = 1
     task_result = AsyncResult(task_id)
-    # logging.info(f"task status:{task_result.status}")
     if task_result.info is not None:
-      # logging.info(f"task info:{task_result.info}")
       if task_result.state == 'SUCCESS':
           result = task_result.result
           html_result = mistune.html(result)

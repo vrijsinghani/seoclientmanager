@@ -36,7 +36,7 @@ Modify `apps/seo_manager/views.py` to include activity logging:
 1. Create a utility function for logging activities:
 
 ```python
-def log_user_activity(user, category, action, client=None, details=None):
+def user_activity_tool(user, category, action, client=None, details=None):
     UserActivity.objects.create(
         user=user,
         client=client,
@@ -51,7 +51,7 @@ def log_user_activity(user, category, action, client=None, details=None):
 ```python
 def client_detail(request, client_id):
     client = get_object_or_404(Client, id=client_id)
-    log_user_activity(request.user, 'view', 'Viewed client details', client=client)
+    user_activity_tool(request.user, 'view', 'Viewed client details', client=client)
     # ... rest of the view logic
 ```
 
@@ -177,7 +177,7 @@ Create a new CSS file `static/css/activity_timeline.css`:
 ## Implementation Steps
 
 1. Create the `UserActivity` model and run migrations.
-2. Implement the `log_user_activity` utility function.
+2. Implement the `user_activity_tool` utility function.
 3. Update existing views to log relevant activities.
 4. Create the `activity_log` view.
 5. Create the activity_log.html template with the "Timeline with dotted line" component.

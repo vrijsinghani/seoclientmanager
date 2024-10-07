@@ -32,7 +32,7 @@ if not SECRET_KEY:
 
 # Enable/Disable DEBUG Mode
 DEBUG = str2bool(os.environ.get('DEBUG'))
-#print(' DEBUG -> ' + str(DEBUG) ) 
+print(' DEBUG -> ' + str(DEBUG) ) 
 
 ALLOWED_HOSTS = ['*', 'manager.neuralami.com']
 
@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'apps.tasks',
     'apps.users',
     'apps.seo_manager',
+    'apps.crawl_website.apps.CrawlWebsiteConfig',  # Updated this line for the new app
 
     'allauth',
     'allauth.account',
@@ -260,7 +261,7 @@ CELERY_LOGS_URL           = "/tasks_logs/"
 CELERY_LOGS_DIR           = os.path.join(BASE_DIR, "tasks_logs"    )
 
 CELERY_BROKER_URL         = os.environ.get("CELERY_BROKER", "redis://redis:6379")
-CELERY_RESULT_BACKEND     = os.environ.get("CELERY_BROKER", "redis://redis:6379")
+#CELERY_RESULT_BACKEND     = os.environ.get("CELERY_BROKER", "redis://redis:6379")
 
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT    = 30 * 60
@@ -351,15 +352,39 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
         },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'debug.log',
+        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'INFO',
         },
         'allauth': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+        'apps.crawl_website': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+        'apps.common': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+        'apps.seo_manager': {
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
         },
     },
 }
+
+
+# def show_toolbar(request):
+#     return True
+
+# DEBUG_TOOLBAR_CONFIG = {
+#     "SHOW_TOOLBAR_CALLBACK": show_toolbar,
+# }

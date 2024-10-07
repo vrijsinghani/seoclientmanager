@@ -76,9 +76,9 @@
     document.addEventListener('DOMContentLoaded', function() {
         {% if analytics_data %}
         // Google Analytics chart
-        const analyticsData = JSON.parse('{{ analytics_data|safe }}');
-        const sessions = analyticsData.map(data => ({ x: new Date(data.date), y: data.sessions }));
-        const pageviews = analyticsData.map(data => ({ x: new Date(data.date), y: data.pageviews }));
+        const analyticsData = {{ analytics_data|safe }};
+        const activeUsers = analyticsData.map(data => ({ x: new Date(data.date).getTime(), y: data.active_users }));
+        const sessions = analyticsData.map(data => ({ x: new Date(data.date).getTime(), y: data.sessions }));
 
         const startDate = '{{ start_date }}';
         const endDate = '{{ end_date }}';
@@ -87,11 +87,11 @@
 
         const chartOptions = {
             series: [{
+                name: 'Active Users',
+                data: activeUsers
+            }, {
                 name: 'Sessions',
                 data: sessions
-            }, {
-                name: 'Page Views',
-                data: pageviews
             }],
             chart: {
                 height: 350,
@@ -149,7 +149,6 @@
             perPageSelect: [10,25,50,100,200],
             fixedHeight: true,
             classes: {}
-
         });
         {% endif %}
     });

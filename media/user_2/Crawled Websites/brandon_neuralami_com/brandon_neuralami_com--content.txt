@@ -1,0 +1,15 @@
+Website URL: https://brandon.neuralami.com
+
+Links Visited:
+/
+
+Total Links: 1
+
+Content:
+---link: https://brandon.neuralami.com/
+Mindblown: a blog about philosophy.
+-
+Welcome to WordPress!
+Getting started… Login as admin and get blogging! Refer to the TurnKey WordPress release notes Refer to the WordPress Getting Started Codex Search WordPress.org for plugins to extend WordPress. Here’s some examples: Yoast SEO: Optimizes your WordPress blog for search engines and XML sitemaps. NextGEN Gallery: Easy to use image gallery with thumbnail & slideshow…
+Got any book recommendations?
+---page-end---

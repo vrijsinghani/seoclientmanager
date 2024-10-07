@@ -37,9 +37,10 @@ urlpatterns = [
     path("users/", include("apps.users.urls")),
     path('i18n/', include('django.conf.urls.i18n')),
     path('accounts/', include('allauth.urls')),
+    path('crawl_website/', include('apps.crawl_website.urls')),  # Add this line for the new app
 
-    re_path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}), 
-    re_path(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}), 
+    # re_path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}), 
+    # re_path(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}), 
 
     # Debug toolbar
     path("__debug__/", include("debug_toolbar.urls")),
