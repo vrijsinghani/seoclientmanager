@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %} Manage Tools {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <!-- Card header -->
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Tools</h5>
+            <p class="text-sm mb-0">
+              View and manage your AI agent tools.
+            </p>
+          </div>
+          <a href="{% url 'agents:add_tool' %}" class="btn btn-primary btn-sm">Add New Tool</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-flush" id="tools-table">
+            <thead class="thead-light">
+              <tr>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Name</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Description</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Tool Class</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for tool in tools %}
+              <tr>
+                <td class="text-sm font-weight-normal">
+                  <a href="{% url 'agents:edit_tool' tool.id %}">{{ tool.name }}</a>
+                </td>
+                <td class="text-sm font-weight-normal">{{ tool.description|truncatechars:50 }}</td>
+                <td class="text-sm font-weight-normal">{{ tool.tool_class }}</td>
+                <td class="text-sm font-weight-normal">
+                  <a href="{% url 'agents:edit_tool' tool.id %}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit tool">
+                    Edit
+                  </a>
+                  |
+                  <a href="{% url 'agents:delete_tool' tool.id %}" class="text-danger font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Delete tool">
+                    Delete
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="text-sm font-weight-normal">No tools found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% include 'includes/footer.html' %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+  <script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
+  <script>
+    const dataTableSearch = new simpleDatatables.DataTable("#tools-table", {
+      searchable: true,
+      fixedHeight: true,
+      perPage: 10
+    });
+  </script>
+{% endblock extra_js %}

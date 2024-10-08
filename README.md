@@ -23,6 +23,7 @@ The product is designed to deliver the best possible user experience with highly
 - File Manager
 - i18n (internationalization) 
 - `Docker`
+- **CrewAI Agents Management**
 
 ![Soft Dashboard PRO Django](https://github.com/app-generator/priv-django-soft-ui-dashboard-enh/assets/51070104/108fab39-b351-41c9-b9b0-06e8fdde51f9)
 
@@ -167,6 +168,26 @@ By default, the app redirects guest users to authenticate. In order to access th
 
 <br />
 
+## CrewAI Agents Management
+
+The application now includes a feature set for managing CrewAI Agents, Tasks, and Tools. These features are accessible via a gear icon placed in the upper left of the Agents card in the CrewAI Agents section.
+
+To access these features:
+
+1. Log in as an admin user.
+2. Navigate to the CrewAI Agents section in the sidebar.
+3. Click on the gear icon in the upper left of the Agents card.
+
+From here, you can:
+
+- Manage Agents: Add, edit, or delete AI agents.
+- Manage Tasks: Create, modify, or remove tasks for agents to perform.
+- Manage Tools: Add, update, or delete tools that agents can use.
+
+These management features are restricted to admin users only.
+
+<br />
+
 ## Start Celery (async task)
 
 - Make sure you have a Redis Server running: `redis://localhost:6379`
@@ -248,6 +269,7 @@ The project is coded using a simple and intuitive structure presented below:
    |    |-- charts/       # Charts APP
    |    |-- tables/       # DataTables APP
    |    |-- tasks/        # Celery App
+   |    |-- agents/       # CrewAI Agents Management
    |
    |-- templates/         # Pages & Templates   
    |-- assets/            # Static Assets [ JS, CSS, images ]   

@@ -1,0 +1,72 @@
+{% extends "agents/base_agents.html" %}
+
+{% block agents_list %}
+<ul class="list-group">
+    <li class="list-group-item">
+        <a href="{% url 'agents:crew_detail' execution.crew.id %}">{{ execution.crew.name }}</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block previous_tasks %}
+<ul class="list-group">
+    {% for prev_execution in execution.crew.crewaiexecution_set.all|slice:":5" %}
+    <li class="list-group-item {% if prev_execution.id == execution.id %}active{% endif %}">
+        <a href="{% url 'agents:execution_detail' prev_execution.id %}" {% if prev_execution.id == execution.id %}class="text-white"{% endif %}>
+            {{ prev_execution.created_at|date:"SHORT_DATETIME_FORMAT" }}
+        </a>
+    </li>
+    {% empty %}
+    <li class="list-group-item">No previous tasks for this crew.</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+{% block main_content %}
+<h2>Execution Details</h2>
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title">{{ execution.crew.name }}</h5>
+        <h6 class="card-subtitle mb-2 text-muted">{{ execution.get_status_display }}</h6>
+        <p class="card-text">Created at: {{ execution.created_at|date:"DATETIME_FORMAT" }}</p>
+        <p class="card-text">Updated at: {{ execution.updated_at|date:"DATETIME_FORMAT" }}</p>
+        {% if execution.client %}
+        <p class="card-text">Client: {{ execution.client.name }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<h3>Inputs</h3>
+<pre>{{ execution.inputs|pprint }}</pre>
+
+<h3>Outputs</h3>
+{% if execution.outputs %}
+<pre>{{ execution.outputs|pprint }}</pre>
+{% else %}
+<p>No outputs available yet.</p>
+{% endif %}
+
+<h3>Messages</h3>
+<div class="list-group">
+    {% for message in execution.crewaimessage_set.all %}
+    <div class="list-group-item">
+        <div class="d-flex w-100 justify-content-between">
+            <h5 class="mb-1">Message {{ forloop.counter }}</h5>
+            <small>{{ message.timestamp|date:"DATETIME_FORMAT" }}</small>
+        </div>
+        <p class="mb-1">{{ message.content }}</p>
+    </div>
+    {% empty %}
+    <p>No messages available.</p>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block javascripts %}
+{{ block.super }}
+<script>
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    })
+</script>
+{% endblock %}

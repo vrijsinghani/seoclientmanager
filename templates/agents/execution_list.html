@@ -1,0 +1,66 @@
+{% extends "agents/base_agents.html" %}
+
+{% block agents_list %}
+<ul class="list-group">
+    {% for crew in crews %}
+    <li class="list-group-item">
+        <a href="{% url 'agents:crew_detail' crew.id %}">{{ crew.name }}</a>
+    </li>
+    {% empty %}
+    <li class="list-group-item">No CrewAI crews available.</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+{% block previous_tasks %}
+<ul class="list-group">
+    {% for execution in executions %}
+    <li class="list-group-item">
+        <a href="{% url 'agents:execution_detail' execution.id %}">
+            {{ execution.crew.name }} - {{ execution.created_at|date:"SHORT_DATETIME_FORMAT" }}
+        </a>
+    </li>
+    {% empty %}
+    <li class="list-group-item">No previous tasks.</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+{% block main_content %}
+<h2>Execution History</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Crew</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for execution in executions %}
+        <tr>
+            <td>{{ execution.crew.name }}</td>
+            <td>{{ execution.get_status_display }}</td>
+            <td>{{ execution.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+            <td>
+                <a href="{% url 'agents:execution_detail' execution.id %}" class="btn btn-sm btn-info">View Details</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4">No executions found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
+
+{% block javascripts %}
+{{ block.super }}
+<script>
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    })
+</script>
+{% endblock %}

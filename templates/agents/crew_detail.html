@@ -1,0 +1,51 @@
+{% extends "agents/base_agents.html" %}
+
+{% block agents_list %}
+<ul class="list-group">
+    <li class="list-group-item active">{{ crew.name }}</li>
+</ul>
+{% endblock %}
+
+{% block previous_tasks %}
+<ul class="list-group">
+    {% for execution in crew.crewaiexecution_set.all|slice:":5" %}
+    <li class="list-group-item">
+        <a href="{% url 'agents:execution_detail' execution.id %}">
+            {{ execution.created_at|date:"SHORT_DATETIME_FORMAT" }}
+        </a>
+    </li>
+    {% empty %}
+    <li class="list-group-item">No previous tasks for this crew.</li>
+    {% endfor %}
+</ul>
+{% endblock %}
+
+{% block main_content %}
+<h2>{{ crew.name }}</h2>
+<p>{{ crew.description }}</p>
+
+<h3>Inputs</h3>
+<pre>{{ crew.inputs|pprint }}</pre>
+
+<h3>Outputs</h3>
+<pre>{{ crew.outputs|pprint }}</pre>
+
+<h3>Tools</h3>
+<pre>{{ crew.tools|pprint }}</pre>
+
+<h3>Start New Execution</h3>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Start Execution</button>
+</form>
+{% endblock %}
+
+{% block javascripts %}
+{{ block.super }}
+<script>
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    })
+</script>
+{% endblock %}

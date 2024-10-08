@@ -1,0 +1,86 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %} Manage Crews {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <!-- Card header -->
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Crews</h5>
+            <p class="text-sm mb-0">
+              View and manage your AI agent crews.
+            </p>
+          </div>
+          <div>
+            <a href="{% url 'agents:add_crew' %}" class="btn btn-primary btn-sm">Add New Crew</a>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-flush" id="crews-table">
+            <thead class="thead-light">
+              <tr>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Name</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Process</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Agents</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Tasks</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for crew in crews %}
+              <tr>
+                <td class="text-sm font-weight-normal">
+                  <a href="{% url 'agents:edit_crew' crew.id %}">{{ crew.name }}</a>
+                </td>
+                <td class="text-sm font-weight-normal">{{ crew.get_process_display }}</td>
+                <td class="text-sm font-weight-normal">
+                  {% for agent in crew.agents.all %}
+                    {{ agent.name }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </td>
+                <td class="text-sm font-weight-normal">
+                  {% for task in crew.tasks.all %}
+                    {{ task.description|truncatechars:30 }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </td>
+                <td class="text-sm font-weight-normal">
+                  <a href="{% url 'agents:edit_crew' crew.id %}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit crew">
+                    Edit
+                  </a>
+                  |
+                  <a href="{% url 'agents:delete_crew' crew.id %}" class="text-danger font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Delete crew">
+                    Delete
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-sm font-weight-normal">No crews found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% include 'includes/footer.html' %}
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+  <script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
+  <script>
+    const dataTableSearch = new simpleDatatables.DataTable("#crews-table", {
+      searchable: true,
+      fixedHeight: true,
+      perPage: 10
+    });
+  </script>
+{% endblock extra_js %}

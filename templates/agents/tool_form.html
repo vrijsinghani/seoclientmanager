@@ -1,0 +1,191 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %} {% if tool %}Edit Tool{% else %}Add Tool{% endif %} {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{% if tool %}Edit Tool{% else %}Add Tool{% endif %}</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="toolForm">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label for="{{ form.tool_class.id_for_label }}" class="form-label">Tool Class</label><br>
+                            {{ form.tool_class }}
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Name</label><br>
+                            <input type="text" id="tool_name" name="name" class="form-control" readonly>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Description</label><br>
+                            <textarea id="tool_description" name="description" class="form-control" readonly rows="4"></textarea>
+                        </div>
+                        <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+                        <div class="d-flex justify-content-end">
+                            <a href="{% url 'agents:manage_tools' %}" class="btn btn-secondary me-2">Cancel</a>
+                            <button type="submit" id="submitButton" class="btn btn-primary" disabled>Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+    .card {
+        box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+        border: 0;
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid rgba(0,0,0,.125);
+        padding: 1rem 1.5rem;
+    }
+    .card-body {
+        padding: 1.5rem;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #344767;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-control, .form-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        margin-top: 0.25rem;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #5e72e4;
+        box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25);
+    }
+    textarea.form-control {
+        min-height: 150px;
+    }
+    .btn {
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.625rem 1.25rem;
+        border-radius: 0.375rem;
+    }
+    .btn-primary {
+        background-color: #5e72e4;
+        border-color: #5e72e4;
+    }
+    .btn-secondary {
+        background-color: #8392ab;
+        border-color: #8392ab;
+    }
+    .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0,0,0,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+        -webkit-animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+        to { -webkit-transform: rotate(360deg); }
+    }
+    @-webkit-keyframes spin {
+        to { -webkit-transform: rotate(360deg); }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block extra_js %}
+<script src="{% static 'assets/js/plugins/choices.min.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Choices.js for select fields
+        var selectFields = document.querySelectorAll('select');
+        selectFields.forEach(function(select) {
+            new Choices(select, {
+                removeItemButton: true,
+                placeholder: true,
+                placeholderValue: 'Select an option'
+            });
+        });
+
+        var toolClassSelect = document.getElementById('{{ form.tool_class.id_for_label }}');
+        var toolNameInput = document.getElementById('tool_name');
+        var toolDescriptionInput = document.getElementById('tool_description');
+        var submitButton = document.getElementById('submitButton');
+        var errorMessageDiv = document.getElementById('errorMessage');
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                toolNameInput.value = 'Loading...';
+                toolDescriptionInput.value = 'Loading...';
+                submitButton.innerHTML = '<span class="loading"></span> Loading';
+            } else {
+                submitButton.innerHTML = 'Save';
+            }
+            submitButton.disabled = isLoading;
+        }
+
+        function showError(message) {
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            errorMessageDiv.style.display = 'none';
+        }
+
+        toolClassSelect.addEventListener('change', function() {
+            var selectedTool = this.value;
+            if (selectedTool) {
+                setLoading(true);
+                hideError();
+                fetch(`/agents/get_tool_info/?tool_class=${selectedTool}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch tool information');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        toolNameInput.value = data.name;
+                        toolDescriptionInput.value = data.description;
+                        submitButton.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showError('Failed to load tool information. Please try again.');
+                        toolNameInput.value = '';
+                        toolDescriptionInput.value = '';
+                        submitButton.disabled = true;
+                    })
+                    .finally(() => {
+                        setLoading(false);
+                    });
+            } else {
+                toolNameInput.value = '';
+                toolDescriptionInput.value = '';
+                submitButton.disabled = true;
+                hideError();
+            }
+        });
+
+        // Trigger the change event on page load if a tool is already selected (for edit mode)
+        if (toolClassSelect.value) {
+            toolClassSelect.dispatchEvent(new Event('change'));
+        }
+    });
+</script>
+{% endblock extra_js %}

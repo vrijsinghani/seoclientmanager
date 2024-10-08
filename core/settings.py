@@ -64,7 +64,8 @@ INSTALLED_APPS = [
     'apps.tasks',
     'apps.users',
     'apps.seo_manager',
-    'apps.crawl_website.apps.CrawlWebsiteConfig',  # Updated this line for the new app
+    'apps.crawl_website.apps.CrawlWebsiteConfig',
+    'apps.agents.apps.AgentsConfig',  # Add this line for the new agents app
 
     'allauth',
     'allauth.account',
@@ -375,6 +376,10 @@ LOGGING = {
             'level': 'DEBUG',
         },
         'apps.seo_manager': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+        },
+        'apps.agents': {  # Add this new logger for the agents app
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
         },

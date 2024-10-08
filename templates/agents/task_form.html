@@ -1,0 +1,185 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %} {% if task %}Edit Task{% else %}Add Task{% endif %} {% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">{% if task %}Edit Task{% else %}Add Task{% endif %}</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-4">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label><br>
+                            {{ form.description }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.agent.id_for_label }}" class="form-label">Agent</label><br>
+                            {{ form.agent }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.expected_output.id_for_label }}" class="form-label">Expected Output</label><br>
+                            {{ form.expected_output }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.tools.id_for_label }}" class="form-label">Tools</label><br>
+                            {{ form.tools }}
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label">Options</label>
+                            <div class="form-check custom-checkbox">
+                                {{ form.async_execution }}
+                                <label class="form-check-label" for="{{ form.async_execution.id_for_label }}">Async Execution</label>
+                            </div>
+                            <div class="form-check custom-checkbox">
+                                {{ form.human_input }}
+                                <label class="form-check-label" for="{{ form.human_input.id_for_label }}">Human Input</label>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.context.id_for_label }}" class="form-label">Context</label><br>
+                            {{ form.context }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.config.id_for_label }}" class="form-label">Config (JSON)</label><br>
+                            {{ form.config }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.output_json.id_for_label }}" class="form-label">Output JSON</label><br>
+                            {{ form.output_json }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.output_pydantic.id_for_label }}" class="form-label">Output Pydantic</label><br>
+                            {{ form.output_pydantic }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.output_file.id_for_label }}" class="form-label">Output File</label><br>
+                            {{ form.output_file }}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.converter_cls.id_for_label }}" class="form-label">Converter Class</label><br>
+                            {{ form.converter_cls }}
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <a href="{% url 'agents:manage_tasks' %}" class="btn btn-secondary me-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_css %}
+<style>
+    .card {
+        box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+        border: 0;
+    }
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid rgba(0,0,0,.125);
+        padding: 1rem 1.5rem;
+    }
+    .card-body {
+        padding: 1.5rem;
+    }
+    .form-label {
+        font-weight: 600;
+        color: #344767;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-control, .form-select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        border: 1px solid #d2d6da;
+        border-radius: 0.375rem;
+        margin-top: 0.25rem;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #5e72e4;
+        box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25);
+    }
+    textarea.form-control {
+        min-height: 100px;
+    }
+    .form-check {
+        margin-bottom: 0.5rem;
+        padding-left: 0;
+    }
+    .form-check-input {
+        margin-top: 0.3rem;
+        margin-right: 0.5rem;
+        float: left;
+    }
+    .form-check-label {
+        display: block;
+        margin-left: 1.75rem;
+    }
+    .btn {
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 0.625rem 1.25rem;
+        border-radius: 0.375rem;
+    }
+    .btn-primary {
+        background-color: #5e72e4;
+        border-color: #5e72e4;
+    }
+    .btn-secondary {
+        background-color: #8392ab;
+        border-color: #8392ab;
+    }
+    .custom-checkbox .form-check-input {
+        border-radius: 0.25rem;
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+    .custom-checkbox .form-check-input:checked {
+        background-color: #5e72e4;
+        border-color: #5e72e4;
+    }
+    .custom-checkbox .form-check-label {
+        padding-top: 0.1rem;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block javascripts %}
+<script src="{% static 'assets/js/plugins/choices.min.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var configField = document.getElementById('{{ form.config.id_for_label }}');
+        if (configField) {
+            configField.addEventListener('blur', function() {
+                try {
+                    JSON.parse(this.value);
+                    this.classList.remove('is-invalid');
+                } catch (error) {
+                    this.classList.add('is-invalid');
+                    alert('Invalid JSON format in Config field');
+                }
+            });
+        }
+
+        // Initialize Choices.js for select fields
+        var selectFields = document.querySelectorAll('select');
+        selectFields.forEach(function(select) {
+            new Choices(select, {
+                removeItemButton: true,
+                placeholder: true,
+                placeholderValue: 'Select an option'
+            });
+        });
+    });
+</script>
+{% endblock javascripts %}
