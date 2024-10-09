@@ -16,7 +16,19 @@ class CrewExecutionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['inputs'].widget.attrs['placeholder'] = 'Enter inputs as JSON'
+        self.fields['inputs'].required = False
+
+    def clean_inputs(self):
+        inputs = self.cleaned_data.get('inputs')
+        if inputs:
+            try:
+                return json.loads(inputs)
+            except json.JSONDecodeError:
+                raise forms.ValidationError("Invalid JSON format in inputs field")
+        return {}  # Return an empty dict if no inputs provided
+
+class HumanInputForm(forms.Form):
+    response = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=True)
 
 class AgentForm(forms.ModelForm):
     class Meta:
@@ -66,7 +78,6 @@ class TaskForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['config'].widget.attrs['placeholder'] = 'Enter config as JSON'
         if self.instance.config:
             self.initial['config'] = json.dumps(self.instance.config, indent=2)
 
@@ -127,9 +138,6 @@ class CrewForm(forms.ModelForm):
         )
         self.fields['max_rpm'].widget.attrs['min'] = 0
         self.fields['max_rpm'].widget.attrs['step'] = 1
-        self.fields['config'].widget.attrs['placeholder'] = 'Enter config as JSON'
-        self.fields['manager_callbacks'].widget.attrs['placeholder'] = 'Enter manager callbacks as JSON'
-        self.fields['embedder'].widget.attrs['placeholder'] = 'Enter embedder configuration as JSON'
 
         if self.instance.config:
             self.initial['config'] = json.dumps(self.instance.config, indent=2)

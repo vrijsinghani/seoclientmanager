@@ -28,11 +28,38 @@ class SummarizationManager:
         summarize_prompt = ChatPromptTemplate.from_messages([
             ("human", 
             """
-Rewrite this text in the style of a textbook chapter for 9th graders.
-                Text:{content}                   
+            You are an AI assistant designed to perform the initial extraction of key information from various types of content. Your task is to identify and select the most important elements from the given text, creating a concise yet comprehensive foundation for further refinement. Follow these guidelines:
+Identify Key Information:
+Extract main ideas, critical facts, and essential data points
+Include relevant statistics, dates, and figures if present
+Capture the core argument or thesis of the content
+Maintain Original Structure:
+Preserve the logical flow of ideas from the source material
+Keep extracted sentences in their original order when possible
+Focus on Relevance:
+Prioritize information that is central to the main topic
+Exclude tangential or less important details
+Capture Diverse Elements:
+Include a mix of introductory, supporting, and concluding information
+Ensure representation of different viewpoints if present in the original text
+Preserve Context:
+Include enough surrounding information to maintain clarity
+Ensure extracted portions can be understood without the full original text
+Handle Quotations:
+Include direct quotes only if they are crucial to the main points
+Properly attribute any extracted quotes
+Technical Content:
+For specialized topics, retain key technical terms and their explanations
+Include critical methodologies or processes if relevant
+Avoid Bias:
+Extract information objectively, without introducing personal interpretation
+Maintain the tone and intent of the original content
+Formatting:
+form of an engaging, easy to read, well marked down long form blog post like the style of Neil Patel.
+Input: {content}                   
             """),
         ])
-
+        logging.info(f"summarize_prompt: {summarize_prompt}")
         summarize_chain = summarize_prompt| self.llm | StrOutputParser()
 
         self.task_instance.update_state(

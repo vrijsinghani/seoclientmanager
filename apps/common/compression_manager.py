@@ -36,11 +36,11 @@ class CompressionManager:
         logging.info(f"Chunk size: {chunk_size} tokens")
         compress_prompt = ChatPromptTemplate.from_messages([
             ("human", """
-1. Carefully read through the text and take detailed bullet point notes.
-2. Focus on including every detail that impacts comprehension while avoiding superficial information or tangents.
-3. Use bullet points, ordered lists, subbullets, or headings as appropriate to structure your notes.
-4. No preambles, post ambles, summaries, just the notes.
-5. Write at a 9th grade level.
+- Carefully read through the text and take detailed notes, do not lose any information, but remove content nonrelated to the main topic like promotions, advertisements, calls to action, etc.
+- Focus on including every detail 
+- long form outline format
+- No preambles, post ambles, summaries, just the notes.
+- Write at a 16 year old level.
 \n\n```{content}```\n\n""")
         ])
 

@@ -1,36 +1,180 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Crew, CrewExecution
-from .forms import CrewExecutionForm
 from django.contrib import messages
+from django.core.paginator import Paginator
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from .models import Crew, CrewExecution, CrewMessage, Pipeline
+from .forms import CrewExecutionForm, HumanInputForm
+from .tasks import execute_crew, resume_crew_execution
+from django.core.exceptions import ValidationError
+import logging
+import json
+
+logger = logging.getLogger(__name__)
+
+@login_required
+def crewai_home(request):
+    crews = Crew.objects.all()[:3]  # Get the first 3 crews for the summary
+    recent_executions = CrewExecution.objects.filter(user=request.user).order_by('-created_at')[:5]
+    
+    context = {
+        'crews': crews,
+        'recent_executions': recent_executions,
+    }
+    return render(request, 'agents/crewai_home.html', context)
 
 @login_required
 def crew_list(request):
+    logger.debug("Entering crew_list view")
     crews = Crew.objects.all()
     return render(request, 'agents/crew_list.html', {'crews': crews})
 
 @login_required
 def crew_detail(request, crew_id):
+    logger.debug(f"Entering crew_detail view for crew_id: {crew_id}")
     crew = get_object_or_404(Crew, id=crew_id)
+    recent_executions = CrewExecution.objects.filter(crew=crew).order_by('-created_at')[:5]
+    
     if request.method == 'POST':
+        logger.debug(f"POST request received for crew_id: {crew_id}")
         form = CrewExecutionForm(request.POST)
         if form.is_valid():
+            logger.debug("Form is valid, creating new CrewExecution")
             execution = form.save(commit=False)
             execution.crew = crew
             execution.user = request.user
+            execution.inputs = form.cleaned_data.get('inputs') or {}
+            logger.info(f"Execution inputs: {json.dumps(execution.inputs)}")
             execution.save()
-            messages.success(request, 'Crew execution started successfully.')
+            
+            logger.info(f"Starting Celery task for CrewExecution id: {execution.id}")
+            # Start the Celery task
+            task = execute_crew.delay(execution.id)
+            logger.info(f"Celery task started with task id: {task.id}")
+            
+            messages.success(request, 'Crew execution started successfully. You will be notified when it completes.')
             return redirect('agents:execution_detail', execution_id=execution.id)
+        else:
+            logger.warning(f"Form is invalid. Errors: {form.errors}")
     else:
         form = CrewExecutionForm()
-    return render(request, 'agents/crew_detail.html', {'crew': crew, 'form': form})
+    
+    context = {
+        'crew': crew,
+        'form': form,
+        'recent_executions': recent_executions,
+    }
+    return render(request, 'agents/crew_detail.html', context)
 
 @login_required
 def execution_list(request):
+    logger.debug("Entering execution_list view")
     executions = CrewExecution.objects.filter(user=request.user).order_by('-created_at')
-    return render(request, 'agents/execution_list.html', {'executions': executions})
+    crews = Crew.objects.all()
+
+    # Apply filters
+    crew_id = request.GET.get('crew')
+    status = request.GET.get('status')
+
+    if crew_id:
+        executions = executions.filter(crew_id=crew_id)
+    if status:
+        executions = executions.filter(status=status)
+
+    # Pagination
+    paginator = Paginator(executions, 10)  # Show 10 executions per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'executions': page_obj,
+        'crews': crews,
+    }
+    return render(request, 'agents/execution_list.html', context)
 
 @login_required
 def execution_detail(request, execution_id):
+    logger.debug(f"Entering execution_detail view for execution_id: {execution_id}")
     execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
-    return render(request, 'agents/execution_detail.html', {'execution': execution})
+    logger.info(f"Execution details: id={execution.id}, status={execution.status}, crew={execution.crew.name}")
+    
+    crew_messages = CrewMessage.objects.filter(execution=execution).order_by('timestamp')
+    logger.info(f"Number of crew messages: {crew_messages.count()}")
+    for message in crew_messages:
+        logger.debug(f"Message: {message.content[:100]}...")  # Log first 100 characters of each message
+    
+    human_input_form = None
+    if execution.status == 'WAITING_FOR_HUMAN_INPUT':
+        human_input_form = HumanInputForm()
+        logger.info("Human input form created")
+    
+    if execution.outputs:
+        logger.info(f"Execution outputs: {json.dumps(execution.outputs)}")
+    else:
+        logger.info("No execution outputs available")
+
+    context = {
+        'execution': execution,
+        'messages': crew_messages,
+        'human_input_form': human_input_form,
+    }
+    logger.debug("Rendering execution_detail.html template")
+    return render(request, 'agents/execution_detail.html', context)
+
+@login_required
+def execution_status(request, execution_id):
+    logger.debug(f"Entering execution_status view for execution_id: {execution_id}")
+    try:
+        execution = CrewExecution.objects.get(id=execution_id, user=request.user)
+        response_data = {
+            'status': execution.status,
+            'outputs': execution.outputs,
+            'human_input_request': execution.human_input_request,
+        }
+        logger.info(f"Execution status response: {json.dumps(response_data)}")
+        return JsonResponse(response_data)
+    except CrewExecution.DoesNotExist:
+        logger.warning(f"CrewExecution with id {execution_id} not found")
+        return JsonResponse({'error': 'Execution not found'}, status=404)
+
+@login_required
+@require_POST
+def submit_human_input(request, execution_id):
+    logger.debug(f"Entering submit_human_input view for execution_id: {execution_id}")
+    execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
+    
+    if execution.status != 'WAITING_FOR_HUMAN_INPUT':
+        logger.warning(f"Execution {execution_id} is not waiting for human input")
+        messages.error(request, 'This execution is not waiting for human input.')
+        return redirect('agents:execution_detail', execution_id=execution.id)
+
+    form = HumanInputForm(request.POST)
+    if form.is_valid():
+        try:
+            execution.human_input_response = form.cleaned_data['response']
+            execution.status = 'RUNNING'
+            execution.save()
+
+            logger.info(f"Resuming Celery task for CrewExecution id: {execution.id}")
+            # Resume the Celery task
+            task = resume_crew_execution.delay(execution.id)
+            logger.info(f"Celery task resumed with task id: {task.id}")
+
+            messages.success(request, 'Human input submitted successfully. The execution will resume shortly.')
+        except ValidationError as e:
+            logger.error(f"Error saving human input for execution {execution_id}: {str(e)}")
+            messages.error(request, f'Error saving human input: {str(e)}')
+    else:
+        logger.warning(f"Invalid human input form for execution {execution_id}. Errors: {form.errors}")
+        messages.error(request, 'Invalid input. Please try again.')
+
+    return redirect('agents:execution_detail', execution_id=execution.id)
+
+@login_required
+def manage_pipelines(request):
+    pipelines = Pipeline.objects.all()
+    context = {
+        'pipelines': pipelines,
+    }
+    return render(request, 'agents/manage_pipelines.html', context)

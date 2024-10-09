@@ -16,13 +16,13 @@
             {% csrf_token %}
             <div class="row">
               <div class="col-6">
-                <label class="form-label">Name</label>
+                <label class="form-label">Name</label><br>
                 <div class="input-group">
                   {{ form.name }}
                 </div>
               </div>
               <div class="col-6">
-                <label class="form-label">Website URL</label>
+                <label class="form-label">Website URL</label><br>
                 <div class="input-group">
                   {{ form.website_url }}
                 </div>
@@ -30,17 +30,17 @@
             </div>
             <div class="row">
               <div class="col-6">
-                <label class="form-label mt-4">Status</label>
+                <label class="form-label mt-4">Status</label><br>
                 {{ form.status }}
               </div>
               <div class="col-6">
-                <label class="form-label mt-4">Group</label>
+                <label class="form-label mt-4">Group</label><br>
                 {{ form.group }}
               </div>
             </div>
             <div class="row">
               <div class="col-12">
-                <label class="form-label mt-4">Target Audience</label>
+                <label class="form-label mt-4">Target Audience</label><br>
                 <div class="input-group">
                   {{ form.target_audience }}
                 </div>

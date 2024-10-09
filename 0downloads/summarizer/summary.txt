@@ -1,55 +1,71 @@
-## Chapter 5:  Optimizing Your Online Presence: A Guide to Search Engine Optimization (SEO)
+# Outline of "Crawl Website" App Development
 
-This chapter explores the fundamentals of Search Engine Optimization (SEO), a crucial strategy for increasing your website's visibility and attracting more online visitors.  We'll cover both the technical aspects and the content creation strategies necessary for success.
+## I. App Creation
+- **App Name**: "Crawl Website"
+- **Location**: apps/crawl_website
 
-**5.1 Defining Your Goals and Audience:**
+## II. User Interface Design
+### A. Page Template
+- **Reference**: templates/pages/applications/kanban.html
+- **Structure**: Three cards styled similarly to existing cards
 
-Before diving into technical details, it's vital to establish clear objectives.  What are your business goals? What products or services are you promoting?  Creating detailed *buyer personas*—descriptions of your ideal customers including their demographics, needs, and online behavior—is essential for targeted marketing.
+### B. Card 1: "Site to crawl"
+1. **Inputs**:
+   - **URL to crawl**:
+     - **Type**: URL
+     - **Placeholder**: https://example.com
+   - **Maximum depth of crawl**:
+     - **Type**: Integer
+     - **Placeholder**: 0
+2. **Button**:
+   - **Label**: "Initiate Crawl"
 
-**5.2 Keyword Research: The Foundation of SEO:**
+## III. Functionality
+### A. URL Submission
+1. **Action**: Function call to browserless instance
+   - **Environment Variables**:
+     - BROWSERLESS_BASE_URL
+     - BROWSERLESS_API_KEY
+   - **Example API Call**:
+     - **Method**: POST
+     - **URL**: https://production-sfo.browserless.io/screenshot?token=MY_API_TOKEN
+     - **Headers**:
+       - Cache-Control: no-cache
+       - Content-Type: application/json
+     - **Data Format**:
+       - URL: "https://example.com/"
+       - **Options**:
+         - fullPage: true
+         - type: "png"
 
-Effective SEO hinges on understanding what people search for online.  This begins with *keyword research*.  Start with broad, general terms (seed keywords) and use tools like Google Ads Keyword Planner and DataForSEO API to identify related terms with higher search volume. Prioritize *high-intent keywords*—phrases like "buy now," "best price," or "near me"—that indicate a strong purchasing intent.
+### B. Image Storage
+1. **Location**: User's file_manager directory
+   - **Subfolder**: crawled_screenshots
+   - **Unique ID**: Assigned for each image
+2. **Display**: Image shown below "Initiate Crawl" button
 
-**5.3 Competitive Analysis: Learning from the Best (and the Rest):**
+## IV. Asynchronous Crawling
+### A. Initiate Crawl Button
+1. **Action**: Start a function to crawl the URL asynchronously
+   - **Method**: Use Celery tasks
+   - **Reference Code**: /apps/common/tools/crawl_website_tool.py
 
-Analyzing your competitors' websites reveals valuable insights.  Examine their content strategy, keyword targeting, and website structure.  Identifying content gaps—topics your competitors haven't covered—presents opportunities to create unique and valuable content.
+### B. Visitor Chart
+1. **Display**: Chart linked to "visitors" chart in templates/pages/dashboards/crm.html
+   - **Label**: "Visitors" = "Total Pages"
+   - **Total Links to Visit**: 5,927
+   - **Completion Percentage**: +55% (links visited / total links to visit)
+   - **Y-axis**: Percent complete (0-100)
+   - **X-axis**: Time in minutes
+   - **Update Frequency**: Every 5 seconds
 
-**5.4 Content Strategy: Creating Engaging and Relevant Material:**
+### C. Links to Visit List
+1. **Display**: List of all links to visit
+   - **Location**: Subcard below Total Pages card
+   - **Component**: "Orders overview" from templates/pages/widgets.html
+   - **Icons**: Two icons to indicate completion status
+   - **Main Label**: Path of the link (excluding host/server)
 
-Your content must be valuable, actionable, and engaging.  Map your keywords to specific content topics and determine appropriate formats, such as blog posts, product pages, FAQs, or comprehensive guides.  A well-structured *content calendar* ensures consistent content creation and publication.
-
-**5.5 On-Page Optimization: Refining Your Website's Content:**
-
-Optimizing individual web pages is crucial.  This includes:
-
-* **Compelling Titles and Meta Descriptions:**  Craft concise and descriptive titles (under 60 characters) and meta descriptions that accurately reflect your page's content and entice clicks.
-* **Structured Content:** Use headings (H1, H2, etc.) to organize your content and improve readability.
-* **Image Optimization:** Use descriptive *alt text* for all images to improve accessibility and SEO.
-* **Internal Linking:** Link relevant pages within your website to improve navigation and distribute link equity.
-
-**5.6 Technical SEO: Ensuring Your Website is Search Engine Friendly:**
-
-Technical SEO focuses on the behind-the-scenes aspects of your website:
-
-* **Website Speed:** Optimize images, compress code, and use caching to improve loading speed.
-* **Mobile-Friendliness:** Ensure your website is responsive and displays correctly on all devices.
-* **Schema Markup:** Implement schema markup to provide search engines with additional context about your website's content.
-
-**5.7 Local SEO (for Local Businesses):**
-
-For businesses with a physical location, local SEO is critical:
-
-* **Google My Business:** Claim and optimize your Google My Business profile, ensuring consistent information (Name, Address, Phone number – NAP).
-* **Online Reviews:** Encourage customer reviews and actively respond to both positive and negative feedback.
-* **Local Keywords:** Incorporate location-specific keywords into your content.
-
-**5.8 Promotion and Engagement:**
-
-Creating great content is only half the battle.  Promote your content through social media, include social sharing buttons, and actively engage with your audience by responding to comments and messages.
-
-**5.9 Monitoring and Optimization: The Ongoing Process:**
-
-SEO is an iterative process.  Regularly monitor your website's performance using tools like Google Analytics and Google Search Console.  Track key metrics such as website traffic, search rankings, click-through rates, and conversions.  Analyze this data to identify areas for improvement and refine your SEO strategy accordingly.
-
-
-This chapter provides a foundational understanding of SEO.  For more advanced strategies and assistance with implementing these techniques, consider exploring resources like Neuralami's LocalSEO service.
+## V. Code Modification
+- **Do Not Modify**: /apps/common/tools/crawl_website_tool.py
+- **Create**: Asynchronous version of the tool for Celery use

@@ -1,4 +1,5 @@
 {% extends "agents/base_agents.html" %}
+{% load static %}
 
 {% block agents_list %}
 <ul class="list-group">
@@ -6,46 +7,101 @@
 </ul>
 {% endblock %}
 
-{% block previous_tasks %}
-<ul class="list-group">
-    {% for execution in crew.crewaiexecution_set.all|slice:":5" %}
-    <li class="list-group-item">
-        <a href="{% url 'agents:execution_detail' execution.id %}">
-            {{ execution.created_at|date:"SHORT_DATETIME_FORMAT" }}
-        </a>
-    </li>
-    {% empty %}
-    <li class="list-group-item">No previous tasks for this crew.</li>
-    {% endfor %}
-</ul>
-{% endblock %}
-
 {% block main_content %}
-<h2>{{ crew.name }}</h2>
-<p>{{ crew.description }}</p>
+<div class="container mt-4">
+    <h2>{{ crew.name }}</h2>
+    <p class="lead">{{ crew.description }}</p>
 
-<h3>Inputs</h3>
-<pre>{{ crew.inputs|pprint }}</pre>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Crew Details</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Process:</strong> {{ crew.get_process_display }}</p>
+            <p><strong>Verbose:</strong> {{ crew.verbose|yesno:"Yes,No" }}</p>
+            
+            <h4>Agents</h4>
+            <ul>
+                {% for agent in crew.agents.all %}
+                <li>{{ agent.name }} - {{ agent.role }}</li>
+                {% empty %}
+                <li>No agents assigned to this crew.</li>
+                {% endfor %}
+            </ul>
 
-<h3>Outputs</h3>
-<pre>{{ crew.outputs|pprint }}</pre>
+            <h4>Tasks</h4>
+            <ul>
+                {% for task in crew.tasks.all %}
+                <li>{{ task.description }}</li>
+                {% empty %}
+                <li>No tasks assigned to this crew.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
 
-<h3>Tools</h3>
-<pre>{{ crew.tools|pprint }}</pre>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Start New Execution</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" id="crew-execution-form">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary" id="submit-btn">Start Execution</button>
+            </form>
+        </div>
+    </div>
 
-<h3>Start New Execution</h3>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Start Execution</button>
-</form>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>Recent Executions</h3>
+            <a href="{% url 'agents:execution_list' %}?crew={{ crew.id }}" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div class="card-body">
+            <ul class="list-group">
+                {% for execution in recent_executions %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{% url 'agents:execution_detail' execution.id %}">
+                        {{ execution.created_at|date:"SHORT_DATETIME_FORMAT" }}
+                    </a>
+                    <span class="badge badge-{% if execution.status == 'COMPLETED' %}success{% elif execution.status == 'FAILED' %}danger{% else %}warning{% endif %}">
+                        {{ execution.get_status_display }}
+                    </span>
+                </li>
+                {% empty %}
+                <li class="list-group-item">No previous executions for this crew.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block javascripts %}
 {{ block.super }}
 <script>
     $(function () {
-        $('[data-toggle="tooltip"]').tooltip()
-    })
+        $('[data-toggle="tooltip"]').tooltip();
+
+        $('#crew-execution-form').on('submit', function(e) {
+            e.preventDefault();
+            var form = $(this);
+            var url = form.attr('action');
+            
+            $.ajax({
+                type: "POST",
+                url: url,
+                data: form.serialize(),
+                success: function(data) {
+                    window.location.href = data.redirect_url;
+                },
+                error: function(xhr, status, error) {
+                    var errorMessage = xhr.status + ': ' + xhr.statusText;
+                    alert('Error - ' + errorMessage);
+                }
+            });
+        });
+    });
 </script>
 {% endblock %}

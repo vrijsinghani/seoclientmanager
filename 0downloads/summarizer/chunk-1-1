@@ -1,54 +1,38 @@
-Briefing Doc: SEO On-Site Content Strategy for Small Businesses by Neuralami
-Main Theme: This document outlines a comprehensive, step-by-step SEO strategy for small businesses to attract customers, improve search engine rankings, and drive valuable traffic to their website.
+Tools
 
-Key Takeaways:
+Create a new app in the project called "Crawl Website" in apps/crawl_website.
 
-Targeted Approach: This strategy emphasizes understanding your target audience, their needs, and their search behavior to create highly relevant content.
-Data-Driven Decisions: Utilize tools like Google Ads Keyword Planner, DataForSEO API, and Google Search Console to make informed decisions about keyword targeting, content optimization, and performance analysis.
-High-Quality Content is King: Focus on creating valuable, actionable, and engaging content that meets user intent and aligns with your target keywords.
-Technical SEO Matters: Optimize your website for technical factors like site speed, mobile-friendliness, and schema markup to improve search engine visibility and user experience.
-Local SEO for Local Businesses: Claim and optimize your Google My Business profile, manage online reviews, and utilize local keywords to attract local customers.
-Continuous Monitoring & Optimization: Regularly track your website's performance, analyze data from various sources, and make necessary adjustments to your strategy based on insights.
-Important Facts & Ideas:
+The app will look loosely like the page template at templates/pages/applications/kanban.html, specifically three cards styled the way the three cards are styled.
 
-Define Clear Goals & Target Audience:
-Clearly outline your business objectives and the specific products or services you want to promote.
-Create detailed buyer personas to understand your ideal customer's demographics, needs, pain points, and buying behavior.
-Quote: "Create buyer personas highlighting demographics, needs, pain points, and buying behavior."
-In-Depth Keyword Research is Crucial:
-Start with broad "seed keywords" and expand your list using keyword research tools.
-Prioritize high-intent keywords that indicate a user's readiness to purchase, such as "buy," "best," "price," and "near me."
-Quote: "Focus on High-Intent Keywords: Prioritize keywords with commercial intent (e.g., 'buy,' 'best,' 'price,' 'near me')."
-Analyze Competitors & Identify Opportunities:
-Analyze the content strategy, keyword targeting, and website structure of your top competitors.
-Identify gaps in their content that you can fill and areas where you can outperform them.
-Quote: "Analyze Competitor Content: Assess the quality, length, and structure of top-ranking pages. Identify gaps in their content that you can fill."
-Develop a Comprehensive Content Strategy:
-Map keywords to specific content topics and determine the most effective content formats (blog posts, product pages, FAQs, guides).
-Create a content calendar to schedule content creation and publication, ensuring consistent posting frequency.
-Quote: "Determine Content Types: Decide on the formats that best suit each topic (e.g., blog posts, product pages, FAQs, guides)."
-Optimize On-Page Elements for Search Engines and Users:
-Craft compelling title tags and meta descriptions that accurately summarize your content and incorporate target keywords.
-Use headings to structure your content logically and improve readability.
-Optimize images with descriptive alt text containing relevant keywords.
-Include internal links to guide users to other valuable pages on your website.
-Quote: "Optimize On-Page Elements: Title Tags: Include primary keyword; keep under 60 characters."
-Technical SEO is Equally Important:
-Improve your website's loading speed by compressing images and optimizing code.
-Ensure your website is mobile-friendly and responsive across various devices.
-Implement schema markup to help search engines understand the context of your content.
-Quote: "Improve Site Speed: Compress images. Minify CSS and JavaScript files. Use browser caching."
-Local SEO for Brick-and-Mortar Businesses:
-Claim and optimize your Google My Business profile with accurate and consistent NAP (Name, Address, Phone Number) information.
-Encourage customer reviews and respond to them promptly.
-Incorporate location-specific keywords in your content and meta tags.
-Quote: "Claim and Complete Google My Business Profile: Ensure consistent NAP (Name, Address, Phone number) information."
-Promote Your Content & Engage Your Audience:
-Share your content on social media platforms and include social sharing buttons on your website.
-Respond to comments and messages promptly to build relationships with your audience.
-Quote: "Promote Content: Share on social media platforms. Encourage sharing by adding social sharing buttons."
-Monitor, Analyze, and Optimize Continuously:
-Regularly track your website traffic, search rankings, click-through rates, and conversions using tools like Google Analytics and Google Search Console.
-Analyze data to identify areas for improvement and optimize your content and website accordingly.
-Quote: "Monitor Search Rankings and Click-Through Rates (CTR): Use Google Search Console to track keyword performance."
-Call to Action: Consider Neuralami's LocalSEO service offering – a paid service where they handle all aspects of this SEO strategy for you, allowing you to focus on your business while they drive results.
+The first card is titled "Site to crawl", inputs: 
+
+1. Url to crawl (URL), placeholder: https://example.com, 
+2. Maximum depth of crawl (Int) placeholder:0.
+
+Below the input boxes is a button "Initiate Crawl"
+
+After a URL is entered, a function call is immediately made to a browserless instance specified by environment variables : BROWSERLESS_BASE_URL and BROWSERLESS_API_KEY using the following as an example usage guide:  
+curl -X POST \
+https://production-sfo.browserless.io/screenshot?token=MY_API_TOKEN \
+-H 'Cache-Control: no-cache' \
+-H 'Content-Type: application/json' \
+-d '{
+"url": "https://example.com/",
+"options": {
+"fullPage": true,
+"type": "png"
+}
+}'
+
+After the request returns, the image is then stored in the users file_manager directory in a subfolder called crawled_screenshots with a unique id for future reference and the image is placed below the "Initiate Crawl" button.
+
+---
+
+When the initiate crawl button is pressed, the app will kick off a function to crawl the URL asynchronously using celery taks based on the code in /apps/common/tools/crawl_website_tool.py
+
+Once the celery task is kicked off, when the getlinks_to \_visit has a list, chart link the "visitors" chart in templates/pages/dashboards/crm.html will show a graph where the label "Visitors" = "Total Pages", the number 5,927 is the total links to visit, the number +55% represents the links visited / total links to visit (i.e. percent complete), the Y axis is the percent complete (0-100) and the x-axis is minutes and dynamically changes every 5 seconds to update.
+
+  
+Furthermore, a list of all links to visit is displayed in another subcard below the Total Pages card. it uses the component called "Orders overview" in templates/pages/widgets.html where the icon is one of two  icons (one icon to show it's complete and the other that it is not.)  The main label is the path (minus the host/sever) of the link to be visited.  
+  
+Do not modify /apps/common/tools/crawl_website_tool.py but create an async version of it for use by celery.

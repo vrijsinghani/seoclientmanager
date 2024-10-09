@@ -1,59 +1,71 @@
-* **Targeted Approach:** Understand your target audience's needs and search behavior to create relevant content.
+# Outline of "Crawl Website" App Development
 
-* **Data-Driven Decisions:** Use Google Ads Keyword Planner, DataForSEO API, and Google Search Console for keyword targeting, content optimization, and performance analysis.
+## I. App Creation
+   A. Create a new app named "Crawl Website"
+      1. Location: apps/crawl_website
 
-* **High-Quality Content:** Create valuable, actionable, and engaging content that meets user intent and aligns with target keywords.
+## II. User Interface Design
+   A. Page Template
+      1. Reference: templates/pages/applications/kanban.html
+      2. Structure: Three cards styled similarly to existing cards
 
-* **Technical SEO:** Optimize website speed, mobile-friendliness, and schema markup.
+   B. Card 1: "Site to crawl"
+      1. Inputs
+         a. URL to crawl
+            - Type: URL
+            - Placeholder: https://example.com
+         b. Maximum depth of crawl
+            - Type: Integer
+            - Placeholder: 0
+      2. Button
+         a. Label: "Initiate Crawl"
 
-* **Local SEO (for local businesses):**
-    * Claim and optimize Google My Business profile.
-    * Manage online reviews.
-    * Use local keywords.
+## III. Functionality
+   A. URL Submission
+      1. Action: Function call to browserless instance
+         a. Environment variables
+            - BROWSERLESS_BASE_URL
+            - BROWSERLESS_API_KEY
+         b. Example usage guide for API call
+            - Method: POST
+            - URL: https://production-sfo.browserless.io/screenshot?token=MY_API_TOKEN
+            - Headers
+               i. Cache-Control: no-cache
+               ii. Content-Type: application/json
+            - Data format
+               - URL: "https://example.com/"
+               - Options
+                  i. fullPage: true
+                  ii. type: "png"
 
-* **Continuous Monitoring & Optimization:** Regularly track website performance and adjust strategy based on data.
+   B. Image Storage
+      1. Location: User's file_manager directory
+         a. Subfolder: crawled_screenshots
+         b. Unique ID for each image
+      2. Display: Image shown below "Initiate Crawl" button
 
-* **Define Clear Goals & Target Audience:**
-    * Outline business objectives and products/services to promote.
-    * Create buyer personas (demographics, needs, pain points, buying behavior).
+## IV. Asynchronous Crawling
+   A. Initiate Crawl Button
+      1. Action: Kick off a function to crawl the URL asynchronously
+         a. Use Celery tasks
+         b. Reference code: /apps/common/tools/crawl_website_tool.py
 
-* **In-Depth Keyword Research:**
-    * Start with broad "seed keywords."
-    * Expand using keyword research tools.
-    * Prioritize high-intent keywords ("buy," "best," "price," "near me").
+   B. Visitor Chart
+      1. Display: Chart linked to "visitors" chart in templates/pages/dashboards/crm.html
+         a. Label: "Visitors" = "Total Pages"
+         b. Total links to visit: 5,927
+         c. Completion percentage: +55% (links visited / total links to visit)
+         d. Y-axis: Percent complete (0-100)
+         e. X-axis: Time in minutes
+         f. Update frequency: Every 5 seconds
 
-* **Analyze Competitors & Identify Opportunities:**
-    * Analyze competitor content strategy, keyword targeting, and website structure.
-    * Identify content gaps and areas for improvement.
+   C. Links to Visit List
+      1. Display: List of all links to visit
+         a. Location: Subcard below Total Pages card
+         b. Component: "Orders overview" from templates/pages/widgets.html
+         c. Icons: Two icons to indicate completion status
+         d. Main label: Path of the link (excluding host/server)
 
-* **Develop a Comprehensive Content Strategy:**
-    * Map keywords to content topics.
-    * Determine content formats (blog posts, product pages, FAQs, guides).
-    * Create a content calendar.
-
-* **Optimize On-Page Elements:**
-    * Craft compelling title tags and meta descriptions (under 60 characters for titles).
-    * Use headings for structure and readability.
-    * Optimize images with descriptive alt text.
-    * Include internal links.
-
-* **Technical SEO:**
-    * Improve website loading speed (compress images, optimize code).
-    * Ensure mobile-friendliness.
-    * Implement schema markup.
-
-* **Local SEO:**
-    * Claim and optimize Google My Business profile (consistent NAP information).
-    * Encourage and respond to customer reviews.
-    * Incorporate location-specific keywords.
-
-* **Promote Your Content & Engage Your Audience:**
-    * Share content on social media.
-    * Include social sharing buttons.
-    * Respond to comments and messages.
-
-* **Monitor, Analyze, and Optimize:**
-    * Track website traffic, search rankings, click-through rates, and conversions (Google Analytics, Google Search Console).
-    * Analyze data to identify areas for improvement.
-
-* **Call to Action:** Consider Neuralami's LocalSEO service.
+## V. Code Modification
+   A. Do not modify: /apps/common/tools/crawl_website_tool.py
+   B. Create: Asynchronous version of the tool for Celery use

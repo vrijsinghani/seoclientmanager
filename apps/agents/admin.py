@@ -36,6 +36,18 @@ class CrewExecutionAdmin(admin.ModelAdmin):
     list_display = ('crew', 'user', 'client', 'status', 'created_at', 'updated_at')
     list_filter = ('status', 'created_at', 'updated_at')
     search_fields = ('crew__name', 'user__username', 'client__name')
+    readonly_fields = ('created_at', 'updated_at', 'human_input_request', 'human_input_response')
+    fieldsets = (
+        (None, {
+            'fields': ('crew', 'user', 'client', 'status', 'inputs', 'outputs')
+        }),
+        ('Human Input', {
+            'fields': ('human_input_request', 'human_input_response')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
 
 @admin.register(CrewMessage)
 class CrewMessageAdmin(admin.ModelAdmin):

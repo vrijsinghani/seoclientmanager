@@ -10,8 +10,9 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatLiteLLM
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.callbacks.manager import CallbackManager
-
-
+import openai
+from langchain.schema import HumanMessage
+from langchain.chat_models.openai import ChatOpenAI
 
 class TokenCounterCallback(BaseCallbackHandler):
     def __init__(self, tokenizer):
@@ -52,12 +53,34 @@ def get_llm(model_name:str, temperature=0.0):
      
     callback_manager = CallbackManager([token_counter_callback])  
 
-    llm = ChatOpenAI(model=model_name, base_url=settings.OPENAI_API_BASE, api_key=settings.LITELLM_MASTER_KEY, temperature=temperature, callbacks=callback_manager)
+    llm = ChatOpenAI(model=model_name, 
+                     base_url=settings.API_BASE_URL, 
+                     api_key=settings.LITELLM_MASTER_KEY, 
+                     temperature=temperature, 
+                     callbacks=callback_manager)
 
     token_counter_callback.llm = llm
     return llm, token_counter_callback
 
-    
+def get_llm_openai(model_name: str, temperature=0.0) -> tuple[openai.OpenAI, BaseCallbackHandler]:
+    """Creates an OpenAI chat client using the LiteLLM proxy."""
+
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    token_counter_callback = TokenCounterCallback(tokenizer)
+
+    callback_manager = CallbackManager([token_counter_callback])  
+
+    llm = openai.OpenAI(
+        model=model_name,
+        base_url=settings.OPENAI_API_BASE,
+        api_key=settings.LITELLM_MASTER_KEY,
+        temperature=temperature,
+        callbacks=[token_counter_callback],
+    )
+    token_counter_callback.llm = llm
+
+    return llm, token_counter_callback
+
 def is_pdf_url(url: str) -> bool:
     """Determine if the given URL points to a PDF document."""
     try:
