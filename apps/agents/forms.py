@@ -1,8 +1,12 @@
+import random
 from django import forms
-from .models import CrewExecution, Agent, Task, Tool, Crew, get_available_tools
+from .models import CrewExecution, Agent, Task, Tool, Crew, get_available_tools, AVATAR_CHOICES
 from apps.seo_manager.models import Client
 from apps.common.utils import get_models
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CrewExecutionForm(forms.ModelForm):
     client = forms.ModelChoiceField(queryset=Client.objects.all(), required=False)
@@ -31,33 +35,59 @@ class HumanInputForm(forms.Form):
     response = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=True)
 
 class AgentForm(forms.ModelForm):
+    avatar = forms.ChoiceField(
+        choices=[(choice, choice) for choice in AVATAR_CHOICES],
+        widget=forms.RadioSelect(),
+        required=False
+    )
+    llm = forms.ChoiceField(
+        choices=[(model, model) for model in get_models()],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=True
+    )
+    tools = forms.ModelMultipleChoiceField(
+        queryset=Tool.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+
     class Meta:
         model = Agent
-        fields = ['name', 'role', 'goal', 'backstory', 'llm', 'tools', 'function_calling_llm', 'max_iter', 'max_rpm', 'max_execution_time', 'verbose', 'allow_delegation', 'step_callback', 'cache', 'system_template', 'prompt_template', 'response_template', 'allow_code_execution', 'max_retry_limit', 'use_system_prompt', 'respect_context_window']
+        fields = '__all__'  # Include all fields from the model
         widgets = {
-            'backstory': forms.Textarea(attrs={'rows': 4}),
-            'tools': forms.CheckboxSelectMultiple(),
+            'goal': forms.Textarea(attrs={'rows': 3}),
+            'backstory': forms.Textarea(attrs={'rows': 3}),
             'system_template': forms.Textarea(attrs={'rows': 4}),
             'prompt_template': forms.Textarea(attrs={'rows': 4}),
             'response_template': forms.Textarea(attrs={'rows': 4}),
+            'tools': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            'llm': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        available_models = get_models()
-        self.fields['llm'] = forms.ChoiceField(
-            choices=[(model, model) for model in available_models],
-            widget=forms.Select(attrs={'class': 'form-control'})
-        )
-        self.fields['function_calling_llm'] = forms.ChoiceField(
-            choices=[(model, model) for model in available_models],
-            widget=forms.Select(attrs={'class': 'form-control'}),
-            required=False
-        )
-        self.fields['max_iter'].widget.attrs['min'] = 1
-        self.fields['max_rpm'].widget.attrs['min'] = 0
-        self.fields['max_execution_time'].widget.attrs['min'] = 0
-        self.fields['max_retry_limit'].widget.attrs['min'] = 0
+        for field in self.fields:
+            if isinstance(self.fields[field].widget, forms.CheckboxInput):
+                self.fields[field].widget.attrs['class'] = 'form-check-input'
+            elif not isinstance(self.fields[field].widget, (forms.SelectMultiple, forms.RadioSelect)):
+                self.fields[field].widget.attrs['class'] = 'form-control'
+
+        # Ensure avatar choices are set
+        self.fields['avatar'].choices = [(choice, choice) for choice in AVATAR_CHOICES]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        logger.debug(f"Cleaned form data: {cleaned_data}")
+        return cleaned_data
+
+    def save(self, commit=True):
+        logger.debug(f"Saving form with data: {self.cleaned_data}")
+        instance = super().save(commit=False)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        logger.debug(f"Saved instance: {instance.__dict__}")
+        return instance
 
 class TaskForm(forms.ModelForm):
     config = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=False)

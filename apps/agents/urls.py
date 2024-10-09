@@ -39,4 +39,8 @@ urlpatterns = [
     path('manage/crews/update_agents/<int:crew_id>/', views_admin.update_crew_agents, name='update_crew_agents'),
     
     path('pipelines/', views.manage_pipelines, name='manage_pipelines'),
+    path('manage/agents/card-view/', views.manage_agents_card_view, name='manage_agents_card_view'),
+    
+    # Add the new URL pattern for manage_crews_card_view
+    path('manage/crews/card-view/', views_admin.manage_crews_card_view, name='manage_crews_card_view'),
 ]

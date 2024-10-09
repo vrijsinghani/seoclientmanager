@@ -25,10 +25,24 @@ def manage_agents(request):
 def add_agent(request):
     if request.method == 'POST':
         form = AgentForm(request.POST)
+        logger.debug(f"POST data: {request.POST}")
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Agent added successfully.')
-            return redirect('agents:manage_agents')
+            logger.info("Form is valid. Attempting to save.")
+            try:
+                agent = form.save(commit=False)
+                agent.avatar = form.cleaned_data['avatar']  # Explicitly set the avatar
+                agent.save()
+                form.save_m2m()  # Save many-to-many relationships
+                logger.info(f"Agent saved successfully. ID: {agent.id}")
+                messages.success(request, 'Agent added successfully.')
+                return redirect('agents:manage_agents')
+            except Exception as e:
+                logger.error(f"Error saving agent: {str(e)}")
+                logger.error(traceback.format_exc())
+                messages.error(request, f"Error adding agent: {str(e)}")
+        else:
+            logger.warning(f"Form is invalid. Errors: {form.errors}")
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = AgentForm()
     return render(request, 'agents/agent_form.html', {'form': form})
@@ -39,10 +53,24 @@ def edit_agent(request, agent_id):
     agent = get_object_or_404(Agent, id=agent_id)
     if request.method == 'POST':
         form = AgentForm(request.POST, instance=agent)
+        logger.debug(f"POST data: {request.POST}")
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Agent updated successfully.')
-            return redirect('agents:manage_agents')
+            logger.info("Form is valid. Attempting to save.")
+            try:
+                agent = form.save(commit=False)
+                agent.avatar = form.cleaned_data['avatar']  # Explicitly set the avatar
+                agent.save()
+                form.save_m2m()  # Save many-to-many relationships
+                logger.info(f"Agent updated successfully. ID: {agent.id}")
+                messages.success(request, 'Agent updated successfully.')
+                return redirect('agents:manage_agents')
+            except Exception as e:
+                logger.error(f"Error updating agent: {str(e)}")
+                logger.error(traceback.format_exc())
+                messages.error(request, f"Error updating agent: {str(e)}")
+        else:
+            logger.warning(f"Form is invalid. Errors: {form.errors}")
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = AgentForm(instance=agent)
     return render(request, 'agents/agent_form.html', {'form': form, 'agent': agent})
@@ -231,8 +259,6 @@ def get_tool_info(request):
     logger.warning("Invalid request: tool_class parameter is missing")
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
-    
-
 @login_required
 @user_passes_test(is_admin)
 def manage_crews(request):
@@ -301,4 +327,11 @@ def update_crew_agents(request, crew_id):
         messages.success(request, 'Crew agents updated successfully.')
     return redirect('agents:manage_crews')
 
-# ... (rest of the code remains unchanged)
+@login_required
+@user_passes_test(is_admin)
+def manage_crews_card_view(request):
+    crews = Crew.objects.all()
+    context = {
+        'crews': crews,
+    }
+    return render(request, 'agents/manage_crews_card_view.html', context)

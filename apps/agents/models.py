@@ -7,10 +7,19 @@ import os
 import importlib
 import logging
 import uuid
+import random
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+AVATAR_CHOICES = [
+    'user.jpg', 'team-5.jpg', 'team-4.jpg', 'team-3.jpg', 'team-2.jpg',
+    'team-1.jpg', 'marie.jpg', 'ivana-squares.jpg', 'ivana-square.jpg'
+]
+
+def random_avatar():
+    return random.choice(AVATAR_CHOICES)
 
 def get_available_tools():
     tools_dir = os.path.join('apps', 'agents', 'tools')
@@ -87,6 +96,7 @@ class Agent(models.Model):
     max_retry_limit = models.IntegerField(default=2)
     use_system_prompt = models.BooleanField(default=True)
     respect_context_window = models.BooleanField(default=True)
+    avatar = models.CharField(max_length=100, default=random_avatar)
 
     def __str__(self):
         return self.name

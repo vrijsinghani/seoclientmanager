@@ -4,8 +4,8 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from .models import Crew, CrewExecution, CrewMessage, Pipeline
-from .forms import CrewExecutionForm, HumanInputForm
+from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent  # Add Agent here
+from .forms import CrewExecutionForm, HumanInputForm, AgentForm
 from .tasks import execute_crew, resume_crew_execution
 from django.core.exceptions import ValidationError
 import logging
@@ -178,3 +178,21 @@ def manage_pipelines(request):
         'pipelines': pipelines,
     }
     return render(request, 'agents/manage_pipelines.html', context)
+
+@login_required
+def manage_agents_card_view(request):
+    agents = Agent.objects.prefetch_related('crew_set', 'task_set', 'tools').all()
+    form = AgentForm()  # Create an instance of the form
+    context = {
+        'agents': agents,
+        'form': form,  # Pass the form to the template
+    }
+    return render(request, 'agents/manage_agents_card_view.html', context)
+
+@login_required
+def manage_crews_card_view(request):
+    crews = Crew.objects.all()
+    context = {
+        'crews': crews,
+    }
+    return render(request, 'agents/manage_crews_card_view.html', context)

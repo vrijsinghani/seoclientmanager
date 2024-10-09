@@ -9,15 +9,23 @@
     <div class="col-12">
       <div class="card mb-4">
         <!-- Card header -->
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-0">Crews</h5>
-            <p class="text-sm mb-0">
-              View and manage your AI agent crews.
-            </p>
-          </div>
-          <div>
-            <a href="{% url 'agents:add_crew' %}" class="btn btn-primary btn-sm">Add New Crew</a>
+        <div class="card-header pb-0">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h6 class="mb-0">Crews</h6>
+              <p class="text-sm mb-0">
+                View and manage your AI agent crews.
+              </p>
+            </div>
+            <div class="d-flex align-items-center">
+              <a href="{% url 'agents:manage_crews' %}" class="btn btn-sm me-2" title="Table View">
+                <i class="fas fa-table fs-5"></i>
+              </a>
+              <a href="{% url 'agents:manage_crews_card_view' %}" class="btn btn-sm me-2" title="Card View">
+                <i class="fas fa-id-card fs-5"></i>
+              </a>
+              <a href="{% url 'agents:add_crew' %}?next={{ request.path|urlencode }}" class="btn btn-primary btn-sm">Add Crew</a>
+            </div>
           </div>
         </div>
         <div class="table-responsive">
