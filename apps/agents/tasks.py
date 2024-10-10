@@ -27,8 +27,8 @@ def custom_input_handler(prompt=None, execution_id=None):
     
     if execution_id is None:
         logger.warning("Execution ID not provided for custom input handler")
-        return builtins.input(prompt)  # Fall back to standard input
-
+        return ''  # Return an empty string or handle accordingly
+    
     # Store the prompt in the cache
     cache.set(f'human_input_request_{execution_id}', prompt, timeout=3600)
     
@@ -66,6 +66,12 @@ def execute_crew(execution_id):
     logger.info(f"Starting crew execution for id: {execution_id}")
     execution = CrewExecution.objects.get(id=execution_id)
     
+    # Store the original input function
+    original_input = builtins.input
+    
+    # Replace the input function with our custom handler
+    builtins.input = lambda prompt=None: custom_input_handler(prompt, execution.id)
+    
     log_crew_message(execution, f"Starting execution for crew: {execution.crew.name}")
     
     try:
@@ -87,6 +93,9 @@ def execute_crew(execution_id):
         handle_human_input_required(execution, e)
     except Exception as e:
         handle_execution_error(execution, e)
+    finally:
+        # Restore the original input function
+        builtins.input = original_input
 
     logger.info(f"Execution completed for CrewExecution id: {execution_id}")
     return execution.id
