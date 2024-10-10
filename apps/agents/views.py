@@ -10,6 +10,7 @@ from .tasks import execute_crew, resume_crew_execution
 from django.core.exceptions import ValidationError
 import logging
 import json
+from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -32,31 +33,25 @@ def crew_list(request):
 
 @login_required
 def crew_detail(request, crew_id):
-    logger.debug(f"Entering crew_detail view for crew_id: {crew_id}")
     crew = get_object_or_404(Crew, id=crew_id)
     recent_executions = CrewExecution.objects.filter(crew=crew).order_by('-created_at')[:5]
     
     if request.method == 'POST':
-        logger.debug(f"POST request received for crew_id: {crew_id}")
         form = CrewExecutionForm(request.POST)
         if form.is_valid():
-            logger.debug("Form is valid, creating new CrewExecution")
             execution = form.save(commit=False)
-            execution.crew = crew
+            execution.crew = crew  # Set the crew here
             execution.user = request.user
             execution.inputs = form.cleaned_data.get('inputs') or {}
-            logger.info(f"Execution inputs: {json.dumps(execution.inputs)}")
             execution.save()
             
-            logger.info(f"Starting Celery task for CrewExecution id: {execution.id}")
             # Start the Celery task
             task = execute_crew.delay(execution.id)
-            logger.info(f"Celery task started with task id: {task.id}")
             
             messages.success(request, 'Crew execution started successfully. You will be notified when it completes.')
-            return redirect('agents:execution_detail', execution_id=execution.id)
+            return JsonResponse({'redirect_url': reverse('agents:execution_detail', args=[execution.id]), 'execution_id': execution.id})
         else:
-            logger.warning(f"Form is invalid. Errors: {form.errors}")
+            return JsonResponse({'errors': form.errors}, status=400)
     else:
         form = CrewExecutionForm()
     
@@ -124,18 +119,17 @@ def execution_detail(request, execution_id):
 
 @login_required
 def execution_status(request, execution_id):
-    logger.debug(f"Entering execution_status view for execution_id: {execution_id}")
     try:
         execution = CrewExecution.objects.get(id=execution_id, user=request.user)
+        recent_messages = CrewMessage.objects.filter(execution=execution).order_by('-timestamp')[:10]
         response_data = {
             'status': execution.status,
             'outputs': execution.outputs,
             'human_input_request': execution.human_input_request,
+            'messages': [{'agent': msg.agent, 'content': msg.content} for msg in recent_messages],
         }
-        logger.info(f"Execution status response: {json.dumps(response_data)}")
         return JsonResponse(response_data)
     except CrewExecution.DoesNotExist:
-        logger.warning(f"CrewExecution with id {execution_id} not found")
         return JsonResponse({'error': 'Execution not found'}, status=404)
 
 @login_required

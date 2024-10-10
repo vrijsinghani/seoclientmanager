@@ -9,18 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 class CrewExecutionForm(forms.ModelForm):
-    client = forms.ModelChoiceField(queryset=Client.objects.all(), required=False)
+    inputs = forms.JSONField(widget=forms.Textarea(attrs={'rows': 4}), required=False)
 
     class Meta:
         model = CrewExecution
-        fields = ['crew', 'inputs', 'client']
-        widgets = {
-            'inputs': forms.Textarea(attrs={'rows': 4}),
-        }
+        fields = ['inputs']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['inputs'].required = False
+        self.fields['inputs'].widget.attrs['class'] = 'form-control'
+        self.fields['inputs'].help_text = 'Enter JSON formatted inputs for the crew execution.'
 
     def clean_inputs(self):
         inputs = self.cleaned_data.get('inputs')
@@ -29,7 +27,7 @@ class CrewExecutionForm(forms.ModelForm):
                 return json.loads(inputs)
             except json.JSONDecodeError:
                 raise forms.ValidationError("Invalid JSON format in inputs field")
-        return {}  # Return an empty dict if no inputs provided
+        return {}
 
 class HumanInputForm(forms.Form):
     response = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=True)

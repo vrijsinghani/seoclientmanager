@@ -5,117 +5,306 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-10 col-xl-8">
+    <div class="row">
+        <div class="col-12">
             <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">{% if crew %}Edit Crew{% else %}Add Crew{% endif %}</h5>
+                <div class="card-header pb-0">
+                    <h6 class="mb-0">{% if crew %}Edit Crew{% else %}Add Crew{% endif %}</h6>
                 </div>
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
-                        <div class="mb-4">
-                            <label for="{{ form.name.id_for_label }}" class="form-label">Name</label><br>
-                            {{ form.name }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.agents.id_for_label }}" class="form-label">Agents</label>
-                            {{ form.agents }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.tasks.id_for_label }}" class="form-label">Tasks</label>
-                            {{ form.tasks }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.process.id_for_label }}" class="form-label">Process</label><br>
-                            {{ form.process }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.manager_llm.id_for_label }}" class="form-label">Manager LLM</label><br>
-                            {{ form.manager_llm }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.function_calling_llm.id_for_label }}" class="form-label">Function Calling LLM</label><br>
-                            {{ form.function_calling_llm }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.config.id_for_label }}" class="form-label">Config</label><br>
-                            {{ form.config }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.max_rpm.id_for_label }}" class="form-label">Max RPM</label><br>
-                            {{ form.max_rpm }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.language.id_for_label }}" class="form-label">Language</label><br>
-                            {{ form.language }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.language_file.id_for_label }}" class="form-label">Language File</label><br>
-                            {{ form.language_file }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.embedder.id_for_label }}" class="form-label">Embedder</label><br>
-                            {{ form.embedder }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.step_callback.id_for_label }}" class="form-label">Step Callback</label><br>
-                            {{ form.step_callback }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.task_callback.id_for_label }}" class="form-label">Task Callback</label><br>
-                            {{ form.task_callback }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.output_log_file.id_for_label }}" class="form-label">Output Log File</label><br>
-                            {{ form.output_log_file }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.manager_agent.id_for_label }}" class="form-label">Manager Agent</label><br>
-                            {{ form.manager_agent }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.manager_callbacks.id_for_label }}" class="form-label">Manager Callbacks</label><br>
-                            {{ form.manager_callbacks }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.prompt_file.id_for_label }}" class="form-label">Prompt File</label><br>
-                            {{ form.prompt_file }}
-                        </div>
-                        <div class="mb-4">
-                            <label for="{{ form.planning_llm.id_for_label }}" class="form-label">Planning LLM</label><br>
-                            {{ form.planning_llm }}
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label">Options</label>
-                            <div class="form-check custom-checkbox">
-                                {{ form.verbose }}
-                                <label class="form-check-label" for="{{ form.verbose.id_for_label }}">Verbose</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.name.id_for_label }}" class="form-control-label">Name</label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                        <div class="text-danger">
+                                            {{ form.name.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div class="form-check custom-checkbox">
-                                {{ form.memory }}
-                                <label class="form-check-label" for="{{ form.memory.id_for_label }}">Memory</label>
-                            </div>
-                            <div class="form-check custom-checkbox">
-                                {{ form.cache }}
-                                <label class="form-check-label" for="{{ form.cache.id_for_label }}">Cache</label>
-                            </div>
-                            <div class="form-check custom-checkbox">
-                                {{ form.full_output }}
-                                <label class="form-check-label" for="{{ form.full_output.id_for_label }}">Full Output</label>
-                            </div>
-                            <div class="form-check custom-checkbox">
-                                {{ form.share_crew }}
-                                <label class="form-check-label" for="{{ form.share_crew.id_for_label }}">Share Crew</label>
-                            </div>
-                            <div class="form-check custom-checkbox">
-                                {{ form.planning }}
-                                <label class="form-check-label" for="{{ form.planning.id_for_label }}">Planning</label>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.agents.id_for_label }}" class="form-control-label">Agents</label>
+                                    {{ form.agents }}
+                                    {% if form.agents.errors %}
+                                        <div class="text-danger">
+                                            {{ form.agents.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-end">
-                            <a href="{% url 'agents:manage_crews' %}" class="btn btn-secondary me-2">Cancel</a>
-                            <button type="submit" class="btn btn-primary">Save</button>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="{{ form.tasks.id_for_label }}" class="form-control-label">Tasks</label>
+                                    {{ form.tasks }}
+                                    {% if form.tasks.errors %}
+                                        <div class="text-danger">
+                                            {{ form.tasks.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.process.id_for_label }}" class="form-control-label">Process</label>
+                                    {{ form.process }}
+                                    {% if form.process.errors %}
+                                        <div class="text-danger">
+                                            {{ form.process.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.manager_llm.id_for_label }}" class="form-control-label">Manager LLM</label>
+                                    {{ form.manager_llm }}
+                                    {% if form.manager_llm.errors %}
+                                        <div class="text-danger">
+                                            {{ form.manager_llm.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.function_calling_llm.id_for_label }}" class="form-control-label">Function Calling LLM</label>
+                                    {{ form.function_calling_llm }}
+                                    {% if form.function_calling_llm.errors %}
+                                        <div class="text-danger">
+                                            {{ form.function_calling_llm.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.config.id_for_label }}" class="form-control-label">Config</label>
+                                    {{ form.config }}
+                                    {% if form.config.errors %}
+                                        <div class="text-danger">
+                                            {{ form.config.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.max_rpm.id_for_label }}" class="form-control-label">Max RPM</label>
+                                    {{ form.max_rpm }}
+                                    {% if form.max_rpm.errors %}
+                                        <div class="text-danger">
+                                            {{ form.max_rpm.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.language.id_for_label }}" class="form-control-label">Language</label>
+                                    {{ form.language }}
+                                    {% if form.language.errors %}
+                                        <div class="text-danger">
+                                            {{ form.language.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.language_file.id_for_label }}" class="form-control-label">Language File</label>
+                                    {{ form.language_file }}
+                                    {% if form.language_file.errors %}
+                                        <div class="text-danger">
+                                            {{ form.language_file.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.embedder.id_for_label }}" class="form-control-label">Embedder</label>
+                                    {{ form.embedder }}
+                                    {% if form.embedder.errors %}
+                                        <div class="text-danger">
+                                            {{ form.embedder.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.step_callback.id_for_label }}" class="form-control-label">Step Callback</label>
+                                    {{ form.step_callback }}
+                                    {% if form.step_callback.errors %}
+                                        <div class="text-danger">
+                                            {{ form.step_callback.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.task_callback.id_for_label }}" class="form-control-label">Task Callback</label>
+                                    {{ form.task_callback }}
+                                    {% if form.task_callback.errors %}
+                                        <div class="text-danger">
+                                            {{ form.task_callback.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.output_log_file.id_for_label }}" class="form-control-label">Output Log File</label>
+                                    {{ form.output_log_file }}
+                                    {% if form.output_log_file.errors %}
+                                        <div class="text-danger">
+                                            {{ form.output_log_file.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.manager_agent.id_for_label }}" class="form-control-label">Manager Agent</label>
+                                    {{ form.manager_agent }}
+                                    {% if form.manager_agent.errors %}
+                                        <div class="text-danger">
+                                            {{ form.manager_agent.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.manager_callbacks.id_for_label }}" class="form-control-label">Manager Callbacks</label>
+                                    {{ form.manager_callbacks }}
+                                    {% if form.manager_callbacks.errors %}
+                                        <div class="text-danger">
+                                            {{ form.manager_callbacks.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.prompt_file.id_for_label }}" class="form-control-label">Prompt File</label>
+                                    {{ form.prompt_file }}
+                                    {% if form.prompt_file.errors %}
+                                        <div class="text-danger">
+                                            {{ form.prompt_file.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.planning_llm.id_for_label }}" class="form-control-label">Planning LLM</label>
+                                    {{ form.planning_llm }}
+                                    {% if form.planning_llm.errors %}
+                                        <div class="text-danger">
+                                            {{ form.planning_llm.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    {{ form.verbose }}
+                                    <label class="form-check-label" for="{{ form.verbose.id_for_label }}">Verbose</label>
+                                    {% if form.verbose.errors %}
+                                        <div class="text-danger">
+                                            {{ form.verbose.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    {{ form.memory }}
+                                    <label class="form-check-label" for="{{ form.memory.id_for_label }}">Memory</label>
+                                    {% if form.memory.errors %}
+                                        <div class="text-danger">
+                                            {{ form.memory.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    {{ form.cache }}
+                                    <label class="form-check-label" for="{{ form.cache.id_for_label }}">Cache</label>
+                                    {% if form.cache.errors %}
+                                        <div class="text-danger">
+                                            {{ form.cache.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    {{ form.full_output }}
+                                    <label class="form-check-label" for="{{ form.full_output.id_for_label }}">Full Output</label>
+                                    {% if form.full_output.errors %}
+                                        <div class="text-danger">
+                                            {{ form.full_output.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    {{ form.share_crew }}
+                                    <label class="form-check-label" for="{{ form.share_crew.id_for_label }}">Share Crew</label>
+                                    {% if form.share_crew.errors %}
+                                        <div class="text-danger">
+                                            {{ form.share_crew.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    {{ form.planning }}
+                                    <label class="form-check-label" for="{{ form.planning.id_for_label }}">Planning</label>
+                                    {% if form.planning.errors %}
+                                        <div class="text-danger">
+                                            {{ form.planning.errors|join:", " }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-12 text-end">
+                                <a href="{% url 'agents:manage_crews' %}" class="btn btn-secondary me-2">Cancel</a>
+                                <button type="submit" class="btn bg-gradient-primary">Save Crew</button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -125,82 +314,6 @@
 </div>
 {% endblock content %}
 
-{% block extrastyle %}
-<style>
-    .card {
-        box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
-        border: 0;
-    }
-    .card-header {
-        background-color: #f8f9fa;
-        border-bottom: 1px solid rgba(0,0,0,.125);
-        padding: 1rem 1.5rem;
-    }
-    .card-body {
-        padding: 1.5rem;
-    }
-    .form-label {
-        font-weight: 600;
-        color: #344767;
-        margin-bottom: 0.5rem;
-        display: block;
-    }
-    .form-control, .form-select {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.875rem;
-        border: 1px solid #d2d6da;
-        border-radius: 0.375rem;
-        margin-top: 0.25rem;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: #5e72e4;
-        box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25);
-    }
-    textarea.form-control {
-        min-height: 100px;
-    }
-    .form-check {
-        margin-bottom: 0.5rem;
-        padding-left: 0;
-    }
-    .form-check-input {
-        margin-top: 0.3rem;
-        margin-right: 0.5rem;
-        float: left;
-    }
-    .form-check-label {
-        display: block;
-        margin-left: 1.75rem;
-    }
-    .btn {
-        font-size: 0.875rem;
-        font-weight: 600;
-        padding: 0.625rem 1.25rem;
-        border-radius: 0.375rem;
-    }
-    .btn-primary {
-        background-color: #5e72e4;
-        border-color: #5e72e4;
-    }
-    .btn-secondary {
-        background-color: #8392ab;
-        border-color: #8392ab;
-    }
-    .custom-checkbox .form-check-input {
-        border-radius: 0.25rem;
-        width: 1.25rem;
-        height: 1.25rem;
-    }
-    .custom-checkbox .form-check-input:checked {
-        background-color: #5e72e4;
-        border-color: #5e72e4;
-    }
-    .custom-checkbox .form-check-label {
-        padding-top: 0.1rem;
-    }
-</style>
-{% endblock extrastyle %}
 
 {% block extra_js %}
 <script src="{% static 'assets/js/plugins/choices.min.js' %}"></script>
@@ -214,6 +327,43 @@
                 placeholder: true,
                 placeholderValue: 'Select an option'
             });
+        });
+
+        // Add classes to form elements
+        var formElements = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), select, textarea');
+        formElements.forEach(function(element) {
+            element.classList.add('form-control');
+        });
+
+        var selectElements = document.querySelectorAll('select');
+        selectElements.forEach(function(element) {
+            element.classList.add('form-select');
+        });
+
+        var checkboxInputs = document.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+        checkboxInputs.forEach(function(element) {
+            element.classList.add('form-check-input');
+        });
+
+        // Form validation
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(event) {
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+
+            requiredFields.forEach(function(field) {
+                if (!field.value.trim()) {
+                    isValid = false;
+                    field.classList.add('is-invalid');
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+
+            if (!isValid) {
+                event.preventDefault();
+                alert('Please fill in all required fields.');
+            }
         });
     });
 </script>

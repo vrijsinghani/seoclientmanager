@@ -20,14 +20,6 @@
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link {% if request.resolver_match.url_name == 'summarize' %}active{% endif %}" href="{% url 'seo_manager:summarize_view' %}">
-          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
-            <i class="ni ni-scissors text-primary text-sm opacity-10"></i>
-          </div>
-          <span class="nav-link-text ms-1">Summarize</span>
-        </a>
-      </li>
-      <li class="nav-item">
         <a class="nav-link {% if request.resolver_match.url_name == 'client_list' %}active{% endif %}" href="{% url 'seo_manager:client_list' %}">
           <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
             <i class="ni ni-briefcase-24 text-primary text-sm opacity-10"></i>
@@ -41,45 +33,8 @@
           <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
             <i class="ni ni-spaceship text-primary text-sm opacity-10"></i>
           </div>
-          <span class="nav-link-text ms-1">CrewAI</span>
+          <span class="nav-link-text ms-1">Agent Crews</span>
         </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link {% if 'agents:' in request.resolver_match.namespace %}active{% endif %}" href="#" data-bs-toggle="collapse" data-bs-target="#crewai-submenu" aria-expanded="false">
-          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
-            <i class="ni ni-spaceship text-primary text-sm opacity-10"></i>
-          </div>
-          <span class="nav-link-text ms-1">CrewAI Agents</span>
-        </a>
-        <div class="collapse {% if 'agents:' in request.resolver_match.namespace %}show{% endif %}" id="crewai-submenu">
-          <ul class="nav ms-4 ps-3">
-            <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'crew_list' %}active{% endif %}" href="{% url 'agents:crew_list' %}">
-                <span class="nav-link-text ms-1">Crews</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'manage_crews' %}active{% endif %}" href="{% url 'agents:manage_crews' %}">
-                <span class="nav-link-text ms-1">Manage Crews</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'manage_agents' %}active{% endif %}" href="{% url 'agents:manage_agents' %}">
-                <span class="nav-link-text ms-1">Manage Agents</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'manage_tasks' %}active{% endif %}" href="{% url 'agents:manage_tasks' %}">
-                <span class="nav-link-text ms-1">Manage Tasks</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'manage_tools' %}active{% endif %}" href="{% url 'agents:manage_tools' %}">
-                <span class="nav-link-text ms-1">Manage Tools</span>
-              </a>
-            </li>
-          </ul>
-        </div>
       </li>
       <li class="nav-item">
         <a class="nav-link {% if request.resolver_match.url_name == 'activity_log' %}active{% endif %}" href="{% url 'seo_manager:activity_log' %}">
@@ -95,6 +50,14 @@
             <i class="ni ni-world-2 text-primary text-sm opacity-10"></i>
           </div>
           <span class="nav-link-text ms-1">Crawl Website</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if request.resolver_match.url_name == 'summarize' %}active{% endif %}" href="{% url 'seo_manager:summarize_view' %}">
+          <div class="icon icon-shape icon-sm shadow border-radius-md bg-white text-center me-2 d-flex align-items-center justify-content-center">
+            <i class="ni ni-scissors text-primary text-sm opacity-10"></i>
+          </div>
+          <span class="nav-link-text ms-1">Summarize</span>
         </a>
       </li>
       <li class="nav-item">

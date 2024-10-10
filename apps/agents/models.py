@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 AVATAR_CHOICES = [
-    'user.jpg', 'team-5.jpg', 'team-4.jpg', 'team-3.jpg', 'team-2.jpg',
+    'user.jpg', 'team-5.jpg', 'team-4.jpg', 'team-3.jpg', 'team-2.jpg', 'kal-visuals-square.jpg',
     'team-1.jpg', 'marie.jpg', 'ivana-squares.jpg', 'ivana-square.jpg'
 ]
 
