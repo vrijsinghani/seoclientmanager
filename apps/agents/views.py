@@ -3,7 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent  # Add Agent here
 from .forms import CrewExecutionForm, HumanInputForm, AgentForm
 from .tasks import execute_crew, resume_crew_execution
@@ -11,6 +12,7 @@ from django.core.exceptions import ValidationError
 import logging
 import json
 from django.urls import reverse
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +42,19 @@ def crew_detail(request, crew_id):
         form = CrewExecutionForm(request.POST)
         if form.is_valid():
             execution = form.save(commit=False)
-            execution.crew = crew  # Set the crew here
+            execution.crew = crew
             execution.user = request.user
             execution.inputs = form.cleaned_data.get('inputs') or {}
             execution.save()
             
             # Start the Celery task
-            task = execute_crew.delay(execution.id)
+            execute_crew.delay(execution.id)
             
-            messages.success(request, 'Crew execution started successfully. You will be notified when it completes.')
-            return JsonResponse({'redirect_url': reverse('agents:execution_detail', args=[execution.id]), 'execution_id': execution.id})
+            # Return a JSON response
+            return JsonResponse({
+                'message': 'Crew execution started successfully',
+                'execution_id': execution.id
+            })
         else:
             return JsonResponse({'errors': form.errors}, status=400)
     else:
@@ -90,31 +95,10 @@ def execution_list(request):
 
 @login_required
 def execution_detail(request, execution_id):
-    logger.debug(f"Entering execution_detail view for execution_id: {execution_id}")
     execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
-    logger.info(f"Execution details: id={execution.id}, status={execution.status}, crew={execution.crew.name}")
-    
-    crew_messages = CrewMessage.objects.filter(execution=execution).order_by('timestamp')
-    logger.info(f"Number of crew messages: {crew_messages.count()}")
-    for message in crew_messages:
-        logger.debug(f"Message: {message.content[:100]}...")  # Log first 100 characters of each message
-    
-    human_input_form = None
-    if execution.status == 'WAITING_FOR_HUMAN_INPUT':
-        human_input_form = HumanInputForm()
-        logger.info("Human input form created")
-    
-    if execution.outputs:
-        logger.info(f"Execution outputs: {json.dumps(execution.outputs)}")
-    else:
-        logger.info("No execution outputs available")
-
     context = {
         'execution': execution,
-        'messages': crew_messages,
-        'human_input_form': human_input_form,
     }
-    logger.debug("Rendering execution_detail.html template")
     return render(request, 'agents/execution_detail.html', context)
 
 @login_required
@@ -133,37 +117,38 @@ def execution_status(request, execution_id):
         return JsonResponse({'error': 'Execution not found'}, status=404)
 
 @login_required
+@csrf_exempt
 @require_POST
-def submit_human_input(request, execution_id):
-    logger.debug(f"Entering submit_human_input view for execution_id: {execution_id}")
-    execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
-    
-    if execution.status != 'WAITING_FOR_HUMAN_INPUT':
-        logger.warning(f"Execution {execution_id} is not waiting for human input")
-        messages.error(request, 'This execution is not waiting for human input.')
-        return redirect('agents:execution_detail', execution_id=execution.id)
+def provide_human_input(request, execution_id):
+    try:
+        execution = CrewExecution.objects.get(id=execution_id, user=request.user)
+        if execution.status != 'WAITING_FOR_HUMAN_INPUT':
+            return JsonResponse({'error': 'Execution is not waiting for human input'}, status=400)
 
-    form = HumanInputForm(request.POST)
-    if form.is_valid():
-        try:
-            execution.human_input_response = form.cleaned_data['response']
-            execution.status = 'RUNNING'
-            execution.save()
+        data = json.loads(request.body)
+        user_input = data.get('input')
 
-            logger.info(f"Resuming Celery task for CrewExecution id: {execution.id}")
-            # Resume the Celery task
-            task = resume_crew_execution.delay(execution.id)
-            logger.info(f"Celery task resumed with task id: {task.id}")
+        if not user_input:
+            return JsonResponse({'error': 'No input provided'}, status=400)
 
-            messages.success(request, 'Human input submitted successfully. The execution will resume shortly.')
-        except ValidationError as e:
-            logger.error(f"Error saving human input for execution {execution_id}: {str(e)}")
-            messages.error(request, f'Error saving human input: {str(e)}')
-    else:
-        logger.warning(f"Invalid human input form for execution {execution_id}. Errors: {form.errors}")
-        messages.error(request, 'Invalid input. Please try again.')
+        # Store the user input in the cache
+        cache.set(f'human_input_response_{execution_id}', user_input, timeout=3600)
 
-    return redirect('agents:execution_detail', execution_id=execution.id)
+        # Update the execution status
+        execution.status = 'RUNNING'
+        execution.save()
+
+        # Resume the Celery task
+        resume_crew_execution.delay(execution_id)
+
+        return JsonResponse({'message': 'Human input received and processing resumed'})
+    except CrewExecution.DoesNotExist:
+        return JsonResponse({'error': 'Execution not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Error in provide_human_input: {str(e)}")
+        return JsonResponse({'error': 'An unexpected error occurred'}, status=500)
 
 @login_required
 def manage_pipelines(request):
@@ -190,3 +175,31 @@ def manage_crews_card_view(request):
         'crews': crews,
     }
     return render(request, 'agents/manage_crews_card_view.html', context)
+
+def connection_test(request):
+    return render(request, 'agents/connection_test.html')
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def provide_human_input(request, execution_id):
+    try:
+        execution = CrewExecution.objects.get(id=execution_id)
+        data = json.loads(request.body)
+        user_input = data.get('input')
+        
+        if not user_input:
+            return JsonResponse({'error': 'No input provided'}, status=400)
+        
+        execution.human_input_response = user_input
+        execution.save()
+        
+        # Resume the execution
+        resume_crew_execution.delay(execution_id)
+        
+        return JsonResponse({'status': 'success', 'message': 'Input received and execution resumed'})
+    except CrewExecution.DoesNotExist:
+        return JsonResponse({'error': 'Execution not found'}, status=404)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

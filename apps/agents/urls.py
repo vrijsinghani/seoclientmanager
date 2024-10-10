@@ -5,17 +5,15 @@ from . import views_admin
 app_name = 'agents'
 
 urlpatterns = [
-    # Change dashboard_home to crewai_home
     path('', views.crewai_home, name='crewai_home'),
-    # Keep the existing crew_list view
     path('crews/', views.crew_list, name='crew_list'),
     path('crew/<int:crew_id>/', views.crew_detail, name='crew_detail'),
     path('executions/', views.execution_list, name='execution_list'),
     path('execution/<int:execution_id>/', views.execution_detail, name='execution_detail'),
     path('execution/<int:execution_id>/status/', views.execution_status, name='execution_status'),
-    path('execution/<int:execution_id>/submit_human_input/', views.submit_human_input, name='submit_human_input'),
+    path('execution/<int:execution_id>/provide_input/', views.provide_human_input, name='provide_human_input'),
     
-    # Keep all existing admin views
+    # Admin views
     path('manage/agents/', views_admin.manage_agents, name='manage_agents'),
     path('manage/agents/add/', views_admin.add_agent, name='add_agent'),
     path('manage/agents/edit/<int:agent_id>/', views_admin.edit_agent, name='edit_agent'),
@@ -40,7 +38,7 @@ urlpatterns = [
     
     path('pipelines/', views.manage_pipelines, name='manage_pipelines'),
     path('manage/agents/card-view/', views.manage_agents_card_view, name='manage_agents_card_view'),
-    
-    # Add the new URL pattern for manage_crews_card_view
     path('manage/crews/card-view/', views_admin.manage_crews_card_view, name='manage_crews_card_view'),
+    
+    path('connection-test/', views.connection_test, name='connection_test'),
 ]

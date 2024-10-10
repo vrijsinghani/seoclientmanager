@@ -136,15 +136,14 @@ class CrewForm(forms.ModelForm):
 
     class Meta:
         model = Crew
-        fields = ['name', 'agents', 'tasks', 'process', 'verbose', 'manager_llm', 'function_calling_llm', 
-                  'config', 'max_rpm', 'language', 'language_file', 'memory', 'cache', 'embedder', 
-                  'full_output', 'step_callback', 'task_callback', 'share_crew', 'output_log_file', 
-                  'manager_agent', 'manager_callbacks', 'prompt_file', 'planning', 'planning_llm']
-        widgets = {
-            'agents': forms.CheckboxSelectMultiple(),
-            'tasks': forms.CheckboxSelectMultiple(),
-            'embedder': forms.Textarea(attrs={'rows': 4}),
-        }
+        fields = [
+            'name', 'agents', 'tasks', 'process', 'verbose', 'manager_llm',
+            'function_calling_llm', 'config', 'max_rpm', 'language',
+            'language_file', 'memory', 'cache', 'embedder', 'full_output',
+            'share_crew', 'output_log_file', 'manager_agent', 'manager_callbacks',
+            'prompt_file', 'planning', 'planning_llm'
+        ]
+        # step_callback and task_callback are removed from here
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

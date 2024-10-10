@@ -55,20 +55,6 @@
         </div>
       </div>
 
-      <!-- New card for real-time updates -->
-      <div class="card mb-4">
-        <div class="card-header pb-0">
-          <h6 class="mb-0">Real-time Execution Updates</h6>
-        </div>
-        <div class="card-body">
-          <div id="execution-status" class="alert alert-info" role="alert">
-            No active execution
-          </div>
-          <div id="execution-messages">
-            <!-- Messages will be dynamically inserted here -->
-          </div>
-        </div>
-      </div>
 
       <!-- Existing card for starting new execution -->
       <div class="card">
@@ -104,6 +90,28 @@
             {% endfor %}
             <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Start Execution</button>
           </form>
+        </div>
+      </div>
+      <!-- New card for real-time updates -->
+      <div class="card mb-4">
+        <div class="card-header pb-0">
+          <h6 class="mb-0">Real-time Execution Updates</h6>
+        </div>
+        <div class="card-body">
+          <div id="execution-status" class="alert alert-info" role="alert">
+            No active execution
+          </div>
+          <div id="execution-messages-container" style="height: 300px; overflow-y: auto; border: 1px solid #e9ecef; padding: 10px; margin-bottom: 15px;">
+            <div id="execution-messages">
+              <!-- Messages will be dynamically inserted here -->
+            </div>
+          </div>
+          <div id="human-input-section" style="display: none;">
+            <h6 class="text-uppercase text-body text-xs font-weight-bolder mb-3">Human Input Required</h6>
+            <div id="human-input-prompt"></div>
+            <textarea id="human-input-response" class="form-control mb-3" rows="3"></textarea>
+            <button id="submit-human-input" class="btn btn-primary">Submit Input</button>
+          </div>
         </div>
       </div>
     </div>
@@ -143,6 +151,7 @@
 {{ block.super }}
 <script>
   $(function () {
+    let socket = null;
     let activeExecutionId = null;
 
     $('#crew-execution-form').on('submit', function(e) {
@@ -156,7 +165,7 @@
         data: form.serialize(),
         success: function(data) {
           activeExecutionId = data.execution_id;
-          updateExecutionStatus();
+          connectWebSocket(activeExecutionId);
           $('#execution-status').text('Execution started');
           $('#execution-messages').empty();
         },
@@ -167,33 +176,79 @@
       });
     });
 
-    function updateExecutionStatus() {
-      if (!activeExecutionId) return;
+    function connectWebSocket(executionId) {
+      const wsScheme = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsPath = `${wsScheme}${window.location.host}/ws/crew_execution/${executionId}/`;
+      
+      socket = new WebSocket(wsPath);
 
+      socket.onopen = function(e) {
+        console.log('WebSocket connection established');
+      };
+
+      socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        handleWebSocketMessage(data);
+      };
+
+      socket.onclose = function(event) {
+        console.log('WebSocket connection closed');
+      };
+
+      socket.onerror = function(error) {
+        console.error('WebSocket Error:', error);
+      };
+    }
+
+    function handleWebSocketMessage(data) {
+      if (data.status) {
+        $('#execution-status').text(`Status: ${data.status}`);
+      }
+      
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(msg => {
+          let messageHtml = `<p class="text-xxs mb-1"><strong>${msg.agent || 'System'}:</strong> ${msg.content}</p>`;
+          $('#execution-messages').append(messageHtml);
+        });
+        
+        // Scroll to the bottom of the messages container
+        const messagesContainer = document.getElementById('execution-messages-container');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      if (data.status === 'WAITING_FOR_HUMAN_INPUT') {
+        showHumanInputPrompt(data.human_input_request);
+      } else {
+        $('#human-input-section').hide();
+      }
+
+      if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+        socket.close();
+        activeExecutionId = null;
+      }
+    }
+
+    function showHumanInputPrompt(prompt) {
+      $('#human-input-prompt').text(prompt);
+      $('#human-input-section').show();
+    }
+
+    $('#submit-human-input').on('click', function() {
+      let userInput = $('#human-input-response').val();
       $.ajax({
-        url: `/agents/execution/${activeExecutionId}/status/`,
+        type: "POST",
+        url: `/agents/execution/${activeExecutionId}/provide_input/`,
+        data: JSON.stringify({ input: userInput }),
+        contentType: "application/json",
         success: function(data) {
-          $('#execution-status').text(`Status: ${data.status}`);
-          
-          if (data.messages && data.messages.length > 0) {
-            let messagesHtml = data.messages.map(msg => 
-              `<p><strong>${msg.agent || 'System'}:</strong> ${msg.content}</p>`
-            ).join('');
-            $('#execution-messages').html(messagesHtml);
-          }
-
-          if (data.status !== 'COMPLETED' && data.status !== 'FAILED') {
-            setTimeout(updateExecutionStatus, 5000);  // Poll every 5 seconds
-          } else {
-            activeExecutionId = null;
-          }
+          $('#human-input-section').hide();
+          $('#human-input-response').val('');
         },
-        error: function() {
-          $('#execution-status').text('Error fetching status');
-          activeExecutionId = null;
+        error: function(xhr, status, error) {
+          alert('Error submitting input: ' + error);
         }
       });
-    }
+    });
   });
 </script>
 {% endblock extra_js %}

@@ -8,6 +8,7 @@ import importlib
 import logging
 import uuid
 import random
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +143,6 @@ class Crew(models.Model):
     cache = models.BooleanField(default=True)
     embedder = models.JSONField(default=default_embedder)
     full_output = models.BooleanField(default=False)
-    step_callback = models.CharField(max_length=255, null=True, blank=True)
-    task_callback = models.CharField(max_length=255, null=True, blank=True)
     share_crew = models.BooleanField(default=False)
     output_log_file = models.CharField(max_length=255, null=True, blank=True)
     manager_agent = models.ForeignKey(Agent, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_crews')
@@ -178,12 +177,13 @@ class CrewExecution(models.Model):
         return f"{self.crew.name} - {self.created_at}"
 
 class CrewMessage(models.Model):
-    execution = models.ForeignKey(CrewExecution, on_delete=models.CASCADE)
+    execution = models.ForeignKey(CrewExecution, on_delete=models.CASCADE, related_name='messages')
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    agent = models.CharField(max_length=255, null=True, blank=True)  # Add this line
 
     def __str__(self):
-        return f"{self.execution.crew.name} - {self.timestamp}"
+        return f"Message for execution {self.execution.id} at {self.timestamp}"
 
 class Pipeline(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -257,9 +257,23 @@ class PipelineRunResult(models.Model):
         return f"Run Result for {self.execution.pipeline.name}"
 
 class CrewOutput(models.Model):
-    run_result = models.ForeignKey(PipelineRunResult, related_name='crew_outputs', on_delete=models.CASCADE)
-    crew = models.ForeignKey('Crew', on_delete=models.CASCADE)
-    output = models.TextField()
+    execution = models.OneToOneField(CrewExecution, on_delete=models.CASCADE, related_name='crew_output')
+    raw = models.TextField()
+    pydantic = models.JSONField(null=True, blank=True)
+    json_dict = models.JSONField(null=True, blank=True)
+    token_usage = models.JSONField(null=True, blank=True)
+
+    @property
+    def json(self):
+        return json.dumps(self.json_dict) if self.json_dict else None
+
+    def to_dict(self):
+        return self.json_dict or (self.pydantic.dict() if self.pydantic else None) or {}
 
     def __str__(self):
-        return f"Output from {self.crew.name} in {self.run_result.execution.pipeline.name}"
+        if self.pydantic:
+            return str(self.pydantic)
+        elif self.json_dict:
+            return json.dumps(self.json_dict)
+        else:
+            return self.raw

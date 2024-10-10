@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'django_api_gen',
+    'channels',
 ]
 
 SITE_ID = 1
@@ -123,6 +124,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+ASGI_APPLICATION = 'core.asgi.application'
 
 
 # Database
@@ -383,6 +385,11 @@ LOGGING = {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
         },
+        'channels': {
+        'handlers': ['console', 'file'],
+        'level': 'DEBUG',
+        'propagate': True,
+        },
     },
 }
 
@@ -393,3 +400,12 @@ LOGGING = {
 # DEBUG_TOOLBAR_CONFIG = {
 #     "SHOW_TOOLBAR_CALLBACK": show_toolbar,
 # }
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}

@@ -19,7 +19,7 @@ django-api-generator==1.0.17
 django-debug-toolbar==4.2.0
 drf-spectacular==0.26.5
 celery-progress==0.3.0
-
+channels-redis==4.2.0
 # Deployment
 whitenoise==6.5.0
 gunicorn==21.2.0
