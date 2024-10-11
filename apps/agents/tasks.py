@@ -95,12 +95,15 @@ def execute_crew(self, execution_id):
                 return execution.id
             update_execution_status(execution, 'COMPLETED', result)
             
+            # Convert UsageMetrics to a dictionary
+            token_usage = result.token_usage.dict() if hasattr(result.token_usage, 'dict') else result.token_usage
+
             CrewOutput.objects.create(
                 execution=execution,
                 raw=str(result),
                 pydantic=result.pydantic.dict() if result.pydantic else None,
                 json_dict=result.json_dict,
-                token_usage=result.token_usage
+                token_usage=token_usage
             )
             
             log_message = f"Crew execution completed successfully. Output: {result}"

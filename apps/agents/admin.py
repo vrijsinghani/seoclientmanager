@@ -1,35 +1,27 @@
 from django.contrib import admin
-from .models import Crew, CrewExecution, CrewMessage, Agent, Task, Tool
+from .models import Crew, CrewExecution, CrewMessage, Agent, Task, Tool, CrewTask, Pipeline, PipelineStage, PipelineRoute, PipelineExecution, PipelineRunResult
 from .forms import AgentForm, TaskForm, CrewForm
+
+class CrewTaskInline(admin.TabularInline):
+    model = CrewTask
+    extra = 1
 
 @admin.register(Crew)
 class CrewAdmin(admin.ModelAdmin):
-    form = CrewForm
-    list_display = ('name', 'process', 'verbose', 'memory', 'cache', 'full_output', 'share_crew', 'planning')
-    list_filter = ('process', 'verbose', 'memory', 'cache', 'full_output', 'share_crew', 'planning')
-    filter_horizontal = ('agents', 'tasks')
-    search_fields = ('name', 'language', 'language_file', 'output_log_file', 'prompt_file')
+    list_display = ('name', 'process', 'verbose')
+    filter_horizontal = ('agents',)
+    inlines = [CrewTaskInline]
     fieldsets = (
         (None, {
-            'fields': ('name', 'agents', 'tasks', 'process')
-        }),
-        ('Language Model Settings', {
-            'fields': ('manager_llm', 'function_calling_llm', 'planning_llm')
-        }),
-        ('Execution Settings', {
-            'fields': ('verbose', 'max_rpm', 'memory', 'cache', 'full_output', 'planning')
-        }),
-        ('Language and Localization', {
-            'fields': ('language', 'language_file')
-        }),
-        ('Callbacks and Logging', {
-            'fields': ('step_callback', 'task_callback', 'output_log_file')
-        }),
-        ('Advanced Settings', {
-            'classes': ('collapse',),
-            'fields': ('config', 'embedder', 'share_crew', 'manager_agent', 'manager_callbacks', 'prompt_file'),
+            'fields': ('name', 'agents', 'process', 'verbose', 'manager_llm', 'function_calling_llm', 'config', 'max_rpm', 'language', 'language_file', 'memory', 'cache', 'embedder', 'full_output', 'share_crew', 'output_log_file', 'manager_agent', 'manager_callbacks', 'prompt_file', 'planning', 'planning_llm')
         }),
     )
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields['agents'].widget.can_add_related = True
+        form.base_fields['agents'].widget.can_change_related = True
+        return form
 
 @admin.register(CrewExecution)
 class CrewExecutionAdmin(admin.ModelAdmin):
@@ -109,3 +101,10 @@ class TaskAdmin(admin.ModelAdmin):
 class ToolAdmin(admin.ModelAdmin):
     list_display = ('name', 'description')
     search_fields = ('name', 'description', 'function')
+
+# Register other models
+admin.site.register(Pipeline)
+admin.site.register(PipelineStage)
+admin.site.register(PipelineRoute)
+admin.site.register(PipelineExecution)
+admin.site.register(PipelineRunResult)

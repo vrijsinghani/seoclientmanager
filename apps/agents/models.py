@@ -130,7 +130,7 @@ class Task(models.Model):
 class Crew(models.Model):
     name = models.CharField(max_length=100)
     agents = models.ManyToManyField(Agent)
-    tasks = models.ManyToManyField(Task)
+    tasks = models.ManyToManyField(Task, through='CrewTask')
     process = models.CharField(max_length=20, choices=[('sequential', 'Sequential'), ('hierarchical', 'Hierarchical')], default='sequential')
     verbose = models.BooleanField(default=False)
     manager_llm = models.CharField(max_length=100, null=True, blank=True)
@@ -277,3 +277,21 @@ class CrewOutput(models.Model):
             return json.dumps(self.json_dict)
         else:
             return self.raw
+
+    def save(self, *args, **kwargs):
+        # Convert UsageMetrics to a dictionary if it's not already
+        if self.token_usage and hasattr(self.token_usage, 'dict'):
+            self.token_usage = self.token_usage.dict()
+        super().save(*args, **kwargs)
+
+class CrewTask(models.Model):
+    crew = models.ForeignKey(Crew, on_delete=models.CASCADE, related_name='crew_tasks')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        unique_together = ('crew', 'task')
+
+    def __str__(self):
+        return f"{self.crew.name} - {self.task.description} (Order: {self.order})"

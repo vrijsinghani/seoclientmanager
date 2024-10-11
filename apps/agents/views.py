@@ -5,8 +5,8 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
-from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent  # Add Agent here
-from .forms import CrewExecutionForm, HumanInputForm, AgentForm
+from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent, CrewTask  # Add Agent here
+from .forms import CrewExecutionForm, HumanInputForm, AgentForm, CrewForm
 from .tasks import execute_crew
 from django.core.exceptions import ValidationError
 import logging
@@ -230,3 +230,31 @@ def submit_human_input(request, execution_id):
     )
     
     return JsonResponse({'message': 'Human input received and processed'})
+
+@login_required
+def crew_create_or_update(request, crew_id=None):
+    if crew_id:
+        crew = get_object_or_404(Crew, id=crew_id)
+    else:
+        crew = None
+
+    if request.method == 'POST':
+        form = CrewForm(request.POST, instance=crew)
+        if form.is_valid():
+            crew = form.save()
+            
+            # Handle task ordering
+            task_order = request.POST.getlist('task_order[]')
+            CrewTask.objects.filter(crew=crew).delete()
+            for index, task_id in enumerate(task_order):
+                CrewTask.objects.create(crew=crew, task_id=task_id, order=index)
+            
+            return redirect('crew_detail', crew_id=crew.id)
+    else:
+        form = CrewForm(instance=crew)
+
+    context = {
+        'form': form,
+        'crew': crew,
+    }
+    return render(request, 'agents/crew_form.html', context)

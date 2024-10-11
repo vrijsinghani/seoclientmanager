@@ -12,7 +12,7 @@
                     <h6 class="mb-0">{% if crew %}Edit Crew{% else %}Add Crew{% endif %}</h6>
                 </div>
                 <div class="card-body">
-                    <form method="post">
+                    <form method="post" id="crew-form">
                         {% csrf_token %}
                         <div class="row">
                             <div class="col-md-6">
@@ -48,6 +48,22 @@
                                             {{ form.tasks.errors|join:", " }}
                                         </div>
                                     {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label class="form-control-label">Task Order</label>
+                                    <ul id="task-order-list" class="list-group">
+                                        {% for crew_task in crew.crew_tasks.all %}
+                                            <li class="list-group-item" data-task-id="{{ crew_task.task.id }}">
+                                                <span class="badge bg-primary me-2">{{ forloop.counter }}</span>
+                                                {{ crew_task.task.description }}
+                                                <input type="hidden" name="task_order[]" value="{{ crew_task.task.id }}">
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
                                 </div>
                             </div>
                         </div>
@@ -317,6 +333,7 @@
 
 {% block extra_js %}
 <script src="{% static 'assets/js/plugins/choices.min.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize Choices.js for select fields
@@ -365,6 +382,63 @@
                 alert('Please fill in all required fields.');
             }
         });
+
+        const taskSelect = document.getElementById('{{ form.tasks.id_for_label }}');
+        const taskOrderList = document.getElementById('task-order-list');
+
+        // Initialize Sortable
+        new Sortable(taskOrderList, {
+            animation: 150,
+            onEnd: function() {
+                updateTaskOrder();
+            }
+        });
+
+        // Update task order when tasks are selected or deselected
+        taskSelect.addEventListener('change', function() {
+            updateTaskList();
+        });
+
+        function updateTaskList() {
+            const selectedTasks = Array.from(taskSelect.selectedOptions);
+            const currentOrder = Array.from(taskOrderList.children).map(li => li.dataset.taskId);
+            
+            // Remove tasks that are no longer selected
+            currentOrder.forEach(taskId => {
+                if (!selectedTasks.some(option => option.value === taskId)) {
+                    const li = taskOrderList.querySelector(`li[data-task-id="${taskId}"]`);
+                    if (li) li.remove();
+                }
+            });
+
+            // Add newly selected tasks
+            selectedTasks.forEach(function(option) {
+                if (!currentOrder.includes(option.value)) {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'list-group-item';
+                    listItem.dataset.taskId = option.value;
+                    listItem.innerHTML = `
+                        <span class="badge bg-primary me-2"></span>
+                        ${option.text}
+                        <input type="hidden" name="task_order[]" value="${option.value}">
+                    `;
+                    taskOrderList.appendChild(listItem);
+                }
+            });
+
+            updateTaskOrder();
+        }
+
+        function updateTaskOrder() {
+            const items = taskOrderList.querySelectorAll('li');
+            items.forEach(function(item, index) {
+                item.querySelector('.badge').textContent = index + 1;
+                item.querySelector('input[name="task_order[]"]').value = item.dataset.taskId;
+            });
+        }
+
+        // Initial update
+        updateTaskList();
     });
 </script>
 {% endblock extra_js %}
