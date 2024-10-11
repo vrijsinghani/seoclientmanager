@@ -57,7 +57,7 @@
 
 
       <!-- Existing card for starting new execution -->
-      <div class="card">
+      <div class="card mb-4">
         <div class="card-header pb-0">
           <h6 class="mb-0">Start New Execution for {{ crew.name }}</h6>
         </div>
@@ -101,16 +101,16 @@
           <div id="execution-status" class="alert alert-info" role="alert">
             No active execution
           </div>
-          <div id="execution-messages-container" style="height: 300px; overflow-y: auto; border: 1px solid #e9ecef; padding: 10px; margin-bottom: 15px;">
-            <div id="execution-messages">
-              <!-- Messages will be dynamically inserted here -->
-            </div>
-          </div>
           <div id="human-input-section" style="display: none;">
             <h6 class="text-uppercase text-body text-xs font-weight-bolder mb-3">Human Input Required</h6>
             <div id="human-input-prompt"></div>
             <textarea id="human-input-response" class="form-control mb-3" rows="3"></textarea>
             <button id="submit-human-input" class="btn btn-primary">Submit Input</button>
+          </div>
+          <div id="execution-messages-container" style="height: 300px; overflow-y: auto; border: 1px solid #e9ecef; padding: 10px; margin-bottom: 15px;">
+            <div id="execution-messages">
+              <!-- Messages will be dynamically inserted here -->
+            </div>
           </div>
         </div>
       </div>
@@ -208,8 +208,8 @@
         
         if (data.messages && data.messages.length > 0) {
             data.messages.forEach(msg => {
-            let messageHtml = `<p class="text-xxs mb-1"><strong>${msg.agent || 'System'}:</strong> ${msg.content}</p>`;
-            $('#execution-messages').append(messageHtml);
+                let messageHtml = `<p class="text-xxs mb-1"><strong>${msg.agent || 'System'}:</strong> ${msg.content}</p>`;
+                $('#execution-messages').append(messageHtml);
             });
             
             // Scroll to the bottom of the messages container
@@ -220,7 +220,7 @@
         if (data.human_input_request) {
             console.log('Human input requested:', data.human_input_request);
             showHumanInputPrompt(data.human_input_request);
-        } else {
+        } else if (data.status !== 'WAITING_FOR_HUMAN_INPUT') {
             $('#human-input-section').hide();
         }
 
@@ -228,10 +228,12 @@
             socket.close();
             activeExecutionId = null;
         }
-        }
+    }
+
     function showHumanInputPrompt(prompt) {
-      $('#human-input-prompt').text(prompt);
-      $('#human-input-section').show();
+        $('#human-input-prompt').text(prompt);
+        $('#human-input-section').show();
+        $('#human-input-response').focus();
     }
 
     $('#submit-human-input').on('click', function() {
@@ -241,6 +243,9 @@
         url: `/agents/execution/${activeExecutionId}/provide_input/`,
         data: JSON.stringify({ input: userInput }),
         contentType: "application/json",
+        headers: {
+          "X-CSRFToken": getCookie("csrftoken")  // Add this line
+        },
         success: function(data) {
           $('#human-input-section').hide();
           $('#human-input-response').val('');
@@ -250,6 +255,22 @@
         }
       });
     });
+
+    // Add this function to get the CSRF token from cookies
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
   });
 </script>
 {% endblock extra_js %}

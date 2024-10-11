@@ -64,8 +64,9 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
 
     async def crew_execution_update(self, event):
         await self.send(text_data=json.dumps({
-            'status': event['status'],
-            'messages': event['messages']
+            'status': event.get('status'),
+            'messages': event.get('messages', []),  # Use .get() with a default empty list
+            'human_input_request': event.get('human_input_request')
         }))
 
     @database_sync_to_async

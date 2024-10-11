@@ -13,6 +13,7 @@ import time
 import json
 from io import StringIO
 from crewai.tasks.task_output import TaskOutput
+from functools import partial
 
 
 logger = logging.getLogger(__name__)
@@ -23,29 +24,28 @@ class HumanInputRequired(Exception):
         self.request = request
         super().__init__(f"Human input required: {request}")
 
-def custom_input_handler(prompt=None, execution_id=None):
-    if prompt is None:
-        prompt = "Input required:"
-    
-    if execution_id is None:
-        logger.warning("Execution ID not provided for custom input handler")
-        return ''  # Return an empty string or handle accordingly
+def custom_input_handler(prompt, execution_id):
+    logger.info(f"Custom input handler called for execution {execution_id} with prompt: {prompt}")
+    execution = CrewExecution.objects.get(id=execution_id)
+    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
+    log_crew_message(execution, prompt or "Input required", agent='System', human_input_request=prompt or "Input required")
     
     # Store the prompt in the cache
-    cache.set(f'human_input_request_{execution_id}', prompt, timeout=3600)
+    cache.set(f'human_input_request_{execution_id}', prompt or "Input required", timeout=3600)
     
     # Notify the web interface that input is needed
     async_to_sync(channel_layer.group_send)(
-        f"execution_{execution_id}",
+        f"crew_execution_{execution_id}",
         {
-            "type": "human_input_required",
-            "message": prompt
+            "type": "crew_execution_update",
+            "status": "WAITING_FOR_HUMAN_INPUT",
+            "human_input_request": prompt or "Input required"
         }
     )
     
     # Wait for the input (with a timeout)
     user_input = None
-    timeout = 120  # 2 minutes timeout
+    timeout = 300  # 5 minutes timeout
     start_time = time.time()
     while user_input is None and time.time() - start_time < timeout:
         user_input = cache.get(f'human_input_response_{execution_id}')
@@ -58,6 +58,7 @@ def custom_input_handler(prompt=None, execution_id=None):
     # Clear the cache
     cache.delete(f'human_input_response_{execution_id}')
     
+    logger.info(f"Received user input for execution {execution_id}: {user_input}")
     return user_input
 
 # Replace the built-in input function
@@ -71,13 +72,19 @@ def execute_crew(execution_id):
     # Store the original input function
     original_input = builtins.input
     
-    # Replace the input function with our custom handler
-    builtins.input = lambda prompt=None: custom_input_handler(prompt, execution.id)
+    def custom_input_wrapper(prompt=''):
+        return custom_input_handler(prompt, execution_id)
+    
+    # Replace the input function with our custom wrapper
+    builtins.input = custom_input_wrapper
     
     log_crew_message(execution, f"Starting execution for crew: {execution.crew.name}")
     
     try:
         result = run_crew(execution)
+        if result == "Execution cancelled by user":
+            update_execution_status(execution, 'CANCELLED')
+            return execution.id
         update_execution_status(execution, 'COMPLETED', result)
         
         # Create CrewOutput
@@ -91,8 +98,6 @@ def execute_crew(execution_id):
         
         log_message = f"Crew execution completed successfully. Output: {result}"
         log_crew_message(execution, log_message)
-    except HumanInputRequired as e:
-        handle_human_input_required(execution, e)
     except Exception as e:
         handle_execution_error(execution, e)
     finally:
@@ -120,10 +125,21 @@ def run_crew(execution):
     crew = create_crew(agents, tasks, execution)
     
     log_crew_message(execution, f"Crew assembled with {len(agents)} agents and {len(tasks)} tasks")
-    
+
     logger.info(f"Crew instance created for execution id: {execution.id}. Starting kickoff.")
     log_crew_message(execution, "Starting crew execution")
     
+    # Request human confirmation before starting the crew only if not already running or resumed
+    if execution.status not in ['RUNNING', 'WAITING_FOR_HUMAN_INPUT']:
+        confirmation = request_human_input(execution, "Are you ready to start the crew execution? (yes/no)")
+        
+        if confirmation.lower() != 'yes':
+            log_crew_message(execution, "Crew execution cancelled by user")
+            update_execution_status(execution, 'CANCELLED')
+            return "Execution cancelled by user"
+
+        update_execution_status(execution, 'RUNNING')
+
     try:
         inputs = execution.inputs or {}
         if execution.crew.process == 'sequential':
@@ -140,37 +156,49 @@ def run_crew(execution):
             result = crew.kickoff_for_each_async(inputs=inputs_array)
         else:
             raise ValueError(f"Unknown process type: {execution.crew.process}")
-        async_to_sync(channel_layer.group_send)(  # Test message
-            f'crew_execution_{execution.id}',
-            {'type': 'crew_execution_update', 'status': 'Test Message'}
-        )
-        log_crew_message(execution, f"Crew execution completed with result: {result}")
-    except HumanInputRequired as e:
-        # This is where you handle the human input request
-        logger.info(f"Human input required: {e.request}", exec_info=True)
-        execution.human_input_request = e.request
-        execution.status = "WAITING_FOR_HUMAN_INPUT"
-        execution.save()
 
-        # Send message to WebSocket, including the prompt
-        async_to_sync(channel_layer.group_send)(
-            f'crew_execution_{execution.id}',
-            {
-                'type': 'crew_execution_update',
-                'status': 'WAITING_FOR_HUMAN_INPUT',
-                'human_input_request': e.request  # Include the prompt here
-            }
-        )
-        return
+        log_crew_message(execution, f"Crew execution completed with result: {result}")
+        return result
     except Exception as e:
         logger.error(f"Error during crew execution: {str(e)}")
         raise
     finally:
         # Remove the CrewAI logger handler
         logging.getLogger('crewai').removeHandler(crewai_handler)
+
+def request_human_input(execution, prompt):
+    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
+    log_crew_message(execution, prompt, agent='System', human_input_request=prompt)
     
-    logger.info(f"Crew kickoff completed for execution id: {execution.id}")
-    return result
+    # Store the prompt in the cache
+    cache.set(f'human_input_request_{execution.id}', prompt, timeout=3600)
+    
+    # Notify the web interface that input is needed
+    async_to_sync(channel_layer.group_send)(
+        f"crew_execution_{execution.id}",
+        {
+            "type": "crew_execution_update",
+            "status": "WAITING_FOR_HUMAN_INPUT",
+            "human_input_request": prompt
+        }
+    )
+    
+    # Wait for the input (with a timeout)
+    user_input = None
+    timeout = 300  # 5 minutes timeout
+    start_time = time.time()
+    while user_input is None and time.time() - start_time < timeout:
+        user_input = cache.get(f'human_input_response_{execution.id}')
+        if user_input is None:
+            time.sleep(1)  # Wait for 1 second before checking again
+    
+    if user_input is None:
+        raise TimeoutError("No user input received within the timeout period")
+    
+    # Clear the cache
+    cache.delete(f'human_input_response_{execution.id}')
+    
+    return user_input
 
 def create_crewai_agents(agent_models):
     agents = []
@@ -287,7 +315,7 @@ def handle_human_input_required(execution, exception):
     update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
     execution.human_input_request = exception.request
     execution.save()
-    log_crew_message(execution, f"Human input required: {exception.request}", agent='System')
+    log_crew_message(execution, f"Human input required: {exception.request}", agent='System', human_input_request=exception.request)
     
     # Send a specific message for human input request
     async_to_sync(channel_layer.group_send)(
@@ -321,7 +349,7 @@ def update_execution_status(execution, status, result=None):
         }
     )
 
-def log_crew_message(execution, content, agent=None):
+def log_crew_message(execution, content, agent=None, human_input_request=None):
     message = CrewMessage.objects.create(execution=execution, content=content, agent=agent)
     
     # Send message to WebSocket
@@ -330,7 +358,8 @@ def log_crew_message(execution, content, agent=None):
         {
             'type': 'crew_execution_update',
             'status': execution.status,
-            'messages': [{'agent': message.agent or 'System', 'content': message.content}]
+            'messages': [{'agent': message.agent or 'System', 'content': message.content}],
+            'human_input_request': human_input_request
         }
     )
     
@@ -352,9 +381,20 @@ def resume_crew_execution(execution_id: int) -> int:
         execution = CrewExecution.objects.get(id=execution_id)
         if execution.status != 'WAITING_FOR_HUMAN_INPUT':
             logger.error(f"Cannot resume execution {execution_id}: not waiting for human input")
+            update_execution_status(execution, 'FAILED')
+            log_crew_message(execution, "Failed to resume execution: not waiting for human input", agent='System')
             return execution_id
 
         update_execution_status(execution, 'RUNNING')
+        
+        # Store the original input function
+        original_input = builtins.input
+        
+        def custom_input_wrapper(prompt=''):
+            return custom_input_handler(prompt, execution_id)
+        
+        # Replace the input function with our custom wrapper
+        builtins.input = custom_input_wrapper
         
         try:
             result = run_crew(execution)
@@ -366,6 +406,9 @@ def resume_crew_execution(execution_id: int) -> int:
             handle_human_input_required(execution, e)
         except Exception as e:
             handle_execution_error(execution, e)
+        finally:
+            # Restore the original input function
+            builtins.input = original_input
 
     except ObjectDoesNotExist:
         logger.error(f"CrewExecution with id {execution_id} not found")

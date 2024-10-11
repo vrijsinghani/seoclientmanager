@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_http_methods
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent  # Add Agent here
 from .forms import CrewExecutionForm, HumanInputForm, AgentForm
 from .tasks import execute_crew, resume_crew_execution
@@ -117,7 +117,7 @@ def execution_status(request, execution_id):
         return JsonResponse({'error': 'Execution not found'}, status=404)
 
 @login_required
-@csrf_exempt
+@csrf_protect
 @require_POST
 def provide_human_input(request, execution_id):
     try:
@@ -128,17 +128,29 @@ def provide_human_input(request, execution_id):
         data = json.loads(request.body)
         user_input = data.get('input')
 
-        if not user_input:
+        if user_input is None:
             return JsonResponse({'error': 'No input provided'}, status=400)
 
         # Store the user input in the cache
         cache.set(f'human_input_response_{execution_id}', user_input, timeout=3600)
 
-        # Update the execution status
+        logger.info(f"Stored user input for execution {execution_id}: {user_input}")
+
+        # Update execution status
         execution.status = 'RUNNING'
         execution.save()
 
-        # Resume the Celery task
+        # Send a WebSocket message to update the frontend
+        async_to_sync(channel_layer.group_send)(
+            f'crew_execution_{execution_id}',
+            {
+                'type': 'crew_execution_update',
+                'status': 'RUNNING',
+                'messages': [{'agent': 'Human', 'content': f'Input provided: {user_input}'}],
+            }
+        )
+
+        # Resume the execution
         resume_crew_execution.delay(execution_id)
 
         return JsonResponse({'message': 'Human input received and processing resumed'})
@@ -203,3 +215,13 @@ def provide_human_input(request, execution_id):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+def provide_human_input(request, execution_id):
+    if request.method == 'POST':
+        user_input = request.POST.get('input')
+        # Store the user input in cache
+        cache.set(f'human_input_response_{execution_id}', user_input, timeout=3600)
+        # Trigger the resume task
+        resume_crew_execution.delay(execution_id)
+        return JsonResponse({'status': 'success'})
+    return JsonResponse({'status': 'error'}, status=400)
