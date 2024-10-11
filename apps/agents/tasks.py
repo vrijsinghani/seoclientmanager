@@ -12,6 +12,8 @@ from channels.layers import get_channel_layer
 import time
 import json
 from io import StringIO
+from crewai.tasks.task_output import TaskOutput
+
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
@@ -103,6 +105,11 @@ def execute_crew(execution_id):
 def run_crew(execution):
     logger.debug(f"Setting up crew for execution id: {execution.id}")
     log_crew_message(execution, f"Setting up crew for execution")
+    inputs = execution.inputs or {}
+    inputs["execution_id"] = execution.id
+
+    # Set up CrewAI logger
+    crewai_handler = setup_crewai_logger(execution.id)
     
     agents = create_crewai_agents(execution.crew.agents.all())
     tasks = create_crewai_tasks(execution.crew.tasks.all(), agents, execution)
@@ -133,11 +140,34 @@ def run_crew(execution):
             result = crew.kickoff_for_each_async(inputs=inputs_array)
         else:
             raise ValueError(f"Unknown process type: {execution.crew.process}")
-        
+        async_to_sync(channel_layer.group_send)(  # Test message
+            f'crew_execution_{execution.id}',
+            {'type': 'crew_execution_update', 'status': 'Test Message'}
+        )
         log_crew_message(execution, f"Crew execution completed with result: {result}")
+    except HumanInputRequired as e:
+        # This is where you handle the human input request
+        logger.info(f"Human input required: {e.request}", exec_info=True)
+        execution.human_input_request = e.request
+        execution.status = "WAITING_FOR_HUMAN_INPUT"
+        execution.save()
+
+        # Send message to WebSocket, including the prompt
+        async_to_sync(channel_layer.group_send)(
+            f'crew_execution_{execution.id}',
+            {
+                'type': 'crew_execution_update',
+                'status': 'WAITING_FOR_HUMAN_INPUT',
+                'human_input_request': e.request  # Include the prompt here
+            }
+        )
+        return
     except Exception as e:
         logger.error(f"Error during crew execution: {str(e)}")
         raise
+    finally:
+        # Remove the CrewAI logger handler
+        logging.getLogger('crewai').removeHandler(crewai_handler)
     
     logger.info(f"Crew kickoff completed for execution id: {execution.id}")
     return result
@@ -170,6 +200,11 @@ def create_crewai_agents(agent_models):
             logger.error(f"Error creating CrewAI Agent for agent {agent_model.id}: {str(e)}")
     return agents
 
+def make_human_input_callback(execution_id):
+      def human_input_callback(prompt):
+          raise HumanInputRequired(prompt)
+      return human_input_callback
+
 def create_crewai_tasks(task_models, agents, execution):
     tasks = []
     for task_model in task_models:
@@ -188,7 +223,7 @@ def create_crewai_tasks(task_models, agents, execution):
             }
 
             if task_model.human_input:
-                task_dict['human_input_callback'] = lambda prompt: custom_input_handler(prompt, execution.id)
+                task_dict['human_input_callback'] = make_human_input_callback(execution.id)
 
             optional_fields = ['output_json', 'output_pydantic', 'output_file', 'callback', 'converter_cls']
             task_dict.update({field: getattr(task_model, field) for field in optional_fields if getattr(task_model, field) is not None})
@@ -199,36 +234,26 @@ def create_crewai_tasks(task_models, agents, execution):
             logger.error(f"Error creating CrewAITask for task {task_model.id}: {str(e)}")
     return tasks
 
-def make_step_callback(execution_id):
-    def step_callback(step_output):
-        message = f"Step: {step_output.get('step_type')} - {step_output.get('output')}"
-        async_to_sync(channel_layer.group_send)(
-            f'crew_execution_{execution_id}',
-            {
-                'type': 'crew_execution_update',
-                'status': 'RUNNING',
-                'messages': [{'agent': step_output.get('agent_name', 'System'), 'content': message}]
-            }
-        )
-    return step_callback
+def task_callback(task_output: TaskOutput):
+    logger.info(f"task_callback called: {task_output}")
+    message = f"Task Completed: {task_output}"
+    if (
+        task_output.task 
+        and task_output.task.agent
+        and task_output.task.agent.crew
+        and task_output.task.agent.crew._inputs
+        ):
+        inputs = task_output.task.agent.crew._inputs
+        execution_id = task_output.get('execution_id')
 
-def make_task_callback(execution_id):
-    def task_callback(task_output):
-        message = f"Task Completed: {task_output.get('task_name')} - {task_output.get('output')}"
-        async_to_sync(channel_layer.group_send)(
-            f'crew_execution_{execution_id}',
-            {
-                'type': 'crew_execution_update',
-                'status': 'RUNNING',
-                'messages': [{'agent': 'System', 'content': message}]
-            }
-        )
-    return task_callback
+    if execution_id:
+        execution = CrewExecution.objects.get(id=execution_id)
+        log_crew_message(execution, message, agent='System')
+        logger.info(f"Task callback: {message}")  # Add this line
+    else:
+        logger.warning("Execution ID not found in task inputs.")
 
-def make_human_input_callback(execution_id):
-    def human_input_callback(request):
-        raise HumanInputRequired(request)
-    return human_input_callback
+    return message
 
 def create_crew(agents, tasks, execution):
     # Base configuration
@@ -237,6 +262,7 @@ def create_crew(agents, tasks, execution):
         'tasks': tasks,
         'process': execution.crew.process,
         'verbose': execution.crew.verbose,
+        'task_callback': task_callback,
     }
 
     # Add optional parameters if they are set and not None
@@ -252,16 +278,26 @@ def create_crew(agents, tasks, execution):
         if value is not None:
             crew_params[param] = value
 
-    # Add callbacks with execution_id in their closure
-    crew_params['step_callback'] = make_step_callback(execution.id)
-    crew_params['task_callback'] = make_task_callback(execution.id)
-
     logger.debug(f"Creating Crew with parameters: {crew_params}")
 
     return Crew(**crew_params)
 
-def handle_human_input(execution, request):
-    raise HumanInputRequired(request)
+def handle_human_input_required(execution, exception):
+    logger.info(f"Human input required for execution {execution.id}: {str(exception)}")
+    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
+    execution.human_input_request = exception.request
+    execution.save()
+    log_crew_message(execution, f"Human input required: {exception.request}", agent='System')
+    
+    # Send a specific message for human input request
+    async_to_sync(channel_layer.group_send)(
+        f'crew_execution_{execution.id}',
+        {
+            'type': 'crew_execution_update',
+            'status': 'WAITING_FOR_HUMAN_INPUT',
+            'human_input_request': exception.request
+        }
+    )
 
 def update_execution_status(execution, status, result=None):
     execution.status = status
@@ -300,13 +336,6 @@ def log_crew_message(execution, content, agent=None):
     
     # Log the message for debugging
     logger.info(f"Sent message to WebSocket: {content}")
-
-def handle_human_input_required(execution, exception):
-    logger.info(f"Human input required for execution {execution.id}: {str(exception)}")
-    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
-    execution.human_input_request = exception.request
-    execution.save()
-    log_crew_message(execution, f"Human input required: {exception.request}")
 
 def handle_execution_error(execution, exception):
     logger.error(f"Error during crew execution: {str(exception)}", exc_info=True)
@@ -353,14 +382,8 @@ class WebSocketHandler(logging.Handler):
 
     def emit(self, record):
         msg = self.format(record)
-        async_to_sync(channel_layer.group_send)(
-            f'crew_execution_{self.execution_id}',
-            {
-                'type': 'crew_execution_update',
-                'status': 'RUNNING',
-                'messages': [{'agent': 'CrewAI', 'content': msg}]
-            }
-        )
+        execution = CrewExecution.objects.get(id=self.execution_id)
+        log_crew_message(execution, msg, agent='CrewAI')
         self.string_io.write(msg + '\n')
 
 def setup_crewai_logger(execution_id):

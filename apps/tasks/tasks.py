@@ -14,7 +14,7 @@ from celery.exceptions import Ignore, TaskError
 from django.utils import timezone
 
 from apps.common.summarizer import Summarizer
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models.openai import ChatOpenAI
 import openai
 from django.utils import timezone
 import logging

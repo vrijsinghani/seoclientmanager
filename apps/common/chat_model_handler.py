@@ -1,4 +1,4 @@
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models.openai import ChatOpenAI
 import openai
 from langchain.prompts.chat import (
     ChatPromptTemplate,

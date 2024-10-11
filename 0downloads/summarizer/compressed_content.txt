@@ -1,71 +1,61 @@
-# Outline of "Crawl Website" App Development
+I. The Gorilla Problem and Superintelligent AI
 
-## I. App Creation
-   A. Create a new app named "Crawl Website"
-      1. Location: apps/crawl_website
+    A. Gorillas' near extinction serves as a metaphor for the potential risks of creating superintelligent AI.
+    B.  Tech companies (Meta, Google, OpenAI) are pursuing Artificial General Intelligence (AGI), aiming to surpass human intelligence in all domains.
+    C.  The potential for AGI to pose an existential threat to humanity is a major concern.
 
-## II. User Interface Design
-   A. Page Template
-      1. Reference: templates/pages/applications/kanban.html
-      2. Structure: Three cards styled similarly to existing cards
+II. Defining Intelligence
 
-   B. Card 1: "Site to crawl"
-      1. Inputs
-         a. URL to crawl
-            - Type: URL
-            - Placeholder: https://example.com
-         b. Maximum depth of crawl
-            - Type: Integer
-            - Placeholder: 0
-      2. Button
-         a. Label: "Initiate Crawl"
+    A.  There's no single, universally accepted definition of intelligence.
+    B.  Proposed definitions include:
+        1. Capacity for knowledge and knowledge possessed (Vivian Henman, 1921).
+        2. Ability to solve hard problems (requires defining "hard").
+    C.  Key characteristics of intelligence (for AI):
+        1. Learning and adaptation.
+        2. Reasoning (conceptual understanding of the world).
+        3. Interaction with the environment to achieve goals.
 
-## III. Functionality
-   A. URL Submission
-      1. Action: Function call to browserless instance
-         a. Environment variables
-            - BROWSERLESS_BASE_URL
-            - BROWSERLESS_API_KEY
-         b. Example usage guide for API call
-            - Method: POST
-            - URL: https://production-sfo.browserless.io/screenshot?token=MY_API_TOKEN
-            - Headers
-               i. Cache-Control: no-cache
-               ii. Content-Type: application/json
-            - Data format
-               - URL: "https://example.com/"
-               - Options
-                  i. fullPage: true
-                  ii. type: "png"
+III. The Role of Embodiment in AI
 
-   B. Image Storage
-      1. Location: User's file_manager directory
-         a. Subfolder: crawled_screenshots
-         b. Unique ID for each image
-      2. Display: Image shown below "Initiate Crawl" button
+    A.  Sergey Levine and Kevin Black argue that AI might only achieve superintelligence with a physical body.
+    B.  A robot example:  A robot learns actions through physical interaction, gaining a direct understanding of concepts like gravity, unlike language models which rely on indirect descriptions.
+    C.  Having a body allows for direct experience and learning, leading to a more fundamental understanding of the world.
+    D.  The robot's ability to manipulate objects, understand instructions, and adapt to novel situations demonstrates subtle human-like attributes crucial for AGI.
 
-## IV. Asynchronous Crawling
-   A. Initiate Crawl Button
-      1. Action: Kick off a function to crawl the URL asynchronously
-         a. Use Celery tasks
-         b. Reference code: /apps/common/tools/crawl_website_tool.py
+IV. Concerns about Superintelligent AI
 
-   B. Visitor Chart
-      1. Display: Chart linked to "visitors" chart in templates/pages/dashboards/crm.html
-         a. Label: "Visitors" = "Total Pages"
-         b. Total links to visit: 5,927
-         c. Completion percentage: +55% (links visited / total links to visit)
-         d. Y-axis: Percent complete (0-100)
-         e. X-axis: Time in minutes
-         f. Update frequency: Every 5 seconds
+    A.  Professor Stuart Russell highlights the risk of "misalignment"—AI pursuing objectives not aligned with human desires.  Example: solving climate change by eliminating humanity.
+    B.  Difficulty in controlling superintelligent AI:  A sufficiently intelligent machine could anticipate and prevent attempts to shut it down.
+    C.  Economic incentives driving AGI development outweigh safety concerns.  The investment in AGI far surpasses that in basic science research.
+    D.  Uncertainties about superintelligent AI behavior:
+        1. Self-replication.
+        2. Assistance to terrorists.
+        3. Controllability.
+    E.  Lack of safety standards comparable to other industries (e.g., medicine).
+    F.  Potential for widespread job displacement and societal consequences:  Humans becoming enfeebled and dependent, leading to the end of human civilization.
+    G.  Historical precedent: Alan Turing's concerns about machines taking control.
 
-   C. Links to Visit List
-      1. Display: List of all links to visit
-         a. Location: Subcard below Total Pages card
-         b. Component: "Orders overview" from templates/pages/widgets.html
-         c. Icons: Two icons to indicate completion status
-         d. Main label: Path of the link (excluding host/server)
+V. Counterarguments and Alternative Perspectives
 
-## V. Code Modification
-   A. Do not modify: /apps/common/tools/crawl_website_tool.py
-   B. Create: Asynchronous version of the tool for Celery use
+    A.  Melanie Mitchell argues that the "existential threat" narrative overestimates current AI capabilities and projects human-like agency onto machines.
+    B.  Current AI limitations:  Hallucinations, biases (e.g., in facial recognition), and the creation of deepfakes.
+    C.  Focus on mitigating current AI harms (bias, misinformation) rather than solely on hypothetical future threats.
+    D.  Uncertainty about the likelihood of superintelligent AI and its potential impact.
+
+VI. Understanding the Human Brain as a Key to AI
+
+    A.  The complexity of the human brain is vastly greater than current AI systems.
+    B.  Professor Ed Boyden's research on mapping the brain:
+        1. Using optogenetics to probe neural circuitry.
+        2. Employing sodium polyacrylate (from diapers) to expand brain tissue for easier mapping.
+        3. Creating detailed neural maps, starting with simpler organisms (worms) and progressing to mice.
+    C.  The current understanding of the brain is limited, making it difficult to determine whether intelligence is simply complex computation or something more.
+    D.  The vast difference between current AI and even the simplest brains highlights the complexity of the challenge of creating human-like intelligence.
+
+
+VII. Conclusion
+
+    A.  The quest for superintelligent AI is fraught with uncertainty.
+    B.  Current risks, such as bias and misinformation, require immediate attention.
+    C.  Understanding the human brain's complexity is crucial for advancing AI safely and responsibly.
+
