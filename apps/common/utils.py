@@ -12,6 +12,8 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.callbacks.manager import CallbackManager
 import openai
 from langchain.schema import HumanMessage
+import markdown
+from bs4 import BeautifulSoup
 
 
 class TokenCounterCallback(BaseCallbackHandler):
@@ -164,3 +166,56 @@ def compare_urls(url1, url2):
     url1 = normalize_url(url1)
     url2 = normalize_url(url2)
     return url1 == url2
+
+def format_message(content):
+    if not content:
+        return ''
+    
+    # Process ANSI color codes
+    color_map = {
+        '\x1b[1m': '<strong>',
+        '\x1b[0m': '</strong>',
+        '\x1b[93m': '<span class="text-warning">',  # Yellow
+        '\x1b[92m': '<span class="text-success">',  # Green
+        '\x1b[95m': '<span class="text-info">',     # Light Blue (for magenta)
+        '\x1b[91m': '<span class="text-danger">',   # Red
+        '\x1b[94m': '<span class="text-primary">',  # Blue
+    }
+
+    # Replace color codes with Bootstrap classes
+    for code, html in color_map.items():
+        content = content.replace(code, html)
+
+    # Remove any remaining ANSI escape sequences
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    content = ansi_escape.sub('', content)
+
+    # Convert Markdown to HTML
+    html_content = markdown.markdown(content, extensions=['fenced_code', 'codehilite'])
+
+    # Parse the HTML with BeautifulSoup
+    soup = BeautifulSoup(html_content, 'html.parser')
+
+    # Add Bootstrap classes to elements
+    for tag in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+        tag['class'] = tag.get('class', []) + ['mt-3', 'mb-2']
+    
+    for tag in soup.find_all('p'):
+        tag['class'] = tag.get('class', []) + ['mb-2']
+    
+    for tag in soup.find_all('ul', 'ol'):
+        tag['class'] = tag.get('class', []) + ['pl-4']
+    
+    for tag in soup.find_all('code'):
+        tag['class'] = tag.get('class', []) + ['bg-light', 'p-1', 'rounded']
+
+    # Convert back to string
+    formatted_content = str(soup)
+
+    # Ensure all spans are closed
+    open_spans = formatted_content.count('<span')
+    close_spans = formatted_content.count('</span>')
+    if open_spans > close_spans:
+        formatted_content += '</span>' * (open_spans - close_spans)
+
+    return formatted_content

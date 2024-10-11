@@ -3,6 +3,10 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import CrewExecution, CrewMessage
 from django.core.cache import cache
+from apps.common.utils import format_message
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ConnectionTestConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -65,9 +69,18 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
             await self.handle_human_input(input_key, user_input)
 
     async def crew_execution_update(self, event):
+        formatted_status = format_message(event.get('status', ''))
+        formatted_messages = [
+            {
+                'agent': msg.get('agent', 'System'),
+                'content': format_message(msg.get('content', ''))
+            } for msg in event.get('messages', []) if msg.get('content')
+        ]
+        logger.info(f"Sending formatted status: {formatted_status}")
+        logger.info(f"Sending formatted messages: {formatted_messages}")
         await self.send(text_data=json.dumps({
-            'status': event.get('status'),
-            'messages': event.get('messages', []),
+            'status': formatted_status,
+            'messages': formatted_messages,
             'human_input_request': event.get('human_input_request')
         }))
 
@@ -92,4 +105,18 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
 
     async def send_execution_status(self):
         status_data = await self.get_execution_status()
-        await self.send(text_data=json.dumps(status_data))
+        formatted_status = format_message(status_data['status'])
+        formatted_messages = [
+            {
+                'agent': msg['agent'],
+                'content': format_message(msg['content'])
+            } for msg in status_data['messages'] if msg.get('content')
+        ]
+        
+        logger.info(f"Sending formatted status: {formatted_status}")
+        logger.info(f"Sending formatted messages: {formatted_messages}")
+        
+        await self.send(text_data=json.dumps({
+            'status': formatted_status,
+            'messages': formatted_messages,
+        }))

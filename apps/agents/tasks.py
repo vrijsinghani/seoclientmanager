@@ -15,6 +15,8 @@ from io import StringIO
 from crewai.tasks.task_output import TaskOutput
 from functools import partial
 import threading
+import sys
+from contextlib import contextmanager
     
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
@@ -62,6 +64,48 @@ def custom_input_handler(prompt, execution_id):
     logger.warning(f"Timeout waiting for human input in execution {execution_id}")
     raise TimeoutError("No user input received within the timeout period")
 
+class WebSocketStringIO(StringIO):
+    def __init__(self, execution_id, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.execution_id = execution_id
+        self.last_position = 0
+
+    def write(self, s):
+        super().write(s)
+        self.send_to_websocket()
+
+    def send_to_websocket(self):
+        current_position = self.tell()
+        if current_position > self.last_position:
+            self.seek(self.last_position)
+            new_content = self.read(current_position - self.last_position)
+            self.seek(current_position)
+            self.last_position = current_position
+
+            async_to_sync(channel_layer.group_send)(
+                f"crew_execution_{self.execution_id}",
+                {
+                    "type": "crew_execution_update",
+                    "status": "RUNNING",
+                    "messages": [{"agent": "System", "content": new_content.strip()}]
+                }
+            )
+
+@contextmanager
+def capture_stdout(execution_id):
+    original_stdout = sys.stdout
+    custom_stdout = WebSocketStringIO(execution_id)
+    sys.stdout = custom_stdout
+    try:
+        yield custom_stdout
+    finally:
+        sys.stdout = original_stdout
+
+def stdout_monitor(custom_stdout):
+    while True:
+        custom_stdout.send_to_websocket()
+        time.sleep(0.1)  # Check every 100ms
+
 @shared_task(bind=True)
 def execute_crew(self, execution_id):
     logger.info(f"Attempting to start crew execution for id: {execution_id} (task_id: {self.request.id})")
@@ -87,32 +131,38 @@ def execute_crew(self, execution_id):
         
         log_crew_message(execution, f"Starting execution for crew: {execution.crew.name}")
         
-        try:
-            crew = initialize_crew(execution)
-            result = run_crew(self.request.id, crew, execution)
-            if result == "Execution cancelled by user":
-                update_execution_status(execution, 'CANCELLED')
-                return execution.id
-            update_execution_status(execution, 'COMPLETED', result)
-            
-            # Convert UsageMetrics to a dictionary
-            token_usage = result.token_usage.dict() if hasattr(result.token_usage, 'dict') else result.token_usage
+        with capture_stdout(execution_id) as custom_stdout:
+            # Start the stdout monitor in a separate thread
+            monitor_thread = threading.Thread(target=stdout_monitor, args=(custom_stdout,))
+            monitor_thread.daemon = True
+            monitor_thread.start()
 
-            CrewOutput.objects.create(
-                execution=execution,
-                raw=str(result),
-                pydantic=result.pydantic.dict() if result.pydantic else None,
-                json_dict=result.json_dict,
-                token_usage=token_usage
-            )
-            
-            log_message = f"Crew execution completed successfully. Output: {result}"
-            log_crew_message(execution, log_message)
-        except Exception as e:
-            handle_execution_error(execution, e)
-        finally:
-            # Restore the original input function
-            builtins.input = original_input
+            try:
+                crew = initialize_crew(execution)
+                result = run_crew(self.request.id, crew, execution)
+                if result == "Execution cancelled by user":
+                    update_execution_status(execution, 'CANCELLED')
+                    return execution.id
+                update_execution_status(execution, 'COMPLETED', result)
+                
+                # Convert UsageMetrics to a dictionary
+                token_usage = result.token_usage.dict() if hasattr(result.token_usage, 'dict') else result.token_usage
+
+                CrewOutput.objects.create(
+                    execution=execution,
+                    raw=str(result),
+                    pydantic=result.pydantic.dict() if result.pydantic else None,
+                    json_dict=result.json_dict,
+                    token_usage=token_usage
+                )
+                
+                log_message = f"Crew execution completed successfully. Output: {result}"
+                log_crew_message(execution, log_message)
+            except Exception as e:
+                handle_execution_error(execution, e)
+            finally:
+                # Restore the original input function
+                builtins.input = original_input
     finally:
         # Release the lock
         cache.delete(lock_id)
@@ -301,19 +351,22 @@ def update_execution_status(execution, status, result=None):
     )
 
 def log_crew_message(execution, content, agent=None, human_input_request=None):
-    message = CrewMessage.objects.create(execution=execution, content=content, agent=agent)
-    
-    async_to_sync(channel_layer.group_send)(
-        f'crew_execution_{execution.id}',
-        {
-            'type': 'crew_execution_update',
-            'status': execution.status,
-            'messages': [{'agent': message.agent or 'System', 'content': message.content}],
-            'human_input_request': human_input_request
-        }
-    )
-    
-    logger.info(f"Sent message to WebSocket: {content}")
+    if content:  # Only create a message if there's content
+        message = CrewMessage.objects.create(execution=execution, content=content, agent=agent)
+        
+        async_to_sync(channel_layer.group_send)(
+            f'crew_execution_{execution.id}',
+            {
+                'type': 'crew_execution_update',
+                'status': execution.status,
+                'messages': [{'agent': message.agent or 'System', 'content': message.content}],
+                'human_input_request': human_input_request
+            }
+        )
+        
+        logger.info(f"Sent message to WebSocket: {content}")
+    else:
+        logger.warning("Attempted to log an empty message, skipping.")
 
 def handle_execution_error(execution, exception):
     logger.error(f"Error during crew execution: {str(exception)}", exc_info=True)

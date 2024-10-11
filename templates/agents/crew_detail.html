@@ -109,7 +109,12 @@
           </div>
           <div id="execution-messages-container" style="height: 300px; overflow-y: auto; border: 1px solid #e9ecef; padding: 10px; margin-bottom: 15px;">
             <div id="execution-messages">
-              <!-- Messages will be dynamically inserted here -->
+              {% for message in messages %}
+                <p class="text-xs mb-1">
+                  <strong>{{ message.agent }}:</strong> 
+                  <span>{{ message.content|safe }}</span>
+                </p>
+              {% endfor %}
             </div>
           </div>
         </div>
