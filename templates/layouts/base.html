@@ -24,9 +24,7 @@
   {% include 'includes/head.html' %}
   <!-- Add Sweet Alert CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.0.19/dist/sweetalert2.min.css">
-  {% block extrahead %}
-
-  {% endblock extrahead %}
+  {% block extrahead %}{% endblock extrahead %}
   {% block extrastyle %}{% endblock extrastyle %}
 </head>
 
@@ -80,9 +78,11 @@
       document.addEventListener('DOMContentLoaded', function() {
         initialDarkMode();
       });
+      console.log({{ reqest.user.profile.dark_mode }})
     }
-
-    // Initialize and show toasts
+  </script>
+  <!-- Initialize and show toasts -->
+  <script>
     document.addEventListener('DOMContentLoaded', function() {
       var toastElList = [].slice.call(document.querySelectorAll('.toast'));
       var toastList = toastElList.map(function(toastEl) {

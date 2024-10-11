@@ -67,11 +67,7 @@ def change_password(request):
 @login_required(login_url='/accounts/login/basic-login/')
 def change_mode(request):
     profile = get_object_or_404(Profile, user=request.user)
-    if profile.dark_mode:
-        profile.dark_mode = False
-    else:
-        profile.dark_mode = True
-    
+    profile.dark_mode = not profile.dark_mode
     profile.save()
 
     return redirect(request.META.get('HTTP_REFERER'))
