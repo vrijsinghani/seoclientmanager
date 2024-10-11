@@ -7,14 +7,17 @@ from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent  # Add Agent here
 from .forms import CrewExecutionForm, HumanInputForm, AgentForm
-from .tasks import execute_crew, resume_crew_execution
+from .tasks import execute_crew
 from django.core.exceptions import ValidationError
 import logging
 import json
 from django.urls import reverse
 from django.core.cache import cache
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 logger = logging.getLogger(__name__)
+channel_layer = get_channel_layer()
 
 @login_required
 def crewai_home(request):
@@ -150,10 +153,8 @@ def provide_human_input(request, execution_id):
             }
         )
 
-        # Resume the execution
-        resume_crew_execution.delay(execution_id)
-
-        return JsonResponse({'message': 'Human input received and processing resumed'})
+        # Return the actual user input
+        return JsonResponse({'message': 'Human input received and processing resumed', 'input': user_input})
     except CrewExecution.DoesNotExist:
         return JsonResponse({'error': 'Execution not found'}, status=404)
     except json.JSONDecodeError:
@@ -189,39 +190,43 @@ def manage_crews_card_view(request):
     return render(request, 'agents/manage_crews_card_view.html', context)
 
 def connection_test(request):
-    return render(request, 'agents/connection_test.html')
+    return render(request, 'agents/connection_test.html')@csrf_exempt
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def provide_human_input(request, execution_id):
-    try:
-        execution = CrewExecution.objects.get(id=execution_id)
-        data = json.loads(request.body)
-        user_input = data.get('input')
-        
-        if not user_input:
-            return JsonResponse({'error': 'No input provided'}, status=400)
-        
-        execution.human_input_response = user_input
-        execution.save()
-        
-        # Resume the execution
-        resume_crew_execution.delay(execution_id)
-        
-        return JsonResponse({'status': 'success', 'message': 'Input received and execution resumed'})
-    except CrewExecution.DoesNotExist:
-        return JsonResponse({'error': 'Execution not found'}, status=404)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-def provide_human_input(request, execution_id):
-    if request.method == 'POST':
-        user_input = request.POST.get('input')
-        # Store the user input in cache
-        cache.set(f'human_input_response_{execution_id}', user_input, timeout=3600)
-        # Trigger the resume task
-        resume_crew_execution.delay(execution_id)
-        return JsonResponse({'status': 'success'})
-    return JsonResponse({'status': 'error'}, status=400)
+@login_required
+@require_POST
+def submit_human_input(request, execution_id):
+    input_key = request.POST.get('input_key')
+    response = request.POST.get('response')
+    
+    if not input_key or not response:
+        return JsonResponse({'error': 'Missing input_key or response'}, status=400)
+    
+    execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
+    
+    # Store the response in the cache
+    cache_key = f"{input_key}_response"
+    cache.set(cache_key, response, timeout=3600)
+    
+    # Verify that the input was stored correctly
+    stored_value = cache.get(cache_key)
+    logger.info(f"Stored human input in cache for execution {execution_id}: key={cache_key}, value={response}")
+    logger.info(f"Verified stored value: {stored_value}")
+    
+    # Create a CrewMessage for the human input
+    CrewMessage.objects.create(
+        execution=execution,
+        agent='Human',
+        content=f"Human input received: {response}"
+    )
+    
+    # Notify the WebSocket that human input has been received
+    async_to_sync(channel_layer.group_send)(
+        f'crew_execution_{execution_id}',
+        {
+            'type': 'crew_execution_update',
+            'status': 'RUNNING',
+            'messages': [{'agent': 'Human', 'content': f'Input provided: {response}'}],
+        }
+    )
+    
+    return JsonResponse({'message': 'Human input received and processed'})

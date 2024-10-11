@@ -201,62 +201,75 @@
     }
 
     function handleWebSocketMessage(data) {
-        console.log('Received data:', data);
-        if (data.status) {
-            $('#execution-status').text(`Status: ${data.status}`);
-        }
+      console.log('Status:', data.status);
+      if (data.status) {
+        $('#execution-status').text(`Status: ${data.status}`);
+      }
+      
+      if (data.messages && data.messages.length > 0) {
+        data.messages.forEach(msg => {
+          let messageHtml = `<p class="text-xs mb-1"><strong>${msg.agent || 'System'}:</strong> ${msg.content}</p>`;
+          $('#execution-messages').append(messageHtml);
+        });
         
-        if (data.messages && data.messages.length > 0) {
-            data.messages.forEach(msg => {
-                let messageHtml = `<p class="text-xxs mb-1"><strong>${msg.agent || 'System'}:</strong> ${msg.content}</p>`;
-                $('#execution-messages').append(messageHtml);
-            });
+        // Scroll to the bottom of the messages container
+        const messagesContainer = document.getElementById('execution-messages-container');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      if (data.human_input_request) {
+        console.log('Human input requested:', data.human_input_request);
+        showHumanInputPrompt(data.human_input_request);
+      } else if (data.status !== 'WAITING_FOR_HUMAN_INPUT') {
+        $('#human-input-section').hide();
+      }
+
+      if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+        socket.close();
+        activeExecutionId = null;
+      }
+    }
+
+    function showHumanInputPrompt(prompt) {
+      $('#human-input-prompt').text(prompt);
+      $('#human-input-section').show();
+      $('#human-input-response').focus();
+    }
+
+    // Update this event listener
+    $(document).on('click', '#submit-human-input', function() {
+    let userInput = $('#human-input-response').val();
+    let inputKey = `human_input_request_${activeExecutionId}`;
+    
+    $.ajax({
+        type: "POST",
+        url: `/agents/execution/${activeExecutionId}/submit_human_input/`,
+        data: {
+            input_key: inputKey,
+            response: userInput
+        },
+        headers: {
+            "X-CSRFToken": getCookie("csrftoken")
+        },
+        success: function(data) {
+            //console.log('Human input submitted successfully');
+            $('#human-input-section').hide();
+            $('#human-input-response').val('');
+            
+            // Add a message to show that the input was submitted
+            // let messageHtml = `<p class="text-xxs mb-1"><strong>Human:</strong> Input submitted: ${userInput}</p>`;
+            // $('#execution-messages').append(messageHtml);
             
             // Scroll to the bottom of the messages container
             const messagesContainer = document.getElementById('execution-messages-container');
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        if (data.human_input_request) {
-            console.log('Human input requested:', data.human_input_request);
-            showHumanInputPrompt(data.human_input_request);
-        } else if (data.status !== 'WAITING_FOR_HUMAN_INPUT') {
-            $('#human-input-section').hide();
-        }
-
-        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-            socket.close();
-            activeExecutionId = null;
-        }
-    }
-
-    function showHumanInputPrompt(prompt) {
-        $('#human-input-prompt').text(prompt);
-        $('#human-input-section').show();
-        $('#human-input-response').focus();
-    }
-
-    $('#submit-human-input').on('click', function() {
-      let userInput = $('#human-input-response').val();
-      $.ajax({
-        type: "POST",
-        url: `/agents/execution/${activeExecutionId}/provide_input/`,
-        data: JSON.stringify({ input: userInput }),
-        contentType: "application/json",
-        headers: {
-          "X-CSRFToken": getCookie("csrftoken")  // Add this line
-        },
-        success: function(data) {
-          $('#human-input-section').hide();
-          $('#human-input-response').val('');
         },
         error: function(xhr, status, error) {
-          alert('Error submitting input: ' + error);
+            console.error('Error submitting human input:', error);
+            alert('Error submitting input. Please try again.');
         }
-      });
     });
-
-    // Add this function to get the CSRF token from cookies
+});
     function getCookie(name) {
       let cookieValue = null;
       if (document.cookie && document.cookie !== '') {

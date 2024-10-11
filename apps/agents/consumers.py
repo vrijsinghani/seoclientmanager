@@ -2,6 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import CrewExecution, CrewMessage
+from django.core.cache import cache
 
 class ConnectionTestConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -59,25 +60,26 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
         message_type = text_data_json.get('type')
 
         if message_type == 'human_input':
+            input_key = text_data_json.get('input_key')
             user_input = text_data_json.get('input')
-            await self.handle_human_input(user_input)
+            await self.handle_human_input(input_key, user_input)
 
     async def crew_execution_update(self, event):
         await self.send(text_data=json.dumps({
             'status': event.get('status'),
-            'messages': event.get('messages', []),  # Use .get() with a default empty list
+            'messages': event.get('messages', []),
             'human_input_request': event.get('human_input_request')
         }))
 
     @database_sync_to_async
-    def handle_human_input(self, user_input):
+    def handle_human_input(self, input_key, user_input):
+        cache.set(f"{input_key}_response", user_input, timeout=3600)
         execution = CrewExecution.objects.get(id=self.execution_id)
         CrewMessage.objects.create(
             execution=execution,
             agent='Human',
             content=f"Human input received: {user_input}"
         )
-        # Add logic to handle the human input in your execution process
 
     @database_sync_to_async
     def get_execution_status(self):

@@ -11,7 +11,7 @@ urlpatterns = [
     path('executions/', views.execution_list, name='execution_list'),
     path('execution/<int:execution_id>/', views.execution_detail, name='execution_detail'),
     path('execution/<int:execution_id>/status/', views.execution_status, name='execution_status'),
-    path('execution/<int:execution_id>/provide_input/', views.provide_human_input, name='provide_human_input'),
+    path('execution/<int:execution_id>/submit_human_input/', views.submit_human_input, name='submit_human_input'),
     
     # Admin views
     path('manage/agents/', views_admin.manage_agents, name='manage_agents'),
