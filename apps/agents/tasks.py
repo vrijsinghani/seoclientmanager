@@ -146,14 +146,20 @@ def custom_input_handler(prompt, execution_id):
     raise TimeoutError("No user input received within the timeout period")
 
 class WebSocketStringIO(StringIO):
-    def __init__(self, execution_id, *args, **kwargs):
+    def __init__(self, execution_id, send_to_original_stdout=False, send_to_websocket=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.execution_id = execution_id
         self.last_position = 0
+        self.send_to_original_stdout = send_to_original_stdout
+        self.send_to_websocket = send_to_websocket
+        self.original_stdout = sys.stdout
 
     def write(self, s):
         super().write(s)
-        self.send_to_websocket()
+        if self.send_to_original_stdout:
+            self.original_stdout.write(s)
+        if self.send_to_websocket:
+            self.send_to_websocket()
 
     def send_to_websocket(self):
         current_position = self.tell()
@@ -173,9 +179,9 @@ class WebSocketStringIO(StringIO):
             )
 
 @contextmanager
-def capture_stdout(execution_id):
+def capture_stdout(execution_id, send_to_original_stdout=False, send_to_websocket=True):
     original_stdout = sys.stdout
-    custom_stdout = WebSocketStringIO(execution_id)
+    custom_stdout = WebSocketStringIO(execution_id, send_to_original_stdout, send_to_websocket)
     sys.stdout = custom_stdout
     try:
         yield custom_stdout
@@ -212,7 +218,7 @@ def execute_crew(self, execution_id):
         
         log_crew_message(execution, f"Starting execution for crew: {execution.crew.name}")
         
-        with capture_stdout(execution_id) as custom_stdout:
+        with capture_stdout(execution_id, send_to_original_stdout=False, send_to_websocket=True) as custom_stdout:
             # Start the stdout monitor in a separate thread
             monitor_thread = threading.Thread(target=stdout_monitor, args=(custom_stdout,))
             monitor_thread.daemon = True
