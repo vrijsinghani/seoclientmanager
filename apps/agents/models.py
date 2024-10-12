@@ -9,6 +9,7 @@ import logging
 import uuid
 import random
 import json
+from django.contrib.postgres.fields import ArrayField
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,12 @@ class Crew(models.Model):
     prompt_file = models.CharField(max_length=255, null=True, blank=True)
     planning = models.BooleanField(default=False)
     planning_llm = models.CharField(max_length=100, null=True, blank=True)
+    input_variables = ArrayField(
+        models.CharField(max_length=100),
+        blank=True,
+        null=True,
+        default=list
+    )
 
     def __str__(self):
         return self.name

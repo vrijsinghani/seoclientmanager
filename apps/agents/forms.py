@@ -143,7 +143,7 @@ class CrewForm(forms.ModelForm):
             'share_crew', 'output_log_file', 'manager_agent', 'manager_callbacks',
             'prompt_file', 'planning', 'planning_llm'
         ]
-        # step_callback and task_callback are removed from here
+        # Note: input_variables is not included here as it's handled separately in the view
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

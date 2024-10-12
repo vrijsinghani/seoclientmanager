@@ -2,12 +2,14 @@ import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import Agent, Task, Tool, Crew
+from .models import Agent, Task, Tool, Crew, CrewTask
 from .forms import AgentForm, TaskForm, ToolForm, CrewForm
 from django.http import JsonResponse
 import importlib
 import traceback
 import os
+from django.core.serializers.json import DjangoJSONEncoder
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -335,3 +337,49 @@ def manage_crews_card_view(request):
         'crews': crews,
     }
     return render(request, 'agents/manage_crews_card_view.html', context)
+
+@login_required
+def crew_create_or_update(request, crew_id=None):
+    if crew_id:
+        crew = get_object_or_404(Crew, id=crew_id)
+    else:
+        crew = None
+
+    if request.method == 'POST':
+        form = CrewForm(request.POST, instance=crew)
+        logger.debug(f"POST data: {request.POST}")
+        if form.is_valid():
+            crew = form.save(commit=False)
+            
+            # Handle input_variables
+            input_variables = request.POST.getlist('input_variables[]')
+            logger.debug(f"Input variables received: {input_variables}")
+            crew.input_variables = input_variables
+            
+            crew.save()
+            form.save_m2m()  # Save many-to-many relationships
+            
+            # Handle task ordering
+            task_order = request.POST.getlist('task_order[]')
+            logger.debug(f"Task order received: {task_order}")
+            CrewTask.objects.filter(crew=crew).delete()
+            for index, task_id in enumerate(task_order):
+                CrewTask.objects.create(crew=crew, task_id=task_id, order=index)
+            
+            logger.info(f"Crew {'updated' if crew_id else 'created'} with id: {crew.id}, input_variables: {crew.input_variables}")
+            messages.success(request, f'Crew {"updated" if crew_id else "created"} successfully.')
+            return redirect('crew_detail', crew_id=crew.id)
+        else:
+            logger.error(f"Form errors: {form.errors}")
+            messages.error(request, f'Error {"updating" if crew_id else "creating"} crew. Please check the form.')
+    else:
+        form = CrewForm(instance=crew)
+        input_variables = crew.input_variables or []
+
+    context = {
+        'form': form,
+        'crew': crew,
+        'input_variables_json': json.dumps(input_variables)
+    }
+
+    return render(request, 'agents/crew_form.html', context)

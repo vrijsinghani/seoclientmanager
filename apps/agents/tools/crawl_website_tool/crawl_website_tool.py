@@ -32,8 +32,7 @@ class CrawlWebsiteTool(BaseTool):
             self.description = f"A tool that can be used to crawl {website_url} and read its content, including content from internal links on the same page."
             self.args_schema = FixedCrawlWebsiteToolSchema
 
-    def _run(self, **kwargs: Any) -> str:
-        website_url = kwargs.get('website_url', self.website_url)
+    def _run(self, website_url: str) -> str:
         print(f"Processing {website_url}")
         content = self._crawl_website(website_url)
         return content

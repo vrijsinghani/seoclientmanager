@@ -56,7 +56,7 @@
       </div>
 
 
-      <!-- Existing card for starting new execution -->
+      <!-- Modify the "Start New Execution" card -->
       <div class="card mb-4">
         <div class="card-header pb-0">
           <h6 class="mb-0">Start New Execution for {{ crew.name }}</h6>
@@ -88,6 +88,18 @@
                 </div>
               {% endif %}
             {% endfor %}
+
+            <!-- Add dynamic input fields based on crew.input_variables -->
+            {% if crew.input_variables %}
+              <h6 class="text-uppercase text-body text-xs font-weight-bolder mt-4 mb-3">Input Variables</h6>
+              {% for variable in crew.input_variables %}
+                <div class="form-group">
+                  <label for="input_{{ variable }}" class="form-control-label">{{ variable|title }}</label>
+                  <input type="text" class="form-control" id="input_{{ variable }}" name="input_variables[{{ variable }}]" required>
+                </div>
+              {% endfor %}
+            {% endif %}
+
             <button type="submit" class="btn btn-primary mt-3" id="submit-btn">Start Execution</button>
           </form>
         </div>
@@ -164,10 +176,23 @@
       var form = $(this);
       var url = form.attr('action');
       
+      // Serialize the form data, including the dynamic input variables
+      var formData = form.serializeArray();
+      var inputVariables = {};
+      formData.forEach(function(item) {
+        if (item.name.startsWith('input_variables[')) {
+          var key = item.name.match(/\[(.*?)\]/)[1];
+          inputVariables[key] = item.value;
+        }
+      });
+      
+      // Add the input_variables to the form data
+      formData.push({name: 'input_variables', value: JSON.stringify(inputVariables)});
+      
       $.ajax({
         type: "POST",
         url: url,
-        data: form.serialize(),
+        data: $.param(formData),
         success: function(data) {
           activeExecutionId = data.execution_id;
           connectWebSocket(activeExecutionId);

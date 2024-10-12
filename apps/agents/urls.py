@@ -31,8 +31,8 @@ urlpatterns = [
     path('get_tool_info/', views_admin.get_tool_info, name='get_tool_info'),
 
     path('manage/crews/', views_admin.manage_crews, name='manage_crews'),
-    path('manage/crews/add/', views_admin.add_crew, name='add_crew'),
-    path('manage/crews/edit/<int:crew_id>/', views_admin.edit_crew, name='edit_crew'),
+    path('manage/crews/add/', views_admin.crew_create_or_update, name='add_crew'),
+    path('manage/crews/edit/<int:crew_id>/', views_admin.crew_create_or_update, name='edit_crew'),
     path('manage/crews/delete/<int:crew_id>/', views_admin.delete_crew, name='delete_crew'),
     path('manage/crews/update_agents/<int:crew_id>/', views_admin.update_crew_agents, name='update_crew_agents'),
     

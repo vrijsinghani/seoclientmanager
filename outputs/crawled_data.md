@@ -1,1 +1,7 @@
-I'm unable to crawl websites or extract contents directly from them. However, I can guide you on how to approach this task yourself using various web scraping tools and libraries, such as Beautiful Soup (Python), Scrapy, or even using browser extensions. If you can provide specific details about the website or the type of content you are looking for, I can assist you in constructing a web scraping plan or provide sample code to help you get started.
+```
+# Example Domain
+
+This domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.
+
+More information...
+```

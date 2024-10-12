@@ -1,6 +1,8 @@
 from celery import shared_task
-from .models import CrewExecution, CrewMessage, Task, Agent as AgentModel, CrewOutput
+from .models import CrewExecution, Tool, CrewMessage, Task, Agent as AgentModel, CrewOutput, CrewTask
 from crewai import Crew, Agent, Task as CrewAITask, LLM
+from langchain.tools import BaseTool
+from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 import logging
 from apps.common.utils import get_llm_openai
@@ -17,9 +19,88 @@ from functools import partial
 import threading
 import sys
 from contextlib import contextmanager
-    
+import importlib
+from crewai_tools import BaseTool as CrewAIBaseTool
+from langchain.tools import BaseTool as LangChainBaseTool
+from crewai_tools import (
+    DirectoryReadTool,
+    FileReadTool,
+    SerperDevTool,
+    WebsiteSearchTool
+)
+import crewai_tools
+from langchain.tools import tool as langchain_tool
+
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
+
+def load_tool(tool_model):
+    try:
+        # Check if it's a pre-built CrewAI tool
+        if hasattr(crewai_tools, tool_model.tool_class):
+            return getattr(crewai_tools, tool_model.tool_class)()
+
+        # If not, try to import a custom tool
+        module_path = f"apps.agents.tools.{tool_model.tool_class}.{tool_model.tool_class}"
+        module = importlib.import_module(module_path)
+        logger.info(f"Successfully imported module: {module_path}")
+
+        # Log all items in the module
+        for name, obj in module.__dict__.items():
+            logger.info(f"Found in module: {name}, type: {type(obj)}")
+
+        # Find suitable tool classes or functions
+        tool_candidates = []
+        for name, obj in module.__dict__.items():
+            if isinstance(obj, type):
+                if issubclass(obj, (CrewAIBaseTool, LangChainBaseTool)) and hasattr(obj, '_run') and obj != CrewAIBaseTool and obj != LangChainBaseTool:
+                    tool_candidates.append(obj)
+            elif callable(obj) and hasattr(obj, '__wrapped__'):  # Check for @tool decorator
+                tool_candidates.append(obj)
+            elif callable(obj) and hasattr(obj, '_run'):  # Custom class with _run method
+                tool_candidates.append(obj)
+
+        if not tool_candidates:
+            raise ValueError(f"No suitable tool class or function found in {module_path}")
+
+        if len(tool_candidates) > 1:
+            logger.warning(f"Multiple tool candidates found in {module_path}. Using the first one: {tool_candidates[0].__name__}")
+
+        tool_class_or_func = tool_candidates[0]
+        logger.info(f"Using tool: {tool_class_or_func.__name__}")
+
+        # Handle different types of tools
+        if isinstance(tool_class_or_func, type):
+            if issubclass(tool_class_or_func, CrewAIBaseTool):
+                return tool_class_or_func()
+            elif issubclass(tool_class_or_func, LangChainBaseTool):
+                # Wrap LangChain tool in CrewAI compatible class
+                class WrappedLangChainTool(CrewAIBaseTool):
+                    name = tool_class_or_func.name
+                    description = tool_class_or_func.description
+
+                    def _run(self, *args, **kwargs):
+                        return tool_class_or_func()(*args, **kwargs)
+
+                return WrappedLangChainTool()
+        elif callable(tool_class_or_func) and hasattr(tool_class_or_func, '__wrapped__'):
+            # Handle @tool decorated function
+            class WrappedToolFunction(CrewAIBaseTool):
+                name = getattr(tool_class_or_func, 'name', tool_class_or_func.__name__)
+                description = getattr(tool_class_or_func, 'description', tool_class_or_func.__doc__ or "No description provided")
+
+                def _run(self, *args, **kwargs):
+                    return tool_class_or_func(*args, **kwargs)
+
+            return WrappedToolFunction()
+        else:
+            # Custom class with _run method
+            return tool_class_or_func()
+
+    except Exception as e:
+        logger.error(f"Error loading tool {tool_model.tool_class}: {str(e)}")
+        logger.exception("Full traceback:")
+        return None
 
 def custom_input_handler(prompt, execution_id):
     logger.info(f"Custom input handler called for execution {execution_id} with prompt: {prompt}")
@@ -172,7 +253,13 @@ def execute_crew(self, execution_id):
 
 def initialize_crew(execution):
     agents = create_crewai_agents(execution.crew.agents.all(), execution.id)
-    tasks = create_crewai_tasks(execution.crew.tasks.all(), agents, execution)
+    
+    # Fetch and order the tasks based on CrewTask
+    ordered_tasks = Task.objects.filter(
+        crewtask__crew=execution.crew
+    ).order_by('crewtask__order')
+    
+    tasks = create_crewai_tasks(ordered_tasks, agents, execution)
     
     if not tasks:
         raise ValueError("No valid tasks for crew execution")
@@ -206,7 +293,7 @@ def run_crew(task_id, crew, execution):
     log_crew_message(execution, f"Running crew")
     inputs = execution.inputs or {}
     inputs["execution_id"] = execution.id
-
+    logger.info(f"Inputs: {inputs}")
     update_execution_status(execution, 'RUNNING')
 
     try:
@@ -251,13 +338,14 @@ def create_crewai_agents(agent_models, execution_id):
                 'llm': crewai_agent_llm,
                 'step_callback': partial(step_callback, execution_id=execution_id),
                 'human_input_handler': partial(human_input_handler, execution_id=execution_id),
+                'tools': [load_tool(tool) for tool in agent_model.tools.all() if load_tool(tool) is not None]
             }
             optional_params = ['max_iter', 'max_rpm', 'function_calling_llm']
             agent_params.update({param: getattr(agent_model, param) for param in optional_params if getattr(agent_model, param) is not None})
             
             agent = Agent(**agent_params)
             agents.append(agent)
-            logger.info(f"CrewAI Agent created successfully for agent id: {agent_model.id}")
+            logger.info(f"CrewAI Agent created successfully for agent id: {agent_model.id} - {agent_model.tools.all()}")
         except Exception as e:
             logger.error(f"Error creating CrewAI Agent for agent {agent_model.id}: {str(e)}")
     return agents
@@ -295,8 +383,9 @@ def human_input_handler(prompt, execution_id):
 def create_crewai_tasks(task_models, agents, execution):
     tasks = []
     for task_model in task_models:
+        logger.info(f"Creating CrewAITask for task: {task_model.id}-{task_model.description}")
         try:
-            crewai_agent = next((agent for agent in agents if agent.role == task_model.agent.role), None)
+            crewai_agent = next((agent for agent in agents if agent.role == AgentModel.objects.get(id=task_model.agent_id).role), None)
             if not crewai_agent:
                 logger.warning(f"No matching CrewAI agent found for task {task_model.id}")
                 continue
@@ -308,6 +397,7 @@ def create_crewai_tasks(task_models, agents, execution):
                 'async_execution': task_model.async_execution,
                 'human_input': task_model.human_input,
                 'callback': partial(task_callback, execution_id=execution.id),
+                'tools': [load_tool(tool) for tool in task_model.tools.all()]
             }
 
             optional_fields = ['output_json', 'output_pydantic', 'output_file', 'converter_cls']

@@ -164,30 +164,6 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="{{ form.step_callback.id_for_label }}" class="form-control-label">Step Callback</label>
-                                    {{ form.step_callback }}
-                                    {% if form.step_callback.errors %}
-                                        <div class="text-danger">
-                                            {{ form.step_callback.errors|join:", " }}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="{{ form.task_callback.id_for_label }}" class="form-control-label">Task Callback</label>
-                                    {{ form.task_callback }}
-                                    {% if form.task_callback.errors %}
-                                        <div class="text-danger">
-                                            {{ form.task_callback.errors|join:", " }}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
                                     <label for="{{ form.output_log_file.id_for_label }}" class="form-control-label">Output Log File</label>
                                     {{ form.output_log_file }}
                                     {% if form.output_log_file.errors %}
@@ -316,6 +292,18 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- Replace the existing input variables section with this -->
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="input_variables" class="form-control-label">Input Variables</label>
+                                    <div id="input-variables-container" class="row">
+                                        <!-- We'll populate this dynamically with JavaScript -->
+                                    </div>
+                                    <button type="button" id="add-variable" class="btn btn-outline-primary btn-sm mt-2">Add Variable</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="row mt-4">
                             <div class="col-12 text-end">
                                 <a href="{% url 'agents:manage_crews' %}" class="btn btn-secondary me-2">Cancel</a>
@@ -345,7 +333,12 @@
                 placeholderValue: 'Select an option'
             });
         });
-
+        try {
+            const initialInputVariables = JSON.parse('{{ input_variables_json|safe }}');
+            // ... rest of your code ...
+        } catch (error) {
+            console.error('Error parsing initial input variables:', error, '{{ input_variables_json|safe }}'); //log the json
+        }
         // Add classes to form elements
         var formElements = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), select, textarea');
         formElements.forEach(function(element) {
@@ -362,9 +355,10 @@
             element.classList.add('form-check-input');
         });
 
-        // Form validation
+        // Form validation and submission
         const form = document.querySelector('form');
         form.addEventListener('submit', function(event) {
+            event.preventDefault();
             const requiredFields = form.querySelectorAll('[required]');
             let isValid = true;
 
@@ -378,9 +372,14 @@
             });
 
             if (!isValid) {
-                event.preventDefault();
                 alert('Please fill in all required fields.');
+                return;
             }
+
+            const formData = new FormData(form);
+            const inputVariables = formData.getAll('input_variables[]');
+            console.log('Submitting form with input variables:', inputVariables);
+            form.submit();
         });
 
         const taskSelect = document.getElementById('{{ form.tasks.id_for_label }}');
@@ -437,8 +436,47 @@
             });
         }
 
-        // Initial update
-        updateTaskList();
+        const inputVariablesContainer = document.getElementById('input-variables-container');
+    const addVariableButton = document.getElementById('add-variable');
+
+    addVariableButton.addEventListener('click', function() {
+        addInputVariable();
     });
+
+    inputVariablesContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-variable') || e.target.closest('.remove-variable')) {
+            e.target.closest('.col-md-4').remove();
+        }
+    });
+
+    function addInputVariable(value = '') {
+        const newInput = document.createElement('div');
+        newInput.className = 'col-md-4 mb-2';
+        newInput.innerHTML = `
+            <div class="input-group">
+                <input type="text" name="input_variables[]" class="form-control form-control-sm" value="${value}" required>
+                <button type="button" class="btn btn-outline-secondary btn-sm remove-variable">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        inputVariablesContainer.appendChild(newInput);
+    }
+
+    // Parse and render initial input variables
+    try {
+        const initialInputVariables = JSON.parse('{{ input_variables_json|safe }}');
+        console.log('Initial input variables:', initialInputVariables);
+        
+        if (Array.isArray(initialInputVariables)) {
+            initialInputVariables.forEach(variable => {
+                addInputVariable(variable);
+                console.log('Added input variable:', variable);
+            });
+        }
+    } catch (error) {
+        console.error('Error parsing initial input variables:', error);
+    }
+});
 </script>
 {% endblock extra_js %}
