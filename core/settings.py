@@ -310,7 +310,7 @@ HTTPS=True
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-API_BASE_URL = "http://192.168.30.100:8000"  # Replace with your actual LiteLLM proxy URL
+API_BASE_URL = os.environ.get('API_BASE_URL')
 LITELLM_MASTER_KEY= os.environ.get('LITELLM_MASTER_KEY')
 SERPAPI_API_KEY=os.environ.get('SERPAPI_API_KEY')
 OPENAI_API_KEY=os.environ.get('OPENAI_API_KEY')

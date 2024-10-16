@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent
-from .forms import CrewExecutionForm, HumanInputForm
+from .forms import CrewExecutionForm, HumanInputForm, AgentForm
 from .tasks import execute_crew
 from django.core.exceptions import ValidationError
 import logging
@@ -173,10 +173,10 @@ def manage_pipelines(request):
 @login_required
 def manage_agents_card_view(request):
     agents = Agent.objects.prefetch_related('crew_set', 'task_set', 'tools').all()
-    form = AgentForm()  # Create an instance of the form
+    form = AgentForm()  # Now AgentForm is defined
     context = {
         'agents': agents,
-        'form': form,  # Pass the form to the template
+        'form': form,
     }
     return render(request, 'agents/manage_agents_card_view.html', context)
 
@@ -229,4 +229,3 @@ def submit_human_input(request, execution_id):
     )
     
     return JsonResponse({'message': 'Human input received and processed'})
-

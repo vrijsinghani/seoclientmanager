@@ -5,6 +5,8 @@ from pydantic.v1 import BaseModel, Field
 from crewai_tools import BaseTool
 from urllib.parse import urljoin
 from trafilatura import fetch_url, extract, sitemaps, spider
+import logging
+logger = logging.getLogger(__name__)
 
 class FixedCrawlWebsiteToolSchema(BaseModel):
     """Input for CrawlWebsiteTool."""
@@ -33,14 +35,16 @@ class CrawlWebsiteTool(BaseTool):
             self.args_schema = FixedCrawlWebsiteToolSchema
 
     def _run(self, website_url: str) -> str:
-        print(f"Processing {website_url}")
+        
+        logger.info(f"Processing {website_url}")
         content = self._crawl_website(website_url)
         return content
 
     def _crawl_website(self, url: str) -> str:
         links_to_visit = self._get_links_to_visit(url)
         content = ""
-        print(f"Reading {len(links_to_visit)} pages.")
+        
+        logger.info(f"Reading {len(links_to_visit)} pages.")
         for link in links_to_visit:
             page_content = self._fetch_and_extract_content(link)
             content += page_content
@@ -51,17 +55,19 @@ class CrawlWebsiteTool(BaseTool):
 #        sitemap_links = sitemaps.sitemap_search(url)
         sitemap_links = []
         if sitemap_links:
-            print(f"Found {len(sitemap_links)} pages from sitemap.")
+            logger.info(f"Found {len(sitemap_links)} pages from sitemap.")
             return sitemap_links
         else:
             _, known_urls = spider.focused_crawler(url, max_seen_urls=10, max_known_urls=1000)
-            print(f"Found {len(known_urls)} from crawling the website.")
+            logger.info(f"Found {len(known_urls)} pages from crawling the website.")
             return list(known_urls)
 
     def _fetch_and_extract_content(self, url: str) -> str:
         html_content = fetch_url(url)
         if html_content:
             extracted_content = f"---link: {url}\n{extract(html_content,url=url)}\n---page-end---\n"
+            logger.info(f"Extracted {url}, html content: {len(html_content)}, extracted_content: {extracted_content}")
             return extracted_content or ""
         else:
+            logger.info(f"Failed to fetch {url}")
             return ""

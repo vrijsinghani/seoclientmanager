@@ -90,7 +90,7 @@ def generate_nested_directory(root_path, current_path):
             }
     return directory
 
-@login_required(login_url='/accounts/login/basic-login/')
+@login_required(login_url='/accounts/login/illustration-login/')
 def file_manager(request, directory=''):
     user_id = str(request.user.id)
     media_path = os.path.join(settings.MEDIA_ROOT, user_id)

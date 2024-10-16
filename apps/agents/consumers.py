@@ -69,17 +69,17 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
             await self.handle_human_input(input_key, user_input)
 
     async def crew_execution_update(self, event):
-        formatted_status = format_message(event.get('status', ''))
+        status = event.get('status', '')  # No formatting applied
         formatted_messages = [
             {
                 'agent': msg.get('agent', 'System'),
                 'content': format_message(msg.get('content', ''))
             } for msg in event.get('messages', []) if msg.get('content')
         ]
-        logger.info(f"Sending formatted status: {formatted_status}")
-        logger.info(f"Sending formatted messages: {formatted_messages}")
+        # logger.info(f"Sending status: {status}")
+        # logger.info(f"Sending formatted messages: {formatted_messages}")
         await self.send(text_data=json.dumps({
-            'status': formatted_status,
+            'status': status,
             'messages': formatted_messages,
             'human_input_request': event.get('human_input_request')
         }))
@@ -105,7 +105,7 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
 
     async def send_execution_status(self):
         status_data = await self.get_execution_status()
-        formatted_status = format_message(status_data['status'])
+        status = status_data['status']  # No formatting applied
         formatted_messages = [
             {
                 'agent': msg['agent'],
@@ -113,10 +113,10 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
             } for msg in status_data['messages'] if msg.get('content')
         ]
         
-        logger.info(f"Sending formatted status: {formatted_status}")
-        logger.info(f"Sending formatted messages: {formatted_messages}")
+        # logger.info(f"Sending status: {status}")
+        # logger.info(f"Sending formatted messages: {formatted_messages}")
         
         await self.send(text_data=json.dumps({
-            'status': formatted_status,
+            'status': status,
             'messages': formatted_messages,
         }))

@@ -5,7 +5,7 @@ from langchain.tools import BaseTool
 from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 import logging
-from apps.common.utils import get_llm_openai
+from apps.common.utils import get_llm
 from django.conf import settings
 import builtins
 from django.core.cache import cache
@@ -30,6 +30,7 @@ from crewai_tools import (
 )
 import crewai_tools
 from langchain.tools import tool as langchain_tool
+import os
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
@@ -43,62 +44,26 @@ def load_tool(tool_model):
         # If not, try to import a custom tool
         module_path = f"apps.agents.tools.{tool_model.tool_class}.{tool_model.tool_class}"
         module = importlib.import_module(module_path)
-        logger.info(f"Successfully imported module: {module_path}")
 
-        # Log all items in the module
-        for name, obj in module.__dict__.items():
-            logger.info(f"Found in module: {name}, type: {type(obj)}")
-
-        # Find suitable tool classes or functions
-        tool_candidates = []
-        for name, obj in module.__dict__.items():
-            if isinstance(obj, type):
-                if issubclass(obj, (CrewAIBaseTool, LangChainBaseTool)) and hasattr(obj, '_run') and obj != CrewAIBaseTool and obj != LangChainBaseTool:
-                    tool_candidates.append(obj)
-            elif callable(obj) and hasattr(obj, '__wrapped__'):  # Check for @tool decorator
-                tool_candidates.append(obj)
-            elif callable(obj) and hasattr(obj, '_run'):  # Custom class with _run method
-                tool_candidates.append(obj)
-
-        if not tool_candidates:
-            raise ValueError(f"No suitable tool class or function found in {module_path}")
-
-        if len(tool_candidates) > 1:
-            logger.warning(f"Multiple tool candidates found in {module_path}. Using the first one: {tool_candidates[0].__name__}")
-
-        tool_class_or_func = tool_candidates[0]
-        logger.info(f"Using tool: {tool_class_or_func.__name__}")
-
-        # Handle different types of tools
-        if isinstance(tool_class_or_func, type):
-            if issubclass(tool_class_or_func, CrewAIBaseTool):
-                return tool_class_or_func()
-            elif issubclass(tool_class_or_func, LangChainBaseTool):
-                # Wrap LangChain tool in CrewAI compatible class
-                class WrappedLangChainTool(CrewAIBaseTool):
-                    name = tool_class_or_func.name
-                    description = tool_class_or_func.description
-
-                    def _run(self, *args, **kwargs):
-                        return tool_class_or_func()(*args, **kwargs)
-
-                return WrappedLangChainTool()
-        elif callable(tool_class_or_func) and hasattr(tool_class_or_func, '__wrapped__'):
-            # Handle @tool decorated function
-            class WrappedToolFunction(CrewAIBaseTool):
-                name = getattr(tool_class_or_func, 'name', tool_class_or_func.__name__)
-                description = getattr(tool_class_or_func, 'description', tool_class_or_func.__doc__ or "No description provided")
+        tool_class = getattr(module, tool_model.tool_subclass)
+        
+        if issubclass(tool_class, CrewAIBaseTool):
+            return tool_class()
+        elif issubclass(tool_class, LangChainBaseTool):
+            # Wrap LangChain tool in CrewAI compatible class
+            class WrappedLangChainTool(CrewAIBaseTool):
+                name = tool_class.name
+                description = tool_class.description
 
                 def _run(self, *args, **kwargs):
-                    return tool_class_or_func(*args, **kwargs)
+                    return tool_class()(*args, **kwargs)
 
-            return WrappedToolFunction()
+            return WrappedLangChainTool()
         else:
-            # Custom class with _run method
-            return tool_class_or_func()
+            raise ValueError(f"Unsupported tool class: {tool_class}")
 
     except Exception as e:
-        logger.error(f"Error loading tool {tool_model.tool_class}: {str(e)}")
+        logger.error(f"Error loading tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}")
         logger.exception("Full traceback:")
         return None
 
@@ -151,15 +116,15 @@ class WebSocketStringIO(StringIO):
         self.execution_id = execution_id
         self.last_position = 0
         self.send_to_original_stdout = send_to_original_stdout
-        self.send_to_websocket = send_to_websocket
+        self.should_send_to_websocket = send_to_websocket  # Rename this variable
         self.original_stdout = sys.stdout
 
     def write(self, s):
         super().write(s)
         if self.send_to_original_stdout:
             self.original_stdout.write(s)
-        if self.send_to_websocket:
-            self.send_to_websocket()
+        if self.should_send_to_websocket:  # Use the renamed variable
+            self.send_to_websocket()  # This is now clearly a method call
 
     def send_to_websocket(self):
         current_position = self.tell()
@@ -329,12 +294,15 @@ def create_crewai_agents(agent_models, execution_id):
     agents = []
     for agent_model in agent_models:
         try:
-            model_name = agent_model.llm.split('/', 1)[1] if '/' in agent_model.llm else agent_model.llm
-            crewai_agent_llm = LLM(
-                model=model_name,
-                api_key=settings.LITELLM_MASTER_KEY,
-                base_url=settings.API_BASE_URL,
-            )
+            model_name = agent_model.llm
+#            model_name = agent_model.llm.split('/', 1)[1] if '/' in agent_model.llm else agent_model.llm
+            # crewai_agent_llm = LLM(
+            #     model=model_name,
+            #     api_key=settings.LITELLM_MASTER_KEY,
+            #     base_url=settings.API_BASE_URL,
+            # )
+            crewai_agent_llm, _ = get_llm(model_name)
+            logger.debug(f"Created LLM for model: {model_name}: {crewai_agent_llm}")
             agent_params = {
                 'role': agent_model.role,
                 'goal': agent_model.goal,
@@ -348,8 +316,9 @@ def create_crewai_agents(agent_models, execution_id):
             }
             optional_params = ['max_iter', 'max_rpm', 'function_calling_llm']
             agent_params.update({param: getattr(agent_model, param) for param in optional_params if getattr(agent_model, param) is not None})
-            
+            logger.debug(f"Creating CrewAI Agent with parameters: {agent_params}")
             agent = Agent(**agent_params)
+            logger.debug(f"CrewAI Agent created successfully for agent id: {agent_model.llm}")
             agents.append(agent)
             logger.info(f"CrewAI Agent created successfully for agent id: {agent_model.id} - {agent_model.tools.all()}")
         except Exception as e:
@@ -406,8 +375,14 @@ def create_crewai_tasks(task_models, agents, execution):
                 'tools': [load_tool(tool) for tool in task_model.tools.all()]
             }
 
-            optional_fields = ['output_json', 'output_pydantic', 'output_file', 'converter_cls']
+            optional_fields = ['output_json', 'output_pydantic', 'converter_cls']
             task_dict.update({field: getattr(task_model, field) for field in optional_fields if getattr(task_model, field) is not None})
+
+            # Handle output_file separately
+            if task_model.output_file:
+                # Construct the full path using MEDIA_ROOT
+                full_path = os.path.join(settings.MEDIA_ROOT, task_model.output_file.name)
+                task_dict['output_file'] = full_path
 
             tasks.append(CrewAITask(**task_dict))
             logger.info(f"CrewAITask created successfully for task: {task_model.id}")
@@ -460,7 +435,7 @@ def log_crew_message(execution, content, agent=None, human_input_request=None):
             }
         )
         
-        logger.info(f"Sent message to WebSocket: {content}")
+        #logger.info(f"Sent message to WebSocket: {content}")
     else:
         logger.warning("Attempted to log an empty message, skipping.")
 

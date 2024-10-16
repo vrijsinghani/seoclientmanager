@@ -3,7 +3,7 @@ from typing import Any, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from ..base_tool import BaseTool
+from crewai_tools import BaseTool as CrewAIBaseTool
 
 
 class FixedDirectoryReadToolSchema(BaseModel):
@@ -18,7 +18,7 @@ class DirectoryReadToolSchema(FixedDirectoryReadToolSchema):
     directory: str = Field(..., description="Mandatory directory to list content")
 
 
-class DirectoryReadTool(BaseTool):
+class DirectoryReadTool(CrewAIBaseTool):
     name: str = "List files in directory"
     description: str = (
         "A tool that can be used to recursively list a directory's content."
@@ -32,7 +32,6 @@ class DirectoryReadTool(BaseTool):
             self.directory = directory
             self.description = f"A tool that can be used to list {directory}'s content."
             self.args_schema = FixedDirectoryReadToolSchema
-            self._generate_description()
 
     def _run(
         self,

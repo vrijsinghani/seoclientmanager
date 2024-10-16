@@ -6,7 +6,7 @@ from django.core.cache import cache
 import logging
 import tiktoken
 from django.conf import settings
-from langchain_community.chat_models.openai import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatLiteLLM
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.callbacks.manager import CallbackManager

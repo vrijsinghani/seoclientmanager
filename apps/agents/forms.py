@@ -5,6 +5,7 @@ from apps.seo_manager.models import Client
 from apps.common.utils import get_models
 import json
 import logging
+from .utils import get_available_tools, get_tool_classes
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ class TaskForm(forms.ModelForm):
             'context': forms.CheckboxSelectMultiple(),
             'output_json': forms.TextInput(),
             'output_pydantic': forms.TextInput(),
-            'output_file': forms.TextInput(),
+            'output_file': forms.FileInput(attrs={'class': 'form-control'}),  # Ensure this is a FileInput
             'converter_cls': forms.TextInput(),
         }
 
@@ -119,16 +120,62 @@ class TaskForm(forms.ModelForm):
         return None
 
 class ToolForm(forms.ModelForm):
+    tool_class = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        required=True
+    )
+    tool_subclass = forms.ChoiceField(
+        choices=[],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        required=True
+    )
+    description = forms.CharField(widget=forms.Textarea(attrs={'readonly': 'readonly'}), required=False)
+
     class Meta:
         model = Tool
-        fields = ['tool_class']
+        fields = ['tool_class', 'tool_subclass', 'name', 'description']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['tool_class'] = forms.ChoiceField(
-            choices=[(tool, tool) for tool in get_available_tools()],
-            widget=forms.Select(attrs={'class': 'form-control'})
-        )
+        available_tools = get_available_tools()
+        self.fields['tool_class'].choices = [(tool, tool) for tool in available_tools]
+        self.fields['name'].widget = forms.HiddenInput()
+        self.fields['name'].required = False
+        
+        if self.data.get('tool_class'):
+            self.fields['tool_subclass'].choices = self.get_subclass_choices(self.data['tool_class'])
+        elif self.instance.pk:
+            self.fields['tool_subclass'].choices = self.get_subclass_choices(self.instance.tool_class)
+
+    def get_subclass_choices(self, tool_class):
+        subclasses = get_tool_classes(tool_class)
+        return [(cls.__name__, cls.__name__) for cls in subclasses]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tool_class = cleaned_data.get('tool_class')
+        tool_subclass = cleaned_data.get('tool_subclass')
+
+        if tool_class:
+            self.fields['tool_subclass'].choices = self.get_subclass_choices(tool_class)
+
+        if tool_class and tool_subclass:
+            subclasses = dict(self.fields['tool_subclass'].choices)
+            if tool_subclass not in subclasses:
+                raise forms.ValidationError(f"Invalid tool subclass '{tool_subclass}' for tool class '{tool_class}'")
+
+        # Set the name field to the value of tool_subclass
+        cleaned_data['name'] = tool_subclass
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.name = self.cleaned_data['tool_subclass']
+        if commit:
+            instance.save()
+        return instance
 
 class CrewForm(forms.ModelForm):
     config = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=False)

@@ -1,28 +1,38 @@
-from crewai_tools import tool
+from typing import Any, Type
+from pydantic.v1 import BaseModel, Field
+from crewai_tools.tools.base_tool import BaseTool
 import requests
 import xml.etree.ElementTree as ET
 
-@tool("Google Suggestions")
-def google_suggestions_tool(argument: str) -> str:
-    """Retrieve Google search suggestions for a given keyword."""
-    # Parse the argument to extract the keyword and other parameters
-    keyword = argument.split(",")[0].strip()
-    country_code = argument.split(",")[1].strip() if "," in argument else "us"
+class GoogleSuggestionsInput(BaseModel):
+    keyword: str = Field(description="The keyword to get suggestions for")
+    country_code: str = Field(default="us", description="The country code for localized suggestions")
 
-    # Build the Google Search query URL
-    search_query = f"is {keyword}"
-    google_search_url = f"http://google.com/complete/search?output=toolbar&gl={country_code}&q={search_query}"
+class GoogleSuggestionsTool(BaseTool):
+    name: str = "Google Suggestions Fetcher"
+    description: str = "Retrieves Google search suggestions for a given keyword."
+    args_schema: Type[BaseModel] = GoogleSuggestionsInput
 
-    # Call the URL and read the data
-    result = requests.get(google_search_url)
-    tree = ET.ElementTree(ET.fromstring(result.content))
-    root = tree.getroot()
+    def _run(self, keyword: str, country_code: str = "us", **kwargs: Any) -> Any:
+        """Use the tool to get Google search suggestions."""
+        # Build the Google Search query URL
+        search_query = f"is {keyword}"
+        google_search_url = f"http://google.com/complete/search?output=toolbar&gl={country_code}&q={search_query}"
 
-    # Extract the suggestions from the XML response
-    suggestions = []
-    for suggestion in root.findall('CompleteSuggestion'):
-        question = suggestion.find('suggestion').attrib.get('data')
-        suggestions.append(question)
+        # Call the URL and read the data
+        result = requests.get(google_search_url)
+        tree = ET.ElementTree(ET.fromstring(result.content))
+        root = tree.getroot()
 
-    # Return the suggestions as a comma-separated string
-    return ", ".join(suggestions)
+        # Extract the suggestions from the XML response
+        suggestions = []
+        for suggestion in root.findall('CompleteSuggestion'):
+            question = suggestion.find('suggestion').attrib.get('data')
+            suggestions.append(question)
+
+        # Return the suggestions as a comma-separated string
+        return ", ".join(suggestions)
+
+    async def _arun(self, keyword: str, country_code: str = "us", **kwargs: Any) -> Any:
+        """Use the tool asynchronously."""
+        raise NotImplementedError("GoogleSuggestionsTool does not support async")

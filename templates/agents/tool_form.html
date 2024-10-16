@@ -14,13 +14,27 @@
                 <div class="card-body">
                     <form method="post" id="toolForm">
                         {% csrf_token %}
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                <ul>
+                                    {% for field in form %}
+                                        {% for error in field.errors %}
+                                            <li>{{ field.label }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {% for error in form.non_field_errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
                         <div class="mb-4">
                             <label for="{{ form.tool_class.id_for_label }}" class="form-label">Tool Class</label><br>
                             {{ form.tool_class }}
                         </div>
                         <div class="mb-4">
-                            <label class="form-label">Name</label><br>
-                            <input type="text" id="tool_name" name="name" class="form-control" readonly>
+                            <label for="{{ form.tool_subclass.id_for_label }}" class="form-label">Tool Subclass</label><br>
+                            {{ form.tool_subclass }}
                         </div>
                         <div class="mb-4">
                             <label class="form-label">Description</label><br>
@@ -111,25 +125,15 @@
 <script src="{% static 'assets/js/plugins/choices.min.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Choices.js for select fields
-        var selectFields = document.querySelectorAll('select');
-        selectFields.forEach(function(select) {
-            new Choices(select, {
-                removeItemButton: true,
-                placeholder: true,
-                placeholderValue: 'Select an option'
-            });
-        });
-
         var toolClassSelect = document.getElementById('{{ form.tool_class.id_for_label }}');
-        var toolNameInput = document.getElementById('tool_name');
+        var toolSubclassSelect = document.getElementById('{{ form.tool_subclass.id_for_label }}');
         var toolDescriptionInput = document.getElementById('tool_description');
         var submitButton = document.getElementById('submitButton');
         var errorMessageDiv = document.getElementById('errorMessage');
 
         function setLoading(isLoading) {
             if (isLoading) {
-                toolNameInput.value = 'Loading...';
+                toolSubclassSelect.innerHTML = '<option value="">Loading...</option>';
                 toolDescriptionInput.value = 'Loading...';
                 submitButton.innerHTML = '<span class="loading"></span> Loading';
             } else {
@@ -153,21 +157,26 @@
                 setLoading(true);
                 hideError();
                 fetch(`/agents/get_tool_info/?tool_class=${selectedTool}`)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Failed to fetch tool information');
-                        }
-                        return response.json();
-                    })
+                    .then(response => response.json())
                     .then(data => {
-                        toolNameInput.value = data.name;
-                        toolDescriptionInput.value = data.description;
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        toolSubclassSelect.innerHTML = '';
+                        data.classes.forEach(cls => {
+                            var option = document.createElement('option');
+                            option.value = cls.name;
+                            option.textContent = cls.name;
+                            option.setAttribute('data-description', cls.description);
+                            toolSubclassSelect.appendChild(option);
+                        });
+                        toolSubclassSelect.dispatchEvent(new Event('change'));
                         submitButton.disabled = false;
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        showError('Failed to load tool information. Please try again.');
-                        toolNameInput.value = '';
+                        showError(`Failed to load tool information: ${error.message}`);
+                        toolSubclassSelect.innerHTML = '';
                         toolDescriptionInput.value = '';
                         submitButton.disabled = true;
                     })
@@ -175,10 +184,19 @@
                         setLoading(false);
                     });
             } else {
-                toolNameInput.value = '';
+                toolSubclassSelect.innerHTML = '';
                 toolDescriptionInput.value = '';
                 submitButton.disabled = true;
                 hideError();
+            }
+        });
+
+        toolSubclassSelect.addEventListener('change', function() {
+            var selectedOption = this.options[this.selectedIndex];
+            if (selectedOption) {
+                toolDescriptionInput.value = selectedOption.getAttribute('data-description') || '';
+            } else {
+                toolDescriptionInput.value = '';
             }
         });
 

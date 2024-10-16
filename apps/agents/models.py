@@ -10,6 +10,7 @@ import uuid
 import random
 import json
 from django.contrib.postgres.fields import ArrayField
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +26,28 @@ def random_avatar():
 
 def get_available_tools():
     tools_dir = os.path.join('apps', 'agents', 'tools')
-    return [name for name in os.listdir(tools_dir) if os.path.isdir(os.path.join(tools_dir, name))]
+    available_tools = []
+
+    for root, dirs, files in os.walk(tools_dir):
+        for dir_name in dirs:
+            if not dir_name.startswith('__'):  # Exclude directories like __pycache__
+                tool_path = os.path.relpath(os.path.join(root, dir_name), tools_dir)
+                available_tools.append(tool_path.replace(os.path.sep, '.'))
+
+    return available_tools
 
 def default_embedder():
     return {'provider': 'openai'}
 
+def user_directory_path(instance, filename):
+    # File will be uploaded to MEDIA_ROOT/user_<id>/<filename>
+    return f'user_{instance.crew_execution.user.id}/{filename}'
+
 class Tool(models.Model):
-    name = models.CharField(max_length=100)
-    description = models.TextField()
-    tool_class = models.CharField(max_length=100, choices=[(tool, tool) for tool in get_available_tools()])
-    schema = models.JSONField(null=True, blank=True)
+    tool_class = models.CharField(max_length=255)
+    tool_subclass = models.CharField(max_length=255)
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
@@ -119,14 +132,32 @@ class Task(models.Model):
     config = models.JSONField(null=True, blank=True)
     output_json = models.CharField(max_length=255, null=True, blank=True)
     output_pydantic = models.CharField(max_length=255, null=True, blank=True)
-    output_file = models.CharField(max_length=255, null=True, blank=True)
+    output_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
     output = models.TextField(null=True, blank=True)
     callback = models.CharField(max_length=255, null=True, blank=True)
     human_input = models.BooleanField(default=False)
     converter_cls = models.CharField(max_length=255, null=True, blank=True)
+    crew_execution = models.ForeignKey('CrewExecution', on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.description[:50]
+
+    def save_output_file(self, content):
+        if self.output_file:
+            file_name = os.path.basename(self.output_file.name)
+        else:
+            file_name = f"task_{self.id}_output.txt"
+        
+        file_path = user_directory_path(self, file_name)
+        full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+        
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        
+        with open(full_path, 'w') as f:
+            f.write(content)
+        
+        self.output_file.name = file_path
+        self.save()
 
 class Crew(models.Model):
     name = models.CharField(max_length=100)
@@ -182,6 +213,10 @@ class CrewExecution(models.Model):
 
     def __str__(self):
         return f"{self.crew.name} - {self.created_at}"
+
+    def save_task_output_file(self, task, content):
+        task.crew_execution = self
+        task.save_output_file(content)
 
 class CrewMessage(models.Model):
     execution = models.ForeignKey(CrewExecution, on_delete=models.CASCADE, related_name='messages')
