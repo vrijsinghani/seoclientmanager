@@ -40,6 +40,7 @@ def get_directory_contents(directory_path, user_id):
             _, extension = os.path.splitext(name)
             contents.append({
                 'name': name,
+                'size' : get_file_size(path),
                 'type': 'file',
                 'path': rel_path,
                 'extension': extension[1:].lower()  # Remove the dot and convert to lowercase
@@ -185,3 +186,9 @@ def upload_file(request):
                 destination.write(chunk)
 
     return redirect(request.META.get('HTTP_REFERER'))
+
+def get_file_size(file_path):
+    try:
+        return os.path.getsize(file_path)
+    except OSError:
+        return 0  # Return 0 if there's an error reading the file size

@@ -31,6 +31,39 @@
   .folder-item.collapsed > .folder-content .fa-chevron-down {
     transform: rotate(-90deg);
   }
+  /* Add these new styles */
+  #directory-tree {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .folder-item {
+    margin-bottom: 5px;
+  }
+  .folder-content {
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+  }
+  .folder-content:hover {
+    background-color: #f8f9fa;
+  }
+  .folder-content a {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+  }
+  .folder-item .fa-chevron-down,
+  .folder-item .fa-folder {
+    font-size: 0.9rem;
+  }
+  .folder-contents {
+    display: none;
+  }
+  .folder-item.active > .folder-contents {
+    display: block;
+  }
 </style>
 {% endblock extrastyle %}
 
@@ -77,6 +110,7 @@
               <thead>
                 <tr>
                   <th scope="col">Name</th>
+                  <th scope="col">Size</th>
                   <th scope="col">Type</th>
                   <th scope="col">Actions</th>
                 </tr>
@@ -91,6 +125,13 @@
                     {% else %}
                       <i class="fas fa-file text-primary me-2"></i>
                       {{ item.name }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.type == 'file' %}
+                      {{ item.size|filesizeformat }}
+                    {% else %}
+                      -
                     {% endif %}
                   </td>
                   <td>

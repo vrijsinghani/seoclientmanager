@@ -101,7 +101,7 @@ class TaskForm(forms.ModelForm):
             'context': forms.CheckboxSelectMultiple(),
             'output_json': forms.TextInput(),
             'output_pydantic': forms.TextInput(),
-            'output_file': forms.FileInput(attrs={'class': 'form-control'}),  # Ensure this is a FileInput
+            'output_file': forms.TextInput(attrs={'placeholder': 'e.g., outputs/task_result.txt'}),
             'converter_cls': forms.TextInput(),
         }
 
@@ -118,6 +118,14 @@ class TaskForm(forms.ModelForm):
             except json.JSONDecodeError:
                 raise forms.ValidationError("Invalid JSON format in config field")
         return None
+
+    def clean_output_file(self):
+        output_file = self.cleaned_data.get('output_file')
+        if output_file:
+            # You can add additional validation here if needed
+            # For example, check if the path is within allowed directories
+            pass
+        return output_file
 
 class ToolForm(forms.ModelForm):
     tool_class = forms.ChoiceField(

@@ -15,6 +15,8 @@ from django.urls import reverse
 from django.core.cache import cache
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.conf import settings
+import os
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
@@ -229,3 +231,30 @@ def submit_human_input(request, execution_id):
     )
     
     return JsonResponse({'message': 'Human input received and processed'})
+
+def task_create_or_update(request, task_id=None):
+    # ... existing view code ...
+
+    if form.is_valid():
+        task = form.save(commit=False)
+        
+        # Handle the output_file path
+        output_file_path = form.cleaned_data['output_file']
+        if output_file_path:
+            # Ensure the path is relative to MEDIA_ROOT
+            full_path = os.path.join(settings.MEDIA_ROOT, output_file_path)
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            # Create an empty file if it doesn't exist
+            if not os.path.exists(full_path):
+                open(full_path, 'a').close()
+            
+            # Save the relative path to the model
+            task.output_file = output_file_path
+
+        task.save()
+        # ... rest of your view logic ...
+
+    # ... rest of your view ...

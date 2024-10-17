@@ -7,9 +7,9 @@
             <div class="folder-content d-flex align-items-center">
                 <i class="fas fa-chevron-down me-2"></i>
                 <i class="fas fa-folder text-warning me-2"></i>
-                <a href="{% url 'file_manager' item|urlencode %}">{{ item|basename }}</a>
+                <a href="{% url 'file_manager' item|urlencode %}" class="text-truncate">{{ item|basename }}</a>
             </div>
-            <ul class="list-unstyled ps-4 folder-contents">
+            <ul class="list-unstyled ps-3 folder-contents">
                 {% include "includes/subdirectories.html" with directory=content.contents %}
             </ul>
         </li>

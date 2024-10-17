@@ -43,21 +43,22 @@
               {% for crew in crews %}
               <tr>
                 <td class="text-sm font-weight-normal">
-                  <a href="{% url 'agents:edit_crew' crew.id %}">{{ crew.name }}</a>
+                  <a href="{% url 'agents:crew_detail' crew.id %}">{{ crew.name }}<i class="fas fa-play ms-1" aria-hidden="true"></i> </a>
+                  
                 </td>
                 <td class="text-sm font-weight-normal">{{ crew.get_process_display }}</td>
                 <td class="text-sm font-weight-normal">
                   {% for agent in crew.agents.all %}
-                    {{ agent.name }}{% if not forloop.last %}, {% endif %}
+                  <a href="{% url 'agents:edit_agent' agent.id %}?next={{ request.path|urlencode }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit agent">{{ agent.name }}</a>{% if not forloop.last %}, {% endif %}
                   {% endfor %}
                 </td>
                 <td class="text-sm font-weight-normal">
                   {% for task in crew.tasks.all %}
-                    {{ task.description|truncatechars:30 }}{% if not forloop.last %}, {% endif %}
+                    <a href="{% url 'agents:edit_task' task.id %}?next={{ request.path|urlencode }}">{{ task.description|truncatechars:30 }}</a>{% if not forloop.last %}, {% endif %}
                   {% endfor %}
                 </td>
                 <td class="text-sm font-weight-normal">
-                  <a href="{% url 'agents:edit_crew' crew.id %}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit crew">
+                  <a href="{% url 'agents:edit_crew' crew.id %}?next={{ request.path|urlencode }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit crew">
                     Edit
                   </a>
                   |

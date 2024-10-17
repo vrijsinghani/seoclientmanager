@@ -114,7 +114,7 @@ class Task(models.Model):
     config = models.JSONField(null=True, blank=True)
     output_json = models.CharField(max_length=255, null=True, blank=True)
     output_pydantic = models.CharField(max_length=255, null=True, blank=True)
-    output_file = models.FileField(upload_to=user_directory_path, null=True, blank=True)
+    output_file = models.CharField(max_length=255, null=True, blank=True)
     output = models.TextField(null=True, blank=True)
     callback = models.CharField(max_length=255, null=True, blank=True)
     human_input = models.BooleanField(default=False)
@@ -126,7 +126,7 @@ class Task(models.Model):
 
     def save_output_file(self, content):
         if self.output_file:
-            file_name = os.path.basename(self.output_file.name)
+            file_name = os.path.basename(self.output_file)
         else:
             file_name = f"task_{self.id}_output.txt"
         
@@ -138,7 +138,7 @@ class Task(models.Model):
         with open(full_path, 'w') as f:
             f.write(content)
         
-        self.output_file.name = file_path
+        self.output_file = file_path
         self.save()
 
 class Crew(models.Model):

@@ -124,13 +124,14 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
-                                    <label for="{{ form.output_file.id_for_label }}" class="form-control-label">Output File</label>
+                                    <label for="{{ form.output_file.id_for_label }}" class="form-control-label">Output File Path</label>
                                     {{ form.output_file }}
                                     {% if form.output_file.errors %}
                                         <div class="text-danger">
                                             {{ form.output_file.errors|join:", " }}
                                         </div>
                                     {% endif %}
+                                    <small class="form-text text-muted">Enter the relative path in the media directory (e.g., 'outputs/task_result.txt')</small>
                                 </div>
                             </div>
                         </div>

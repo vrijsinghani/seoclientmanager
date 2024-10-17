@@ -375,13 +375,13 @@ def create_crewai_tasks(task_models, agents, execution):
             # Handle output_file separately
             if task_model.output_file:
                 # Construct the full path using MEDIA_ROOT
-                full_path = os.path.join(settings.MEDIA_ROOT, task_model.output_file.name)
+                full_path = os.path.join(settings.MEDIA_ROOT, task_model.output_file)
                 task_dict['output_file'] = full_path
 
             tasks.append(CrewAITask(**task_dict))
             logger.debug(f"CrewAITask created successfully for task: {task_model.id}")
         except Exception as e:
-            logger.error(f"Error creating CrewAITask for task {task_model.id}: {str(e)}")
+            logger.error(f"Error creating CrewAITask for task {task_model.id}: {str(e)}", exc_info=True)
     return tasks
 
 def step_callback(step_output, execution_id):
