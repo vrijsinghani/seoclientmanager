@@ -1,9 +1,9 @@
 from celery import shared_task
 from .models import CrewExecution, Tool, CrewMessage, Task, Agent as AgentModel, CrewOutput, CrewTask
-from crewai import Crew, Agent, Task as CrewAITask, LLM
+from crewai import Crew, Agent, Task as CrewAITask
 from langchain.tools import BaseTool
 from django.apps import apps
-from django.core.exceptions import ObjectDoesNotExist
+#from django.core.exceptions import ObjectDoesNotExist
 import logging
 from apps.common.utils import get_llm
 from django.conf import settings
@@ -22,49 +22,39 @@ from contextlib import contextmanager
 import importlib
 from crewai_tools import BaseTool as CrewAIBaseTool
 from langchain.tools import BaseTool as LangChainBaseTool
-from crewai_tools import (
-    DirectoryReadTool,
-    FileReadTool,
-    SerperDevTool,
-    WebsiteSearchTool
-)
+
 import crewai_tools
-from langchain.tools import tool as langchain_tool
+#from langchain.tools import tool as langchain_tool
 import os
+from apps.agents.utils import load_tool as utils_load_tool
+import dill
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
 
 def load_tool(tool_model):
+    logger.debug(f"loading tool {tool_model}")
+    tool_class = utils_load_tool(tool_model)
+    logger.debug(f"tool_class: {tool_class}")
+    if tool_class is None:
+        logger.error(f"Failed to load tool {tool_model.tool_class}.{tool_model.tool_subclass}")
+        return None
+    
+    # Use dill to serialize the tool class
     try:
-        # Check if it's a pre-built CrewAI tool
-        if hasattr(crewai_tools, tool_model.tool_class):
-            return getattr(crewai_tools, tool_model.tool_class)()
-
-        # If not, try to import a custom tool
-        module_path = f"apps.agents.tools.{tool_model.tool_class}.{tool_model.tool_class}"
-        module = importlib.import_module(module_path)
-
-        tool_class = getattr(module, tool_model.tool_subclass)
+        serialized_tool = dill.dumps(tool_class)
+        deserialized_tool = dill.loads(serialized_tool)
         
-        if issubclass(tool_class, CrewAIBaseTool):
-            return tool_class()
-        elif issubclass(tool_class, LangChainBaseTool):
-            # Wrap LangChain tool in CrewAI compatible class
-            class WrappedLangChainTool(CrewAIBaseTool):
-                name = tool_class.name
-                description = tool_class.description
-
-                def _run(self, *args, **kwargs):
-                    return tool_class()(*args, **kwargs)
-
-            return WrappedLangChainTool()
+        # Check if the deserialized_tool is callable (i.e., a class)
+        if callable(deserialized_tool):
+            logger.debug(f"Loaded tool {tool_model.tool_class}.{tool_model.tool_subclass} as a class")
+            return deserialized_tool()
         else:
-            raise ValueError(f"Unsupported tool class: {tool_class}")
-
+            # If it's not callable, it's likely already an instance
+            logger.debug(f"Loaded tool {tool_model.tool_class}.{tool_model.tool_subclass} as an instance")
+            return deserialized_tool
     except Exception as e:
-        logger.error(f"Error loading tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}")
-        logger.exception("Full traceback:")
+        logger.error(f"Error serializing/deserializing tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}")
         return None
 
 def custom_input_handler(prompt, execution_id):
@@ -111,19 +101,19 @@ def custom_input_handler(prompt, execution_id):
     raise TimeoutError("No user input received within the timeout period")
 
 class WebSocketStringIO(StringIO):
-    def __init__(self, execution_id, send_to_original_stdout=False, send_to_websocket=True, *args, **kwargs):
+    def __init__(self, execution_id, send_to_original_stdout=True, send_to_websocket=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.execution_id = execution_id
         self.last_position = 0
         self.send_to_original_stdout = send_to_original_stdout
-        self.should_send_to_websocket = send_to_websocket  # Rename this variable
+        self.should_send_to_websocket = send_to_websocket  
         self.original_stdout = sys.stdout
 
     def write(self, s):
         super().write(s)
         if self.send_to_original_stdout:
             self.original_stdout.write(s)
-        if self.should_send_to_websocket:  # Use the renamed variable
+        if self.should_send_to_websocket:  
             self.send_to_websocket()  # This is now clearly a method call
 
     def send_to_websocket(self):
@@ -255,7 +245,7 @@ def initialize_crew(execution):
         if value is not None:
             crew_params[param] = value
 
-    logger.debug(f"Creating Crew with parameters: {crew_params}")
+    #logger.debug(f"Creating Crew with parameters: {crew_params}")
 
     return Crew(**crew_params)
 
@@ -264,20 +254,30 @@ def run_crew(task_id, crew, execution):
     log_crew_message(execution, f"Running crew")
     inputs = execution.inputs or {}
     inputs["execution_id"] = execution.id
-    logger.info(f"Inputs: {inputs}")
+    logger.info(f"Crew inputs: {inputs}")
+    logger.info(f"Crew process type: {execution.crew.process}")
     update_execution_status(execution, 'RUNNING')
 
     try:
         if execution.crew.process == 'sequential':
+            logger.info("Starting sequential crew execution")
+            for task in crew.tasks:
+                logger.info(f"Executing task: {task.description}")
+                logger.info(f"Task tools: {[tool.name for tool in task.tools]}")
+                logger.info(f"Agent tools: {[tool.name for tool in task.agent.tools]}")
             result = crew.kickoff(inputs=inputs)
         elif execution.crew.process == 'hierarchical':
+            logger.info("Starting hierarchical crew execution")
             result = crew.kickoff(inputs=inputs)
         elif execution.crew.process == 'for_each':
+            logger.info("Starting for_each crew execution")
             inputs_array = inputs.get('inputs_array', [])
             result = crew.kickoff_for_each(inputs=inputs_array)
         elif execution.crew.process == 'async':
+            logger.info("Starting async crew execution")
             result = crew.kickoff_async(inputs=inputs)
         elif execution.crew.process == 'for_each_async':
+            logger.info("Starting for_each_async crew execution")
             inputs_array = inputs.get('inputs_array', [])
             result = crew.kickoff_for_each_async(inputs=inputs_array)
         else:
@@ -295,14 +295,18 @@ def create_crewai_agents(agent_models, execution_id):
     for agent_model in agent_models:
         try:
             model_name = agent_model.llm
-#            model_name = agent_model.llm.split('/', 1)[1] if '/' in agent_model.llm else agent_model.llm
-            # crewai_agent_llm = LLM(
-            #     model=model_name,
-            #     api_key=settings.LITELLM_MASTER_KEY,
-            #     base_url=settings.API_BASE_URL,
-            # )
             crewai_agent_llm, _ = get_llm(model_name)
-            logger.debug(f"Created LLM for model: {model_name}: {crewai_agent_llm}")
+            #logger.debug(f"Created LLM for model: {model_name}: {crewai_agent_llm}")
+            
+            agent_tools = []
+            for tool in agent_model.tools.all():
+                loaded_tool = load_tool(tool)
+                if loaded_tool:
+                    agent_tools.append(loaded_tool)
+                    logger.info(f"Added tool {tool.name} to agent {agent_model.name}")
+                else:
+                    logger.warning(f"Failed to load tool {tool.name} for agent {agent_model.name}")
+
             agent_params = {
                 'role': agent_model.role,
                 'goal': agent_model.goal,
@@ -312,15 +316,14 @@ def create_crewai_agents(agent_models, execution_id):
                 'llm': crewai_agent_llm,
                 'step_callback': partial(step_callback, execution_id=execution_id),
                 'human_input_handler': partial(human_input_handler, execution_id=execution_id),
-                'tools': [load_tool(tool) for tool in agent_model.tools.all() if load_tool(tool) is not None]
+                'tools': agent_tools  # Make sure this line is present
             }
             optional_params = ['max_iter', 'max_rpm', 'function_calling_llm']
             agent_params.update({param: getattr(agent_model, param) for param in optional_params if getattr(agent_model, param) is not None})
-            logger.debug(f"Creating CrewAI Agent with parameters: {agent_params}")
+            
             agent = Agent(**agent_params)
-            logger.debug(f"CrewAI Agent created successfully for agent id: {agent_model.llm}")
+            logger.info(f"CrewAI Agent created successfully for agent id: {agent_model.id} with {len(agent_tools)} tools")
             agents.append(agent)
-            logger.info(f"CrewAI Agent created successfully for agent id: {agent_model.id} - {agent_model.tools.all()}")
         except Exception as e:
             logger.error(f"Error creating CrewAI Agent for agent {agent_model.id}: {str(e)}")
     return agents
@@ -365,6 +368,17 @@ def create_crewai_tasks(task_models, agents, execution):
                 logger.warning(f"No matching CrewAI agent found for task {task_model.id}")
                 continue
 
+            task_tools = []
+            for tool_model in task_model.tools.all():
+                tool = load_tool(tool_model)
+                if tool:
+                    task_tools.append(tool)
+                    logger.info(f"Added tool {tool_model.name} to task {task_model.id}")
+                    # Add the tool to the agent as well
+                    if tool not in crewai_agent.tools:
+                        crewai_agent.tools.append(tool)
+                        logger.info(f"Added tool {tool_model.name} to agent {crewai_agent.role}")
+
             task_dict = {
                 'description': task_model.description,
                 'agent': crewai_agent,
@@ -372,7 +386,7 @@ def create_crewai_tasks(task_models, agents, execution):
                 'async_execution': task_model.async_execution,
                 'human_input': task_model.human_input,
                 'callback': partial(task_callback, execution_id=execution.id),
-                'tools': [load_tool(tool) for tool in task_model.tools.all()]
+                'tools': task_tools
             }
 
             optional_fields = ['output_json', 'output_pydantic', 'converter_cls']
@@ -384,8 +398,13 @@ def create_crewai_tasks(task_models, agents, execution):
                 full_path = os.path.join(settings.MEDIA_ROOT, task_model.output_file.name)
                 task_dict['output_file'] = full_path
 
-            tasks.append(CrewAITask(**task_dict))
-            logger.info(f"CrewAITask created successfully for task: {task_model.id}")
+            task = CrewAITask(**task_dict)
+            tasks.append(task)
+            logger.info(f"CrewAITask created successfully for task: {task_model.id} with {len(task_tools)} tools")
+            
+            # Log the tools assigned to the task and agent
+            logger.info(f"Tools assigned to task {task_model.id}: {[tool.name for tool in task.tools]}")
+            logger.info(f"Tools assigned to agent {crewai_agent.role}: {[tool.name for tool in crewai_agent.tools]}")
         except Exception as e:
             logger.error(f"Error creating CrewAITask for task {task_model.id}: {str(e)}")
     return tasks
@@ -435,7 +454,7 @@ def log_crew_message(execution, content, agent=None, human_input_request=None):
             }
         )
         
-        #logger.info(f"Sent message to WebSocket: {content}")
+        logger.info(f"Sent message to WebSocket: {content}")
     else:
         logger.warning("Attempted to log an empty message, skipping.")
 

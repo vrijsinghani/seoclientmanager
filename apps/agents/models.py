@@ -11,6 +11,7 @@ import random
 import json
 from django.contrib.postgres.fields import ArrayField
 from django.conf import settings
+from apps.agents.utils import load_tool, get_tool_description
 
 logger = logging.getLogger(__name__)
 
@@ -48,44 +49,25 @@ class Tool(models.Model):
     tool_subclass = models.CharField(max_length=255)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    module_path = models.CharField(max_length=255)
 
     def __str__(self):
         return self.name
 
     def save(self, *args, **kwargs):
+        if not self.module_path:
+            self.module_path = f"apps.agents.tools.{self.tool_class}"
+        
         try:
-            # Import the tool module
-            module_path = f"apps.agents.tools.{self.tool_class}.{self.tool_class}"
-            module = importlib.import_module(module_path)
-            logger.info(f"Successfully imported module: {module_path}")
-
-            # Get all classes defined in the module
-            classes = [cls for name, cls in module.__dict__.items() if isinstance(cls, type)]
-            logger.info(f"Found {len(classes)} classes in the module")
-
-            # Try to find the correct tool class
-            tool_class = next((cls for cls in classes if cls.__name__.lower() == self.tool_class.lower() or cls.__name__.endswith('Tool')), None)
-
-            if tool_class is None:
-                raise ValueError(f"Could not find a suitable Tool class in module {module_path}")
-
-            logger.info(f"Using tool class: {tool_class.__name__}")
-
-            # Set name and description
-            self.name = getattr(tool_class, 'name', self.tool_class)
-            self.description = getattr(tool_class, 'description', '')
-
-            # Set schema if args_schema is available and is a subclass of BaseModel
-            args_schema = getattr(tool_class, 'args_schema', None)
-            if args_schema and issubclass(args_schema, BaseModel):
-                self.schema = args_schema.schema()
+            tool = load_tool(self)
+            if tool:
+                self.name = getattr(tool, 'name', self.tool_subclass)
+                self.description = get_tool_description(tool.__class__)
             else:
-                self.schema = None
-                logger.warning(f"args_schema not found or not a subclass of BaseModel for {self.tool_class}")
-
+                raise ValueError(f"Failed to load tool: {self.module_path}.{self.tool_subclass}. Check the logs for more details.")
         except Exception as e:
             logger.error(f"Error in Tool.save: {str(e)}")
-            raise
+            raise ValidationError(f"Error loading tool: {str(e)}")
 
         super().save(*args, **kwargs)
 
