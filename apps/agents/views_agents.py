@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from .models import Agent
 from .forms import AgentForm
+import traceback
 
 logger = logging.getLogger(__name__)
 

@@ -99,23 +99,13 @@ def get_tool_class_obj(tool_class, tool_subclass):
 
 def load_tool(tool_model) -> Optional[CrewAIBaseTool]:
     logger.info(f"Attempting to load tool: {tool_model.tool_class}.{tool_model.tool_subclass}")
-    cache_key = f"tool_class_{tool_model.tool_class}_{tool_model.tool_subclass}"
-    cached_tool = cache.get(cache_key)
     
-    if cached_tool:
-        logger.info(f"Retrieved tool from cache: {tool_model.tool_class}.{tool_model.tool_subclass}")
-        tool_instance = cached_tool() if callable(cached_tool) else cached_tool
-        logger.info(f"Loaded tool instance: {tool_instance}")
-        return tool_instance
-
     try:
         # Check if it's a pre-built CrewAI tool
         if hasattr(crewai_tools, tool_model.tool_class):
             logger.info(f"Loading pre-built CrewAI tool: {tool_model.tool_class}")
             tool_class = getattr(crewai_tools, tool_model.tool_class)
-            tool_instance = tool_class()
-            cache.set(cache_key, tool_instance, timeout=3600)
-            return tool_instance
+            return tool_class()
 
         # If not, try to import a custom tool
         full_module_path = f"apps.agents.tools.{tool_model.tool_class}"
@@ -125,10 +115,7 @@ def load_tool(tool_model) -> Optional[CrewAIBaseTool]:
         
         if issubclass(tool_class, CrewAIBaseTool):
             logger.info(f"Loaded custom CrewAI tool: {tool_model.tool_subclass}")
-            tool_instance = tool_class()
-            cache.set(cache_key, tool_instance, timeout=3600)
-            logger.info(f"Cached and returned tool instance: {tool_instance}")
-            return tool_instance
+            return tool_class()
         elif issubclass(tool_class, LangChainBaseTool):
             logger.info(f"Loaded and wrapped LangChain tool: {tool_model.tool_subclass}")
             # Wrap LangChain tool in CrewAI compatible class
@@ -139,10 +126,7 @@ def load_tool(tool_model) -> Optional[CrewAIBaseTool]:
                 def _run(self, *args, **kwargs):
                     return tool_class()(*args, **kwargs)
 
-            tool_instance = WrappedLangChainTool()
-            cache.set(cache_key, tool_instance, timeout=3600)
-            logger.info(f"Cached and returned wrapped tool instance: {tool_instance}")
-            return tool_instance
+            return WrappedLangChainTool()
         else:
             raise ValueError(f"Unsupported tool class: {tool_class}")
 
@@ -154,3 +138,13 @@ def load_tool(tool_model) -> Optional[CrewAIBaseTool]:
         logger.error(f"Unexpected error loading tool {full_module_path}.{tool_model.tool_subclass}: {str(e)}")
     
     return None
+
+def get_tool_info(tool_model):
+    logger.info(f"Getting tool info for: {tool_model.tool_class}.{tool_model.tool_subclass}")
+    
+    full_module_path = f"apps.agents.tools.{tool_model.tool_class}"
+    
+    return {
+        'module_path': full_module_path,
+        'class_name': tool_model.tool_subclass
+    }

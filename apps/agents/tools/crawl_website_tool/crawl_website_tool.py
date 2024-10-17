@@ -1,11 +1,10 @@
-import requests
-from bs4 import BeautifulSoup
-from typing import Optional, Type, Any, List
+import logging
+from typing import Optional, Type, Any, List, Set
 from pydantic.v1 import BaseModel, Field
 from crewai_tools import BaseTool
-from urllib.parse import urljoin
-from trafilatura import fetch_url, extract, sitemaps, spider
-import logging
+from urllib.parse import urljoin, urlparse
+from apps.agents.tools.browser_tool.browser_tool import BrowserTool
+
 logger = logging.getLogger(__name__)
 
 class FixedCrawlWebsiteToolSchema(BaseModel):
@@ -21,53 +20,46 @@ class CrawlWebsiteTool(BaseTool):
     description: str = "A tool that can be used to crawl a website and read its content, including content from internal links on the same page."
     args_schema: Type[BaseModel] = CrawlWebsiteToolSchema
     website_url: Optional[str] = None
-    headers: Optional[dict] = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Referer': 'https://www.google.com/'
-    }
+    browser_tool: Optional[BrowserTool] = None
 
     def __init__(self, website_url: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
+        self.browser_tool = BrowserTool()
         if website_url is not None:
             self.website_url = website_url
             self.description = f"A tool that can be used to crawl {website_url} and read its content, including content from internal links on the same page."
             self.args_schema = FixedCrawlWebsiteToolSchema
 
     def _run(self, website_url: str) -> str:
-        
         logger.info(f"Processing {website_url}")
         content = self._crawl_website(website_url)
         return content
 
-    def _crawl_website(self, url: str) -> str:
-        links_to_visit = self._get_links_to_visit(url)
+    def _crawl_website(self, start_url: str) -> str:
+        visited_urls: Set[str] = set()
+        urls_to_visit: List[str] = [start_url]
         content = ""
         
-        logger.info(f"Reading {len(links_to_visit)} pages.")
-        for link in links_to_visit:
-            page_content = self._fetch_and_extract_content(link)
-            content += page_content
+        while urls_to_visit:
+            url = urls_to_visit.pop(0)
+            if url in visited_urls:
+                continue
+            
+            logger.info(f"Processing page: {url}")
+            page_content = self.browser_tool.get_content(url)
+            content += f"---link: {url}\n{page_content}\n---page-end---\n"
+            visited_urls.add(url)
+            
+            new_links = self.browser_tool.get_links(url)
+            for link in new_links:
+                if link not in visited_urls and link not in urls_to_visit:
+                    urls_to_visit.append(link)
+            
+            logger.info(f"Processed {url}. Queue size: {len(urls_to_visit)}")
+            
+            # Limit the number of pages to crawl (adjust as needed)
+            if len(visited_urls) >= 10:
+                logger.info("Reached maximum number of pages to crawl.")
+                break
         
         return content
-
-    def _get_links_to_visit(self, url: str) -> List[str]:
-#        sitemap_links = sitemaps.sitemap_search(url)
-        sitemap_links = []
-        if sitemap_links:
-            logger.info(f"Found {len(sitemap_links)} pages from sitemap.")
-            return sitemap_links
-        else:
-            _, known_urls = spider.focused_crawler(url, max_seen_urls=10, max_known_urls=1000)
-            logger.info(f"Found {len(known_urls)} pages from crawling the website.")
-            return list(known_urls)
-
-    def _fetch_and_extract_content(self, url: str) -> str:
-        html_content = fetch_url(url)
-        if html_content:
-            extracted_content = f"---link: {url}\n{extract(html_content,url=url)}\n---page-end---\n"
-            logger.info(f"Extracted {url}, html content: {len(html_content)}, extracted_content: {extracted_content}")
-            return extracted_content or ""
-        else:
-            logger.info(f"Failed to fetch {url}")
-            return ""

@@ -26,39 +26,29 @@ from langchain.tools import BaseTool as LangChainBaseTool
 import crewai_tools
 #from langchain.tools import tool as langchain_tool
 import os
-from apps.agents.utils import load_tool as utils_load_tool
-import dill
+from apps.agents.utils import get_tool_info
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
 
-def load_tool(tool_model):
-    logger.debug(f"loading tool {tool_model}")
-    tool_class = utils_load_tool(tool_model)
-    logger.debug(f"tool_class: {tool_class}")
-    if tool_class is None:
-        logger.error(f"Failed to load tool {tool_model.tool_class}.{tool_model.tool_subclass}")
-        return None
+def load_tool_in_task(tool_model):
+    tool_info = get_tool_info(tool_model)
     
-    # Use dill to serialize the tool class
     try:
-        serialized_tool = dill.dumps(tool_class)
-        deserialized_tool = dill.loads(serialized_tool)
+        module = importlib.import_module(tool_info['module_path'])
+        tool_class = getattr(module, tool_info['class_name'])
         
-        # Check if the deserialized_tool is callable (i.e., a class)
-        if callable(deserialized_tool):
-            logger.debug(f"Loaded tool {tool_model.tool_class}.{tool_model.tool_subclass} as a class")
-            return deserialized_tool()
+        if issubclass(tool_class, (CrewAIBaseTool, LangChainBaseTool)):
+            return tool_class()
         else:
-            # If it's not callable, it's likely already an instance
-            logger.debug(f"Loaded tool {tool_model.tool_class}.{tool_model.tool_subclass} as an instance")
-            return deserialized_tool
+            logger.error(f"Unsupported tool class: {tool_class}")
+            return None
     except Exception as e:
-        logger.error(f"Error serializing/deserializing tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}")
+        logger.error(f"Error loading tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}")
         return None
 
 def custom_input_handler(prompt, execution_id):
-    logger.info(f"Custom input handler called for execution {execution_id} with prompt: {prompt}")
+    logger.debug(f"Custom input handler called for execution {execution_id} with prompt: {prompt}")
     execution = CrewExecution.objects.get(id=execution_id)
     update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
     log_crew_message(execution, prompt or "Input required", agent='System', human_input_request=prompt or "Input required")
@@ -150,16 +140,16 @@ def stdout_monitor(custom_stdout):
 
 @shared_task(bind=True)
 def execute_crew(self, execution_id):
-    logger.info(f"Attempting to start crew execution for id: {execution_id} (task_id: {self.request.id})")
+    logger.debug(f"Attempting to start crew execution for id: {execution_id} (task_id: {self.request.id})")
     
     # Try to acquire a lock
     lock_id = f'crew_execution_lock_{execution_id}'
     if not cache.add(lock_id, 'locked', timeout=3600):  # 1 hour timeout
-        logger.info(f"Execution {execution_id} is already in progress. Skipping this task.")
+        logger.warning(f"Execution {execution_id} is already in progress. Skipping this task.")
         return
     
     try:
-        logger.info(f"Starting crew execution for id: {execution_id} (task_id: {self.request.id})")
+        logger.debug(f"Starting crew execution for id: {execution_id} (task_id: {self.request.id})")
         execution = CrewExecution.objects.get(id=execution_id)
         
         # Store the original input function
@@ -209,7 +199,7 @@ def execute_crew(self, execution_id):
         # Release the lock
         cache.delete(lock_id)
 
-    logger.info(f"Execution completed for CrewExecution id: {execution_id}")
+    logger.debug(f"Execution completed for CrewExecution id: {execution_id}")
     return execution.id
 
 def initialize_crew(execution):
@@ -260,24 +250,20 @@ def run_crew(task_id, crew, execution):
 
     try:
         if execution.crew.process == 'sequential':
-            logger.info("Starting sequential crew execution")
-            for task in crew.tasks:
-                logger.info(f"Executing task: {task.description}")
-                logger.info(f"Task tools: {[tool.name for tool in task.tools]}")
-                logger.info(f"Agent tools: {[tool.name for tool in task.agent.tools]}")
+            logger.debug("Starting sequential crew execution")
             result = crew.kickoff(inputs=inputs)
         elif execution.crew.process == 'hierarchical':
-            logger.info("Starting hierarchical crew execution")
+            logger.debug("Starting hierarchical crew execution")
             result = crew.kickoff(inputs=inputs)
         elif execution.crew.process == 'for_each':
-            logger.info("Starting for_each crew execution")
+            logger.debug("Starting for_each crew execution")
             inputs_array = inputs.get('inputs_array', [])
             result = crew.kickoff_for_each(inputs=inputs_array)
         elif execution.crew.process == 'async':
-            logger.info("Starting async crew execution")
+            logger.debug("Starting async crew execution")
             result = crew.kickoff_async(inputs=inputs)
         elif execution.crew.process == 'for_each_async':
-            logger.info("Starting for_each_async crew execution")
+            logger.debug("Starting for_each_async crew execution")
             inputs_array = inputs.get('inputs_array', [])
             result = crew.kickoff_for_each_async(inputs=inputs_array)
         else:
@@ -296,14 +282,13 @@ def create_crewai_agents(agent_models, execution_id):
         try:
             model_name = agent_model.llm
             crewai_agent_llm, _ = get_llm(model_name)
-            #logger.debug(f"Created LLM for model: {model_name}: {crewai_agent_llm}")
             
             agent_tools = []
             for tool in agent_model.tools.all():
-                loaded_tool = load_tool(tool)
+                loaded_tool = load_tool_in_task(tool)
                 if loaded_tool:
                     agent_tools.append(loaded_tool)
-                    logger.info(f"Added tool {tool.name} to agent {agent_model.name}")
+                    logger.debug(f"Added tool {tool.name} to agent {agent_model.name}")
                 else:
                     logger.warning(f"Failed to load tool {tool.name} for agent {agent_model.name}")
 
@@ -316,13 +301,13 @@ def create_crewai_agents(agent_models, execution_id):
                 'llm': crewai_agent_llm,
                 'step_callback': partial(step_callback, execution_id=execution_id),
                 'human_input_handler': partial(human_input_handler, execution_id=execution_id),
-                'tools': agent_tools  # Make sure this line is present
+                'tools': agent_tools
             }
             optional_params = ['max_iter', 'max_rpm', 'function_calling_llm']
             agent_params.update({param: getattr(agent_model, param) for param in optional_params if getattr(agent_model, param) is not None})
             
             agent = Agent(**agent_params)
-            logger.info(f"CrewAI Agent created successfully for agent id: {agent_model.id} with {len(agent_tools)} tools")
+            logger.debug(f"CrewAI Agent created successfully for agent id: {agent_model.id} with {len(agent_tools)} tools")
             agents.append(agent)
         except Exception as e:
             logger.error(f"Error creating CrewAI Agent for agent {agent_model.id}: {str(e)}")
@@ -361,7 +346,7 @@ def human_input_handler(prompt, execution_id):
 def create_crewai_tasks(task_models, agents, execution):
     tasks = []
     for task_model in task_models:
-        logger.info(f"Creating CrewAITask for task: {task_model.id}-{task_model.description}")
+        logger.debug(f"Creating CrewAITask for task: {task_model.id}-{task_model.description}-{task_model.agent_id}-{agents}")
         try:
             crewai_agent = next((agent for agent in agents if agent.role == AgentModel.objects.get(id=task_model.agent_id).role), None)
             if not crewai_agent:
@@ -370,14 +355,9 @@ def create_crewai_tasks(task_models, agents, execution):
 
             task_tools = []
             for tool_model in task_model.tools.all():
-                tool = load_tool(tool_model)
+                tool = load_tool_in_task(tool_model)
                 if tool:
                     task_tools.append(tool)
-                    logger.info(f"Added tool {tool_model.name} to task {task_model.id}")
-                    # Add the tool to the agent as well
-                    if tool not in crewai_agent.tools:
-                        crewai_agent.tools.append(tool)
-                        logger.info(f"Added tool {tool_model.name} to agent {crewai_agent.role}")
 
             task_dict = {
                 'description': task_model.description,
@@ -398,13 +378,8 @@ def create_crewai_tasks(task_models, agents, execution):
                 full_path = os.path.join(settings.MEDIA_ROOT, task_model.output_file.name)
                 task_dict['output_file'] = full_path
 
-            task = CrewAITask(**task_dict)
-            tasks.append(task)
-            logger.info(f"CrewAITask created successfully for task: {task_model.id} with {len(task_tools)} tools")
-            
-            # Log the tools assigned to the task and agent
-            logger.info(f"Tools assigned to task {task_model.id}: {[tool.name for tool in task.tools]}")
-            logger.info(f"Tools assigned to agent {crewai_agent.role}: {[tool.name for tool in crewai_agent.tools]}")
+            tasks.append(CrewAITask(**task_dict))
+            logger.debug(f"CrewAITask created successfully for task: {task_model.id}")
         except Exception as e:
             logger.error(f"Error creating CrewAITask for task {task_model.id}: {str(e)}")
     return tasks
@@ -412,12 +387,12 @@ def create_crewai_tasks(task_models, agents, execution):
 def step_callback(step_output, execution_id):
     logger.info(f"Step completed for execution {execution_id}: {step_output}")
     execution = CrewExecution.objects.get(id=execution_id)
-    log_crew_message(execution, f"Step completed: {step_output}", agent='System')
+    log_crew_message(execution, f"Step callback: {step_output}", agent='System')
 
 def task_callback(task_output: TaskOutput, execution_id):
     logger.info(f"Task completed for execution {execution_id}: {task_output}")
     execution = CrewExecution.objects.get(id=execution_id)
-    log_crew_message(execution, f"Task completed: {task_output}", agent='System')
+    log_crew_message(execution, f"Task callback: {task_output}", agent='System')
 
 def update_execution_status(execution, status, result=None):
     execution.status = status
@@ -454,7 +429,7 @@ def log_crew_message(execution, content, agent=None, human_input_request=None):
             }
         )
         
-        logger.info(f"Sent message to WebSocket: {content}")
+        logger.debug(f"Sent message to WebSocket: {content}")
     else:
         logger.warning("Attempted to log an empty message, skipping.")
 

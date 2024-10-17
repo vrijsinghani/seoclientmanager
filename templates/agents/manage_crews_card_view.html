@@ -88,6 +88,11 @@
                       <a href="{% url 'agents:edit_crew' crew.id %}?next={{ request.path|urlencode }}" class="btn btn-link text-dark mb-0 ps-0" data-toggle="tooltip" data-original-title="Edit crew">
                         <i class="fas fa-pencil-alt text-dark me-2" aria-hidden="true"></i>Edit
                       </a>
+                      <div class="text-center">
+                        <a class="btn btn-primary btn-sm" href="{% url 'agents:crew_detail' crew.id %}">
+                          <i class="fas fa-play me-2"></i>Run
+                        </a>
+                      </div>
                       <a href="{% url 'agents:delete_crew' crew.id %}" class="btn btn-link text-danger mb-0 pe-0" data-toggle="tooltip" data-original-title="Delete crew">
                         <i class="far fa-trash-alt me-2"></i>Delete
                       </a>

@@ -17,7 +17,6 @@ class KeywordsForSiteTool(BaseTool):
     args_schema: Type[BaseModel] = BaseModel
 
     def _run(self, target: str, **kwargs: Any) -> Any:
-        logger.info(f"KeywordsForSiteTool._run called with target: {target}")
         login, password = KeywordTools._dataforseo_credentials()
         cred = (login, password)
         url = "https://api.dataforseo.com/v3/keywords_data/google_ads/keywords_for_site/live"
@@ -29,16 +28,11 @@ class KeywordsForSiteTool(BaseTool):
             }
         ]
         headers = {"Content-Type": "application/json"}
-        try:
-            logger.info(f"Sending request to DataForSEO API for target: {target}")
-            response = requests.post(url, json=payload, headers=headers, auth=cred)
-            response.raise_for_status()
-            results = response.json()
-            logger.info(f"Received response from DataForSEO API for target: {target}")
-            return results["tasks"][0]["result"]
-        except Exception as e:
-            logger.error(f"Error in KeywordsForSiteTool._run: {str(e)}")
-            raise
+        response = requests.post(url, json=payload, headers=headers, auth=cred)
+        response.raise_for_status()  # Raise an exception for non-2xx status codes
+        results = response.json()
+        logger.info(f"Keywords for site: {target}")
+        return results["tasks"][0]["result"]
 
     async def _arun(self, target: str, **kwargs: Any) -> Any:
         raise NotImplementedError("KeywordsForSiteTool does not support async")
