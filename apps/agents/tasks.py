@@ -375,7 +375,10 @@ def create_crewai_tasks(task_models, agents, execution):
             # Handle output_file separately
             if task_model.output_file:
                 # Construct the full path using MEDIA_ROOT
-                full_path = os.path.join(settings.MEDIA_ROOT, task_model.output_file)
+                full_path = os.path.join(settings.MEDIA_URL, str(execution.user.id), task_model.output_file)
+                logger.debug(f"Full path for output_file: {full_path}")
+                log_crew_message(execution, f"Task output will be saved to: {full_path}", agent='System')
+
                 task_dict['output_file'] = full_path
 
             tasks.append(CrewAITask(**task_dict))
@@ -387,7 +390,7 @@ def create_crewai_tasks(task_models, agents, execution):
 def step_callback(step_output, execution_id):
     logger.info(f"Step completed for execution {execution_id}: {step_output}")
     execution = CrewExecution.objects.get(id=execution_id)
-    log_crew_message(execution, f"Step callback: {step_output}", agent='System')
+    #log_crew_message(execution, f"Step callback: {step_output}", agent='System')
 
 def task_callback(task_output: TaskOutput, execution_id):
     logger.info(f"Task completed for execution {execution_id}: {task_output}")
