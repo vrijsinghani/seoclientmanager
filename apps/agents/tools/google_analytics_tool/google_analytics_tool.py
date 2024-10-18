@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class GoogleAnalyticsCredentials(BaseModel):
   view_id: str = None
+  client_id: str = None
   access_token: str = None
   refresh_token: str = None
   token_uri: str = None
@@ -30,15 +31,17 @@ class GoogleAnalyticsToolSchema(BaseModel):
   property_id: str = Field(..., description="The Google Analytics property ID.")
   start_date: str = Field(..., description="The start date for the analytics data (YYYY-MM-DD).")
   end_date: str = Field(..., description="The end date for the analytics data (YYYY-MM-DD).")
+  credentials: GoogleAnalyticsCredentials
 
 class GoogleAnalyticsTool(BaseTool):
   name: str = "Google Analytics Data Fetcher"
   description: str = "Fetches Google Analytics data for a specified property and date range."
   args_schema: Type[BaseModel] = GoogleAnalyticsToolSchema
-  credentials: GoogleAnalyticsCredentials = None
+  
 
   def __init__(self, **kwargs):
       super().__init__()
+      logger.info(f"Initializing GoogleAnalyticsTool with kwargs: {kwargs}")
       if 'credentials' in kwargs:
           self.set_credentials(kwargs['credentials'])
 
@@ -83,13 +86,16 @@ class GoogleAnalyticsTool(BaseTool):
         logger.error(f"Error creating analytics service: {str(e)}", exc_info=True)
         raise
 
-  def run(self, property_id: str, start_date: str, end_date: str, **kwargs: Any) -> Any:
-      logger.info("Entering GoogleAnalyticsTool.run")
-      return self._run(property_id, start_date, end_date, **kwargs)
   
   def _run(self, property_id: str, start_date: str, end_date: str, **kwargs: Any) -> Any:
     try:
         logger.info("Entering GoogleAnalyticsTool._run")
+        if 'credentials' in kwargs:
+            self.set_credentials(kwargs['credentials'])
+
+        if not self.credentials:
+            raise ValueError(f"Credentials have not been set. Use set_credentials() method to set them. inputs: {property_id} - {start_date} - {end_date} - {kwargs}")
+        
         client = self._get_analytics_service()
         logger.info(f"Fetching analytics data for Property ID: {property_id}, Start Date: {start_date}, End Date: {end_date}")
         

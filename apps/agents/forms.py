@@ -44,6 +44,12 @@ class AgentForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         required=True
     )
+    function_calling_llm = forms.ChoiceField(
+        choices=[(model, model) for model in get_models()],
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False
+    )
+    
     tools = forms.ModelMultipleChoiceField(
         queryset=Tool.objects.all(),
         widget=forms.CheckboxSelectMultiple,

@@ -1,11 +1,21 @@
 {% extends "layouts/base.html" %}
 {% load static %}
 
-{% block title %} Manage Crews - Card View {% endblock %}
+{% block title %} Manage Crews {% endblock %}
 
 {% block content %}
 
 <div class="container-fluid py-4">
+  {% if selected_client %}
+    <div class="alert alert-info" role="alert">
+      Selected Client: {{ selected_client.name }}
+    </div>
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      No client selected. Showing all crews.
+    </div>
+  {% endif %}
+  
   <div class="row">
     <div class="col-12">
       <div class="card mb-4">

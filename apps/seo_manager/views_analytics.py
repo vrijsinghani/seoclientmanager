@@ -7,7 +7,7 @@ from .models import Client, GoogleAnalyticsCredentials, SearchConsoleCredentials
 from .google_auth import get_search_console_properties
 from datetime import datetime, timedelta
 from google.auth.exceptions import RefreshError
-from apps.common.tools.google_analytics_tool import GoogleAnalyticsTool, GoogleAnalyticsCredentials as GACredentialsPydantic
+from apps.agents.tools.google_analytics_tool.google_analytics_tool import GoogleAnalyticsTool, GoogleAnalyticsCredentials as GACredentialsPydantic
 from django.core.serializers.json import DjangoJSONEncoder
 from apps.common.tools.user_activity_tool import user_activity_tool
 
@@ -47,7 +47,7 @@ def client_analytics(request, client_id):
             user_email=ga_credentials.user_email,
             scopes=['https://www.googleapis.com/auth/analytics.readonly']
         ))
-        ga_tool_data = ga_tool.run(property_id=property_id, start_date=start_date, end_date=end_date)
+        ga_tool_data = ga_tool._run(property_id=property_id, start_date=start_date, end_date=end_date)
         
         # Parse the JSON string returned by the tool
         try:

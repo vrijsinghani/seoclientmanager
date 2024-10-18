@@ -7,6 +7,35 @@
 
 <div class="container-fluid py-4">
   <div class="row">
+    <!-- New Client Selection Card -->
+    <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+      <div class="card">
+        <div class="card-body p-3">
+          <div class="row">
+            <div class="col-8">
+              <div class="numbers">
+                <p class="text-sm mb-0 text-capitalize font-weight-bold">Select Client</p>
+                <form id="client-select-form" method="get">
+                  <select class="form-control" name="client_id" id="client-select">
+                    <option value="">All Clients</option>
+                    {% for client in clients %}
+                      <option value="{{ client.id }}" {% if client.id|stringformat:"s" == selected_client_id %}selected{% endif %}>
+                        {{ client.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </form>
+              </div>
+            </div>
+            <div class="col-4 text-end">
+              <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                <i class="ni ni-building text-lg opacity-10" aria-hidden="true"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
       <div class="card">
         <div class="card-body p-3">
@@ -211,3 +240,14 @@
 {{ block.super }}
 <script src="{% static 'assets/js/plugins/chartjs.min.js' %}"></script>
 {% endblock javascripts %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+  $(function() {
+    $('#client-select').change(function() {
+      $('#client-select-form').submit();
+    });
+  });
+</script>
+{% endblock extra_js %}

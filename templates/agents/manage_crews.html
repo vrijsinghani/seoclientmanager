@@ -5,16 +5,25 @@
 
 {% block content %}
 <div class="container-fluid py-4">
+  {% if selected_client %}
+    <div class="alert alert-info" role="alert">
+      Selected Client: {{ selected_client.name }}
+    </div>
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      No client selected. Showing all crews.
+    </div>
+  {% endif %}
+
   <div class="row">
     <div class="col-12">
       <div class="card mb-4">
-        <!-- Card header -->
         <div class="card-header pb-0">
           <div class="d-flex justify-content-between align-items-center">
             <div>
               <h6 class="mb-0">Crews</h6>
               <p class="text-sm mb-0">
-                View and manage your AI agent crews.
+                Manage your AI agent crews
               </p>
             </div>
             <div class="d-flex align-items-center">
@@ -28,68 +37,60 @@
             </div>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table table-flush" id="crews-table">
-            <thead class="thead-light">
-              <tr>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Name</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Process</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Agents</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Tasks</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for crew in crews %}
-              <tr>
-                <td class="text-sm font-weight-normal">
-                  <a href="{% url 'agents:crew_detail' crew.id %}">{{ crew.name }}<i class="fas fa-play ms-1" aria-hidden="true"></i> </a>
-                  
-                </td>
-                <td class="text-sm font-weight-normal">{{ crew.get_process_display }}</td>
-                <td class="text-sm font-weight-normal">
-                  {% for agent in crew.agents.all %}
-                  <a href="{% url 'agents:edit_agent' agent.id %}?next={{ request.path|urlencode }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit agent">{{ agent.name }}</a>{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                </td>
-                <td class="text-sm font-weight-normal">
-                  {% for task in crew.tasks.all %}
-                    <a href="{% url 'agents:edit_task' task.id %}?next={{ request.path|urlencode }}">{{ task.description|truncatechars:30 }}</a>{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                </td>
-                <td class="text-sm font-weight-normal">
-                  <a href="{% url 'agents:edit_crew' crew.id %}?next={{ request.path|urlencode }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit crew">
-                    Edit
-                  </a>
-                  |
-                  <a href="{% url 'agents:delete_crew' crew.id %}" class="text-danger font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Delete crew">
-                    Delete
-                  </a>
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="5" class="text-sm font-weight-normal">No crews found.</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="card-body px-0 pt-0 pb-2">
+          <div class="table-responsive p-0">
+            <table class="table align-items-center mb-0">
+              <thead>
+                <tr>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Crew</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Process</th>
+                  <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Agents</th>
+                  <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Tasks</th>
+                  <th class="text-secondary opacity-7"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for crew in crews %}
+                <tr>
+                  <td>
+                    <div class="d-flex px-2 py-1">
+                      <div>
+                        <img src="{% static 'assets/img/team-2.jpg' %}" class="avatar avatar-sm me-3" alt="user1">
+                      </div>
+                      <div class="d-flex flex-column justify-content-center">
+                        <h6 class="mb-0 text-sm">{{ crew.name }}</h6>
+                        <p class="text-xs text-secondary mb-0">{{ crew.description|truncatechars:50 }}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <p class="text-xs font-weight-bold mb-0">{{ crew.get_process_display }}</p>
+                  </td>
+                  <td class="align-middle text-center text-sm">
+                    <span class="badge badge-sm bg-gradient-success">{{ crew.agents.count }}</span>
+                  </td>
+                  <td class="align-middle text-center">
+                    <span class="text-secondary text-xs font-weight-bold">{{ crew.tasks.count }}</span>
+                  </td>
+                  <td class="align-middle">
+                    <a href="{% url 'agents:edit_crew' crew.id %}?next={{ request.path|urlencode }}" class="text-secondary font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Edit crew">
+                      Edit
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   </div>
-
-  {% include 'includes/footer.html' %}
 </div>
+
 {% endblock content %}
 
-{% block extra_js %}
-  <script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
-  <script>
-    const dataTableSearch = new simpleDatatables.DataTable("#crews-table", {
-      searchable: true,
-      fixedHeight: true,
-      perPage: 10
-    });
-  </script>
-{% endblock extra_js %}
+{% block javascripts %}
+{{ block.super }}
+<script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
+{% endblock javascripts %}

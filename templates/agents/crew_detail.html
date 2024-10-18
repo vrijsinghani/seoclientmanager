@@ -55,11 +55,15 @@
         </div>
       </div>
 
-
       <!-- Modify the "Start New Execution" card -->
       <div class="card mb-4">
         <div class="card-header pb-0">
           <h6 class="mb-0">Start New Execution for {{ crew.name }}</h6>
+          {% if selected_client %}
+            <p class="text-sm mb-0">Selected Client: {{ selected_client.name }}</p>
+          {% else %}
+            <p class="text-sm mb-0">No client selected</p>
+          {% endif %}
         </div>
         <div class="card-body">
           <form method="post" id="crew-execution-form">
@@ -282,13 +286,8 @@
             "X-CSRFToken": getCookie("csrftoken")
         },
         success: function(data) {
-            //console.log('Human input submitted successfully');
             $('#human-input-section').hide();
             $('#human-input-response').val('');
-            
-            // Add a message to show that the input was submitted
-            // let messageHtml = `<p class="text-xxs mb-1"><strong>Human:</strong> Input submitted: ${userInput}</p>`;
-            // $('#execution-messages').append(messageHtml);
             
             // Scroll to the bottom of the messages container
             const messagesContainer = document.getElementById('execution-messages-container');

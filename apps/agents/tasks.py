@@ -1,9 +1,10 @@
 from celery import shared_task
 from .models import CrewExecution, Tool, CrewMessage, Task, Agent as AgentModel, CrewOutput, CrewTask
+from apps.seo_manager.models import Client, GoogleAnalyticsCredentials, SearchConsoleCredentials
 from crewai import Crew, Agent, Task as CrewAITask
 from langchain.tools import BaseTool
 from django.apps import apps
-#from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist
 import logging
 from apps.common.utils import get_llm
 from django.conf import settings
@@ -22,11 +23,13 @@ from contextlib import contextmanager
 import importlib
 from crewai_tools import BaseTool as CrewAIBaseTool
 from langchain.tools import BaseTool as LangChainBaseTool
-
-import crewai_tools
+from django.shortcuts import get_object_or_404
 #from langchain.tools import tool as langchain_tool
 import os
 from apps.agents.utils import get_tool_info
+from django.forms.models import model_to_dict
+
+
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
@@ -82,7 +85,6 @@ def custom_input_handler(prompt, execution_id):
             log_crew_message(execution, f"Received human input: {user_input}", agent='Human')
             update_execution_status(execution, 'RUNNING')
             
-            logger.info(f"Received human input for execution {execution_id}: {user_input}")
             return user_input
        
         time.sleep(poll_interval)
@@ -240,10 +242,20 @@ def initialize_crew(execution):
     return Crew(**crew_params)
 
 def run_crew(task_id, crew, execution):
-    logger.debug(f"Running crew for execution id: {execution.id}")
     log_crew_message(execution, f"Running crew")
     inputs = execution.inputs or {}
     inputs["execution_id"] = execution.id
+    client = get_object_or_404(Client, id=execution.client_id)
+    inputs["client"] = {
+        "id": client.id,
+        "name": client.name,
+        "website_url": client.website_url,
+        "business_objectives": client.business_objectives,
+        "target_audience": client.target_audience,
+    }
+    ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
+    inputs["client_analytics_credentials"] = model_to_dict(ga_credentials)
+    inputs["client_searchconsole_credentials"] = model_to_dict(get_object_or_404(SearchConsoleCredentials, client=client))
     logger.info(f"Crew inputs: {inputs}")
     logger.info(f"Crew process type: {execution.crew.process}")
     update_execution_status(execution, 'RUNNING')
@@ -269,7 +281,6 @@ def run_crew(task_id, crew, execution):
         else:
             raise ValueError(f"Unknown process type: {execution.crew.process}")
 
-        logger.info(f"Crew kickoff completed for execution id: {execution.id}")
         log_crew_message(execution, f"Crew execution completed with result: {result}")
         return result
     except Exception as e:
@@ -314,7 +325,6 @@ def create_crewai_agents(agent_models, execution_id):
     return agents
 
 def human_input_handler(prompt, execution_id):
-    logger.info(f"Human input required for execution {execution_id}: {prompt}")
     execution = CrewExecution.objects.get(id=execution_id)
     update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
     log_crew_message(execution, f"Human input required: {prompt}", agent='System', human_input_request=prompt)
@@ -395,7 +405,7 @@ def step_callback(step_output, execution_id):
     #log_crew_message(execution, f"Step callback: {step_output}", agent='System')
 
 def task_callback(task_output: TaskOutput, execution_id):
-    logger.info(f"Task completed for execution {execution_id}: {task_output}")
+    #logger.info(f"Task completed for execution {execution_id}: {task_output}")
     execution = CrewExecution.objects.get(id=execution_id)
     log_crew_message(execution, f"Task callback: {task_output}", agent='System')
 
@@ -434,7 +444,7 @@ def log_crew_message(execution, content, agent=None, human_input_request=None):
             }
         )
         
-        logger.debug(f"Sent message to WebSocket: {content}")
+        logger.debug(f"Sent message to WebSocket: {content[:100]}")
     else:
         logger.warning("Attempted to log an empty message, skipping.")
 

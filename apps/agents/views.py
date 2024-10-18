@@ -17,6 +17,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 import os
+from apps.seo_manager.models import Client  # Import the Client model
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
@@ -25,10 +26,19 @@ channel_layer = get_channel_layer()
 def crewai_home(request):
     crews = Crew.objects.all()[:3]  # Get the first 3 crews for the summary
     recent_executions = CrewExecution.objects.filter(user=request.user).order_by('-created_at')[:5]
+    clients = Client.objects.all()  # Get all clients
+    
+    # Get the selected client_id from the session or request
+    selected_client_id = request.session.get('selected_client_id') or request.GET.get('client_id')
+    
+    if selected_client_id:
+        request.session['selected_client_id'] = selected_client_id
     
     context = {
         'crews': crews,
         'recent_executions': recent_executions,
+        'clients': clients,
+        'selected_client_id': selected_client_id,
     }
     return render(request, 'agents/crewai_home.html', context)
 
@@ -43,12 +53,19 @@ def crew_detail(request, crew_id):
     crew = get_object_or_404(Crew, id=crew_id)
     recent_executions = CrewExecution.objects.filter(crew=crew).order_by('-created_at')[:5]
     
+    # Get the selected client_id from the session
+    selected_client_id = request.session.get('selected_client_id')
+    selected_client = None
+    if selected_client_id:
+        selected_client = get_object_or_404(Client, id=selected_client_id)
+    
     if request.method == 'POST':
         form = CrewExecutionForm(request.POST)
         if form.is_valid():
             execution = form.save(commit=False)
             execution.crew = crew
             execution.user = request.user
+            execution.client = selected_client  # Associate the selected client with the execution
             
             # Handle input variables
             input_variables = json.loads(request.POST.get('input_variables', '{}'))
@@ -68,6 +85,7 @@ def crew_detail(request, crew_id):
         'crew': crew,
         'form': form,
         'recent_executions': recent_executions,
+        'selected_client': selected_client,
     }
     return render(request, 'agents/crew_detail.html', context)
 
@@ -183,10 +201,40 @@ def manage_agents_card_view(request):
     return render(request, 'agents/manage_agents_card_view.html', context)
 
 @login_required
-def manage_crews_card_view(request):
+def manage_crews(request):
     crews = Crew.objects.all()
+    
+    # Get the selected client_id from the session
+    selected_client_id = request.session.get('selected_client_id')
+    selected_client = None
+    
+    if selected_client_id:
+        selected_client = get_object_or_404(Client, id=selected_client_id)
+        # Optionally, you can filter crews by the selected client if there's a relationship
+        # crews = crews.filter(client=selected_client)
+    
     context = {
         'crews': crews,
+        'selected_client': selected_client,
+    }
+    return render(request, 'agents/manage_crews.html', context)
+
+@login_required
+def manage_crews_card_view(request):
+    crews = Crew.objects.all()
+    
+    # Get the selected client_id from the session
+    selected_client_id = request.session.get('selected_client_id')
+    selected_client = None
+    
+    if selected_client_id:
+        selected_client = get_object_or_404(Client, id=selected_client_id)
+        # Optionally, you can filter crews by the selected client if there's a relationship
+        # crews = crews.filter(client=selected_client)
+    
+    context = {
+        'crews': crews,
+        'selected_client': selected_client,
     }
     return render(request, 'agents/manage_crews_card_view.html', context)
 

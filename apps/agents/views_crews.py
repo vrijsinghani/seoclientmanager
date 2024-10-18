@@ -8,6 +8,7 @@ from django.contrib import messages
 from .models import Crew, CrewTask
 from .forms import CrewForm
 import json
+from apps.seo_manager.models import Client
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,20 @@ def is_admin(user):
 @login_required
 @user_passes_test(is_admin)
 def manage_crews(request):
-    crews = Crew.objects.all().prefetch_related('agents', 'tasks')
+    crews = Crew.objects.all()
+    
+    # Get the selected client_id from the session
+    selected_client_id = request.session.get('selected_client_id')
+    selected_client = None
+    
+    if selected_client_id:
+        selected_client = get_object_or_404(Client, id=selected_client_id)
+        # Optionally, you can filter crews by the selected client if there's a relationship
+        # crews = crews.filter(client=selected_client)
+    
     context = {
         'crews': crews,
-        'show_process': True,
-        'show_planning': True,
-        'show_language': True,
+        'selected_client': selected_client,
     }
     return render(request, 'agents/manage_crews.html', context)
 
@@ -86,8 +95,19 @@ def update_crew_agents(request, crew_id):
 @user_passes_test(is_admin)
 def manage_crews_card_view(request):
     crews = Crew.objects.all()
+    
+    # Get the selected client_id from the session
+    selected_client_id = request.session.get('selected_client_id')
+    selected_client = None
+    
+    if selected_client_id:
+        selected_client = get_object_or_404(Client, id=selected_client_id)
+        # Optionally, you can filter crews by the selected client if there's a relationship
+        # crews = crews.filter(client=selected_client)
+    
     context = {
         'crews': crews,
+        'selected_client': selected_client,
     }
     return render(request, 'agents/manage_crews_card_view.html', context)
 
@@ -145,4 +165,3 @@ def crew_create_or_update(request, crew_id=None):
     }
 
     return render(request, 'agents/crew_form.html', context)
-

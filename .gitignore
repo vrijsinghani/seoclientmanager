@@ -1,5 +1,4 @@
 media/
-experiments/crewAI-examples/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -181,3 +180,4 @@ celerybeat-schedule.dat
 celerybeat-schedule.dir
 0downloads
 experiments/crewAI-examples
+google_secrets.json
