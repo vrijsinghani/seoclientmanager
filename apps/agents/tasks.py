@@ -374,8 +374,10 @@ def create_crewai_tasks(task_models, agents, execution):
 
             # Handle output_file separately
             if task_model.output_file:
+                description_part = task_model.description[:20]  # Adjust the slice as needed
+
                 # Construct the full path using MEDIA_ROOT
-                full_path = os.path.join(settings.MEDIA_URL, str(execution.user.id), task_model.output_file)
+                full_path = os.path.join(settings.MEDIA_URL, str(execution.user.id), description_part, task_model.output_file)
                 logger.debug(f"Full path for output_file: {full_path}")
                 log_crew_message(execution, f"Task output will be saved to: {full_path}", agent='System')
 
