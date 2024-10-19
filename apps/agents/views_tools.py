@@ -11,11 +11,16 @@ from .utils import get_available_tools, get_tool_classes, get_tool_description, 
 from pydantic import BaseModel
 import inspect
 import json
+import tiktoken
 
 logger = logging.getLogger(__name__)
 
 def is_admin(user):
     return user.is_staff or user.is_superuser
+
+def count_tokens(text):
+    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    return len(encoding.encode(text))
 
 @login_required
 @user_passes_test(is_admin)
@@ -211,7 +216,12 @@ def test_tool(request, tool_id):
         else:
             # If no args_schema, pass inputs directly
             result = tool_instance._run(**inputs)
-        return JsonResponse({'result': result})
+        
+        # Convert result to JSON string for consistent token counting
+        result_json = json.dumps(result, ensure_ascii=False)
+        token_count = count_tokens(result_json)
+        
+        return JsonResponse({'result': result, 'token_count': token_count})
     except Exception as e:
         logger.error(f"Error testing tool: {str(e)}")
-        return JsonResponse({'error': str(e)}, status=400)
+        return JsonResponse({'error': str(e), 'token_count': 0}, status=400)

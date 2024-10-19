@@ -76,6 +76,7 @@
                                     <div class="card">
                                         <div class="card-header d-flex justify-content-between align-items-center">
                                             <h6 class="mb-0">Tool Output</h6>
+                                            <span id="tokenCount">Token Count: 0</span>
                                             <button id="copyOutputBtn" class="btn btn-sm btn-outline-primary">Copy to clipboard</button>
                                         </div>
                                         <div class="card-body">
@@ -258,6 +259,7 @@
         const testToolBtn = document.getElementById('testToolBtn');
         const toolOutput = document.getElementById('toolOutput');
         const copyOutputBtn = document.getElementById('copyOutputBtn');
+        const tokenCountSpan = document.getElementById('tokenCount');
 
         // Function to fetch tool schema and create input fields
         function fetchToolSchema() {
@@ -310,14 +312,7 @@
         testToolBtn.addEventListener('click', function() {
             const formData = new FormData(document.getElementById('toolTestForm'));
             toolOutput.textContent = 'Testing tool...';
-
-            // Pre-process form data
-            for (let [key, value] of formData.entries()) {
-                if (value.startsWith('[') && value.endsWith(']')) {
-                    // It's likely a list, so let's format it as JSON
-                    formData.set(key, JSON.stringify(JSON.parse(value)));
-                }
-            }
+            tokenCountSpan.textContent = 'Token Count: ...';
 
             fetch(`/agents/test_tool/{{ tool.id }}/`, {
                 method: 'POST',
@@ -330,12 +325,16 @@
             .then(data => {
                 if (data.error) {
                     toolOutput.textContent = 'Error: ' + data.error;
+                    tokenCountSpan.textContent = 'Token Count: 0';
                 } else {
-                    toolOutput.textContent = JSON.stringify(data.result, null, 2);
+                    const outputText = JSON.stringify(data.result, null, 2);
+                    toolOutput.textContent = outputText;
+                    tokenCountSpan.textContent = `Token Count: ${data.token_count}`;
                 }
             })
             .catch(error => {
                 toolOutput.textContent = 'Error: ' + error.message;
+                tokenCountSpan.textContent = 'Token Count: 0';
             });
         });
 
