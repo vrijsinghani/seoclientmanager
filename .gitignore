@@ -181,3 +181,4 @@ celerybeat-schedule.dir
 0downloads
 experiments/crewAI-examples
 google_secrets.json
+response.json

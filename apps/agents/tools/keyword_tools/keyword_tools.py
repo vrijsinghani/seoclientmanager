@@ -5,6 +5,10 @@ from pydantic.v1 import BaseModel, Field
 from crewai_tools.tools.base_tool import BaseTool
 import logging
 import json
+import csv
+import io
+import pandas as pd
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +45,7 @@ class KeywordsForSiteTool(BaseTool):
         try:
             response = requests.post(url, json=payload, headers=headers, auth=cred)
             response.raise_for_status()  # Raise an exception for non-2xx status codes
+
         except Exception as e:
             logger.error(f"Error making request to DataForSEO: {e}")
             raise e
@@ -58,86 +63,51 @@ class KeywordsForSiteTool(BaseTool):
     async def _arun(self, target: str, **kwargs: Any) -> Any:
         raise NotImplementedError("KeywordsForSiteTool does not support async")
 
-    def transform_keyword_data(self, data: Dict) -> List[str]:
-        """Transforms the keyword data into a more LLM-friendly format."""
-        transformed_data = []
-
+    def transform_keyword_data(self, data: Dict) -> str:
+        """Transforms the keyword data into CSV format."""
         try:
-            tasks = data.get('tasks', [])
+            # Extract all results from all tasks
+            all_results = [item for task in data.get('tasks', []) for item in task.get('result', [])]
+
+            # Convert to DataFrame
+            df = pd.DataFrame(all_results)
+
+            # Process monthly_searches
+            df['monthly_searches'] = df['monthly_searches'].fillna(pd.Series([[] for _ in range(len(df))]))
+            df['min_search'] = df['monthly_searches'].apply(lambda x: min((m.get('search_volume', 0) or 0) for m in x) if x else 0)
+            df['max_search'] = df['monthly_searches'].apply(lambda x: max((m.get('search_volume', 0) or 0) for m in x) if x else 0)
+            df['avg_search_volume'] = df['monthly_searches'].apply(lambda x: sum((m.get('search_volume', 0) or 0) for m in x) / len(x) if x else 0)
+
+            # Select and rename columns
+            result_df = df[['keyword', 'avg_search_volume', 'min_search', 'max_search', 'competition', 'low_top_of_page_bid', 'high_top_of_page_bid', 'cpc']]
+            result_df = result_df.rename(columns={
+                'low_top_of_page_bid': 'low_top_bid',
+                'high_top_of_page_bid': 'high_top_bid'
+            })
+
+            # Fill NaN values
+            result_df = result_df.fillna({
+                'keyword': 'N/A',
+                'competition': 'NONE',
+                'avg_search_volume': 0,
+                'min_search': 0,
+                'max_search': 0,
+                'low_top_bid': 0,
+                'high_top_bid': 0,
+                'cpc': 0
+            })
+
+            # Sort by avg_search_volume in descending order
+            result_df = result_df.sort_values('cpc', ascending=False)
+
+            # Convert to CSV
+            csv_output = result_df.to_csv(index=False)
+            return csv_output
+
         except Exception as e:
-            logger.error(f"Error getting tasks: {e}")
+            logger.error(f"Error transforming keyword data: {e}")
             raise e
-
-        for task in tasks:
-            try:
-                results = task.get('result', [])
-            except Exception as e:
-                logger.error(f"Error getting result: {e}")
-                raise e
-
-            for item in results:
-                try:
-                    keyword = item.get('keyword', 'N/A')
-                    search_volume = item.get('search_volume', 0)
-                    competition = item.get('competition', 'N/A')
-                    low_top_of_page_bid = item.get('low_top_of_page_bid', 0)
-                    high_top_of_page_bid = item.get('high_top_of_page_bid', 0)
-                    cpc = item.get('cpc', 0)
-                    monthly_searches = item.get('monthly_searches', [])
-
-                    if monthly_searches:
-                        min_search = min((m.get('search_volume', 0) or 0) for m in monthly_searches)
-                        max_search = max((m.get('search_volume', 0) or 0) for m in monthly_searches)
-                        avg_search_volume = sum((m.get('search_volume', 0) or 0) for m in monthly_searches) / len(monthly_searches) if monthly_searches else 0
-                    else:
-                        min_search = max_search = avg_search_volume = 0
-
-                    try:
-                        summary = {
-                            "keyword": keyword,
-                            "avg_search_volume": avg_search_volume,
-                            "min_search": min_search,
-                            "max_search": max_search,
-                            "competition": competition,
-                            "low_top_bid": low_top_of_page_bid,
-                            "high_top_bid": high_top_of_page_bid,
-                            "cpc": cpc,
-                        }
-                    except Exception as e:
-                        logger.error(f"Error processing item summary: {item}, Error: {e}")  
-
-                    transformed_data.append(summary)
-                except Exception as e:
-                    logger.error(f"Error processing item: {item}, Error: {e}")
-
-        # Sort transformed_data by avg_search_volume in descending order
-        transformed_data.sort(key=lambda x: x['avg_search_volume'], reverse=True)
-
-        # Format the sorted data for output
-        formatted_data=[]
-
-        for item in transformed_data:
-            try:
-                # Check for None values and handle them
-                avg_search_volume = item['avg_search_volume'] if item['avg_search_volume'] is not None else 0
-                min_search = item['min_search'] if item['min_search'] is not None else 0
-                max_search = item['max_search'] if item['max_search'] is not None else 0
-                low_top_bid = item['low_top_bid'] if item['low_top_bid'] is not None else 0
-                high_top_bid = item['high_top_bid'] if item['high_top_bid'] is not None else 0
-                cpc = item['cpc'] if item['cpc'] is not None else 0
-
-                formatted_data.append(
-                    (f"Keyword: {item['keyword']}, Avg. Monthly Searches: {avg_search_volume:.0f}, "
-                    f"Min: {min_search}, Max: {max_search}, Competition: {item['competition']}, "
-                    f"Low Top Bid: ${low_top_bid:.2f}, High Top Bid: ${high_top_bid:.2f}, "
-                    f"CPC: ${cpc:.2f}")
-                )
-            except Exception as e:
-                logger.error(f"Error formatting item: {item}, Error: {e}")
-
-
-        return formatted_data
-
+        
 class KeywordSuggestionsTool(BaseTool):
     name: str = "Keyword Suggestions"
     description: str = "Provides a list of keywords relevant to the target domain. Each keyword is supplied with relevant categories, search volume data for the last month, cost-per-click, competition, and search volume trend values for the past 12 months"
