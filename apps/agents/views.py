@@ -28,11 +28,14 @@ def crewai_home(request):
     recent_executions = CrewExecution.objects.filter(user=request.user).order_by('-created_at')[:5]
     clients = Client.objects.all()  # Get all clients
     
-    # Get the selected client_id from the session or request
-    selected_client_id = request.session.get('selected_client_id') or request.GET.get('client_id')
+    # Get the selected client_id from the request, fallback to session
+    selected_client_id = request.GET.get('client_id') or request.session.get('selected_client_id')
     
     if selected_client_id:
         request.session['selected_client_id'] = selected_client_id
+    else:
+        # If no client is selected, remove it from the session
+        request.session.pop('selected_client_id', None)
     
     context = {
         'crews': crews,
