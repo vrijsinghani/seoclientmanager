@@ -2,11 +2,15 @@ import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import Tool
-from .forms import ToolForm
+from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 import traceback
-from .utils import get_available_tools, get_tool_classes, get_tool_description, get_tool_class_obj
+from .models import Tool
+from .forms import ToolForm
+from .utils import get_available_tools, get_tool_classes, get_tool_description, get_tool_class_obj, load_tool
+from pydantic import BaseModel
+import inspect
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -127,3 +131,87 @@ def get_tool_info(request):
     
     logger.warning("Invalid request: tool_class parameter is missing")
     return JsonResponse({'error': 'Invalid request: tool_class parameter is missing'}, status=400)
+
+@login_required
+@user_passes_test(is_admin)
+def get_tool_schema(request, tool_id):
+    tool = get_object_or_404(Tool, id=tool_id)
+    try:
+        tool_class = get_tool_class_obj(tool.tool_class, tool.tool_subclass)
+
+        if tool_class is None:
+            return JsonResponse({'error': 'Failed to load tool class'}, status=400)
+
+        manual_schema = {
+            "type": "object",
+            "properties": {}
+        }
+
+        if hasattr(tool_class, 'args_schema') and issubclass(tool_class.args_schema, BaseModel):
+            # Use Pydantic v2 method if available
+            if hasattr(tool_class.args_schema, 'model_json_schema'):
+                schema = tool_class.args_schema.model_json_schema()
+            else:
+                # Fallback for Pydantic v1
+                schema = tool_class.args_schema.schema()
+
+            for field_name, field_schema in schema.get('properties', {}).items():
+                manual_schema['properties'][field_name] = {
+                    "type": field_schema.get('type', 'string'),
+                    "title": field_schema.get('title', field_name.capitalize()),
+                    "description": field_schema.get('description', '')
+                }
+        else:
+            # Fallback for tools without args_schema
+            for param_name, param in inspect.signature(tool_class._run).parameters.items():
+                if param_name not in ['self', 'kwargs']:
+                    manual_schema['properties'][param_name] = {
+                        "type": "string",
+                        "title": param_name.capitalize(),
+                        "description": ""
+                    }
+
+        if not manual_schema["properties"]:
+            logger.error(f"No input fields found for tool: {tool_class}")
+            return JsonResponse({'error': 'No input fields found for this tool'}, status=400)
+
+        logger.debug(f"Generated schema for tool {tool_id}: {manual_schema}")
+        return JsonResponse(manual_schema)
+    except Exception as e:
+        logger.error(f"Error getting tool schema: {str(e)}")
+        return JsonResponse({'error': f'Error getting tool schema: {str(e)}'}, status=500)
+
+@login_required
+@user_passes_test(is_admin)
+@require_http_methods(["POST"])
+def test_tool(request, tool_id):
+    tool = get_object_or_404(Tool, id=tool_id)
+    tool_instance = load_tool(tool)
+
+    if tool_instance is None:
+        return JsonResponse({'error': 'Failed to load tool'}, status=400)
+
+    inputs = {key: value for key, value in request.POST.items() if key != 'csrfmiddlewaretoken'}
+
+    try:
+        # Check if the tool has an args_schema
+        if hasattr(tool_instance, 'args_schema'):
+            # Pre-process inputs
+            for key, value in inputs.items():
+                try:
+                    # Try to parse as JSON (for lists and dicts)
+                    inputs[key] = json.loads(value)
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, keep the original string
+                    pass
+
+            # Validate and convert inputs using the args_schema
+            validated_inputs = tool_instance.args_schema(**inputs)
+            result = tool_instance._run(**validated_inputs.dict())
+        else:
+            # If no args_schema, pass inputs directly
+            result = tool_instance._run(**inputs)
+        return JsonResponse({'result': result})
+    except Exception as e:
+        logger.error(f"Error testing tool: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=400)

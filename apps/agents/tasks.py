@@ -28,8 +28,10 @@ from django.shortcuts import get_object_or_404
 import os
 from apps.agents.utils import get_tool_info
 from django.forms.models import model_to_dict
-
-
+from datetime import datetime
+from crewai.agents.parser import AgentAction, AgentFinish
+from crewai.project import callback
+from typing import Union
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
@@ -38,16 +40,23 @@ def load_tool_in_task(tool_model):
     tool_info = get_tool_info(tool_model)
     
     try:
+        print(f"Attempting to load tool: {tool_model.tool_class}.{tool_model.tool_subclass}", file=sys.stderr)
+        logger.info(f"Attempting to load tool: {tool_model.tool_class}.{tool_model.tool_subclass}")
+        
         module = importlib.import_module(tool_info['module_path'])
         tool_class = getattr(module, tool_info['class_name'])
         
         if issubclass(tool_class, (CrewAIBaseTool, LangChainBaseTool)):
-            return tool_class()
+            tool_instance = tool_class()
+            print(f"Tool loaded successfully: {tool_class.__name__}", file=sys.stderr)
+            logger.info(f"Tool loaded successfully: {tool_class.__name__}")
+            return tool_instance
         else:
             logger.error(f"Unsupported tool class: {tool_class}")
             return None
     except Exception as e:
-        logger.error(f"Error loading tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}")
+        logger.error(f"Error loading tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}", exc_info=True)
+        print(f"Error loading tool {tool_model.tool_class}.{tool_model.tool_subclass}: {str(e)}", file=sys.stderr)
         return None
 
 def custom_input_handler(prompt, execution_id):
@@ -105,8 +114,9 @@ class WebSocketStringIO(StringIO):
         super().write(s)
         if self.send_to_original_stdout:
             self.original_stdout.write(s)
+            self.original_stdout.flush()  # Ensure immediate output
         if self.should_send_to_websocket:  
-            self.send_to_websocket()  # This is now clearly a method call
+            self.send_to_websocket()
 
     def send_to_websocket(self):
         current_position = self.tell()
@@ -126,7 +136,7 @@ class WebSocketStringIO(StringIO):
             )
 
 @contextmanager
-def capture_stdout(execution_id, send_to_original_stdout=False, send_to_websocket=True):
+def capture_stdout(execution_id, send_to_original_stdout=True, send_to_websocket=True):
     original_stdout = sys.stdout
     custom_stdout = WebSocketStringIO(execution_id, send_to_original_stdout, send_to_websocket)
     sys.stdout = custom_stdout
@@ -165,7 +175,7 @@ def execute_crew(self, execution_id):
         
         log_crew_message(execution, f"Starting execution for crew: {execution.crew.name}")
         
-        with capture_stdout(execution_id, send_to_original_stdout=False, send_to_websocket=True) as custom_stdout:
+        with capture_stdout(execution_id, send_to_original_stdout=True, send_to_websocket=True) as custom_stdout:
             # Start the stdout monitor in a separate thread
             monitor_thread = threading.Thread(target=stdout_monitor, args=(custom_stdout,))
             monitor_thread.daemon = True
@@ -190,6 +200,9 @@ def execute_crew(self, execution_id):
                     token_usage=token_usage
                 )
                 
+                # Save the result to a file
+                save_result_to_file(execution, result)
+                
                 log_message = f"Crew execution completed successfully. Output: {result}"
                 log_crew_message(execution, log_message)
             except Exception as e:
@@ -203,6 +216,28 @@ def execute_crew(self, execution_id):
 
     logger.debug(f"Execution completed for CrewExecution id: {execution_id}")
     return execution.id
+
+def save_result_to_file(execution, result):
+    timestamp = datetime.now().strftime("%y-%m-%d-%H-%M")
+    crew_name = execution.crew.name.replace(' ', '_')
+    file_name = f"finaloutput_{timestamp}.txt"
+    
+    # Create the directory path
+    dir_path = os.path.join(settings.MEDIA_ROOT, str(execution.user.id), 'crew_runs', crew_name)
+    os.makedirs(dir_path, exist_ok=True)
+    
+    # Create the full file path
+    file_path = os.path.join(dir_path, file_name)
+    
+    # Write the result to the file
+    with open(file_path, 'w') as f:
+        f.write(str(result))
+    
+    # Log the file creation
+    relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT)
+    log_message = f"Final output saved to: {relative_path}"
+    log_crew_message(execution, log_message, agent='System')
+    logger.info(log_message)
 
 def initialize_crew(execution):
     agents = create_crewai_agents(execution.crew.agents.all(), execution.id)
@@ -222,7 +257,9 @@ def initialize_crew(execution):
         'tasks': tasks,
         'process': execution.crew.process,
         'verbose': execution.crew.verbose,
+        'step_callback': partial(step_callback, execution_id=execution.id),
         'task_callback': partial(task_callback, execution_id=execution.id),
+        'execution_id': execution.id,
     }
 
     optional_params = [
@@ -241,10 +278,13 @@ def initialize_crew(execution):
 
     return Crew(**crew_params)
 
+from apps.agents.tools.google_analytics_tool.google_analytics_tool import GACredentials
+
 def run_crew(task_id, crew, execution):
     log_crew_message(execution, f"Running crew")
     inputs = execution.inputs or {}
     inputs["execution_id"] = execution.id
+    inputs["current_date"] = datetime.now().strftime("%Y-%m-%d")
     client = get_object_or_404(Client, id=execution.client_id)
     inputs["client"] = {
         "id": client.id,
@@ -254,8 +294,21 @@ def run_crew(task_id, crew, execution):
         "target_audience": client.target_audience,
     }
     ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
-    inputs["client_analytics_credentials"] = model_to_dict(ga_credentials)
-    inputs["client_searchconsole_credentials"] = model_to_dict(get_object_or_404(SearchConsoleCredentials, client=client))
+    ga_pydantic= GACredentials(
+            view_id=ga_credentials.view_id,
+            client_id=None,
+            access_token=ga_credentials.access_token,
+            refresh_token=ga_credentials.refresh_token,
+            token_uri=ga_credentials.token_uri,
+            ga_client_id=ga_credentials.ga_client_id,
+            client_secret=ga_credentials.client_secret,
+            use_service_account=ga_credentials.use_service_account,
+            service_account_json=ga_credentials.service_account_json,
+            user_email='',
+            scopes=['https://www.googleapis.com/auth/analytics.readonly']
+        )
+    inputs["client_analytics_credentials"] = ga_pydantic.dict()
+    #inputs["client_searchconsole_credentials"] = model_to_dict(get_object_or_404(SearchConsoleCredentials, client=client))
     logger.info(f"Crew inputs: {inputs}")
     logger.info(f"Crew process type: {execution.crew.process}")
     update_execution_status(execution, 'RUNNING')
@@ -310,9 +363,10 @@ def create_crewai_agents(agent_models, execution_id):
                 'verbose': agent_model.verbose,
                 'allow_delegation': agent_model.allow_delegation,
                 'llm': crewai_agent_llm,
-                'step_callback': partial(step_callback, execution_id=execution_id),
+                'step_callback': partial(detailed_step_callback, execution_id=execution_id),
                 'human_input_handler': partial(human_input_handler, execution_id=execution_id),
-                'tools': agent_tools
+                'tools': agent_tools,
+                'execution_id': execution_id
             }
             optional_params = ['max_iter', 'max_rpm', 'function_calling_llm']
             agent_params.update({param: getattr(agent_model, param) for param in optional_params if getattr(agent_model, param) is not None})
@@ -375,19 +429,28 @@ def create_crewai_tasks(task_models, agents, execution):
                 'expected_output': task_model.expected_output,
                 'async_execution': task_model.async_execution,
                 'human_input': task_model.human_input,
-                'callback': partial(task_callback, execution_id=execution.id),
-                'tools': task_tools
+                'tools': task_tools,
+                'execution_id': execution.id  # Add this line
             }
-
+            logger.info(f"Task dict: {task_dict}")
             optional_fields = ['output_json', 'output_pydantic', 'converter_cls']
             task_dict.update({field: getattr(task_model, field) for field in optional_fields if getattr(task_model, field) is not None})
 
             # Handle output_file separately
             if task_model.output_file:
                 description_part = task_model.description[:20]  # Adjust the slice as needed
+                
+                # Generate a pithy timestamp
+                timestamp = datetime.now().strftime("%y-%m-%d-%H-%M")
+                
+                # Get the file name and extension
+                file_name, file_extension = os.path.splitext(task_model.output_file)
+                
+                # Append the timestamp to the file name
+                new_file_name = f"{file_name}_{timestamp}{file_extension}"
 
                 # Construct the full path using MEDIA_ROOT
-                full_path = os.path.join(settings.MEDIA_URL, str(execution.user.id), description_part, task_model.output_file)
+                full_path = os.path.join(settings.MEDIA_URL, str(execution.user.id), description_part, new_file_name)
                 logger.debug(f"Full path for output_file: {full_path}")
                 log_crew_message(execution, f"Task output will be saved to: {full_path}", agent='System')
 
@@ -400,14 +463,16 @@ def create_crewai_tasks(task_models, agents, execution):
     return tasks
 
 def step_callback(step_output, execution_id):
-    logger.info(f"Step completed for execution {execution_id}: {step_output}")
+    logger.info(f"Step callback: {step_output}")
     execution = CrewExecution.objects.get(id=execution_id)
-    #log_crew_message(execution, f"Step callback: {step_output}", agent='System')
+    log_crew_message(execution, f"Step callback: {step_output}", agent='System')
 
 def task_callback(task_output: TaskOutput, execution_id):
-    #logger.info(f"Task completed for execution {execution_id}: {task_output}")
     execution = CrewExecution.objects.get(id=execution_id)
-    log_crew_message(execution, f"Task callback: {task_output}", agent='System')
+    log_message = f"Task callback: {task_output.raw}"
+    agent = task_output.agent
+    if task_output.raw:
+        log_crew_message(execution, log_message, agent=agent)
 
 def update_execution_status(execution, status, result=None):
     execution.status = status
@@ -455,3 +520,66 @@ def handle_execution_error(execution, exception):
     log_crew_message(execution, error_message, agent=None)
     execution.error_message = error_message
     execution.save()
+
+    # Print the full traceback to stdout
+    import traceback
+    print("Full traceback:")
+    traceback.print_exc()
+
+def detailed_step_callback(event: Union[AgentAction, AgentFinish], execution_id):
+    """
+    This callback is triggered after each step in an agent's execution.
+
+    Args:
+        event (Union[AgentAction, AgentFinish]):  Either an AgentAction (if a tool was used) or an AgentFinish (if the agent completed its task).
+        execution_id (int): ID of the crew execution
+    """
+    execution = CrewExecution.objects.get(id=execution_id)
+    if isinstance(event, AgentAction):
+        logger.info(f"Detailed step callback: Action - {event.tool}, Input - {event.tool_input}, Thought - {event.thought}")
+    elif isinstance(event, AgentFinish):
+        logger.info(f"Detailed step callback: Final Answer - {event.output}, Reasoning - {event.reasoning}")
+    else:
+        logger.info(f"Detailed step callback: Unknown event type - {event}")
+
+    # Extract agent role from the event text
+    # Extract agent role safely
+    role_parts = event.text.split("Role:")
+    agent_role = role_parts[1].split("\n")[0].strip() if len(role_parts) > 1 else "Agent"
+
+    content = f"Agent '{agent_role}' step callback triggered."  # Include agent role
+
+    if isinstance(event, AgentAction):
+        content += f"\n Thought: {event.thought}"
+        content += f"\n Action: {event.tool}"
+        content += f"\n Action Input: {event.tool_input}"
+        content += f"\n Tool Output: {event.result}"
+    elif isinstance(event, AgentFinish):
+        content += f"\n Final Answer: {event.output}"
+
+    log_crew_message(execution, content, agent='System')  # Log the complete content
+
+from crewai.tools.tool_usage_events import ToolUsageError
+from crewai.utilities.events import on
+
+@on(ToolUsageError)
+def tool_error_callback(source, event: ToolUsageError):
+    """
+    This callback is triggered whenever a tool encounters an error during execution.
+
+    Args:
+        source: The source of the event (likely the ToolUsage instance).
+        event (ToolUsageError): The ToolUsageError event containing error details.
+    """
+    execution_id = source.task.execution_id  # Assuming you've stored execution_id in the Task
+    execution = CrewExecution.objects.get(id=execution_id)
+    agent_role = event.agent_role
+
+    error_message = f"Tool '{event.tool_name}' failed for agent '{agent_role}'."
+    error_message += f"\n Error: {event.error}"
+    error_message += f"\n Tool Arguments: {event.tool_args}"
+    error_message += f"\n Run Attempts: {event.run_attempts}"
+    error_message += f"\n Delegations: {event.delegations}"
+    
+    log_crew_message(execution, error_message, agent='System')
+    logger.error(error_message)

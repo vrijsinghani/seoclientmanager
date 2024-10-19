@@ -7,7 +7,7 @@
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
         <div class="col-lg-8 col-xl-6">
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">{% if tool %}Edit Tool{% else %}Add Tool{% endif %}</h5>
                 </div>
@@ -48,6 +48,47 @@
                     </form>
                 </div>
             </div>
+        </div>
+            {% if tool %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Test Tool</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Tool Inputs</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <form id="toolTestForm">
+                                                <!-- Tool input fields will be dynamically added here -->
+                                                <div id="toolInputs"></div>
+                                                <button type="button" id="testToolBtn" class="btn btn-primary mt-3">Test</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="card">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0">Tool Output</h6>
+                                            <button id="copyOutputBtn" class="btn btn-sm btn-outline-primary">Copy to clipboard</button>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="toolOutput" class="border p-3" style="height: 300px; overflow-y: auto;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -117,6 +158,12 @@
     }
     @-webkit-keyframes spin {
         to { -webkit-transform: rotate(360deg); }
+    }
+    #toolOutput {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-family: monospace;
+        font-size: 0.9rem;
     }
 </style>
 {% endblock extrastyle %}
@@ -204,6 +251,105 @@
         if (toolClassSelect.value) {
             toolClassSelect.dispatchEvent(new Event('change'));
         }
+
+        {% if tool %}
+        // Tool testing functionality
+        const toolInputs = document.getElementById('toolInputs');
+        const testToolBtn = document.getElementById('testToolBtn');
+        const toolOutput = document.getElementById('toolOutput');
+        const copyOutputBtn = document.getElementById('copyOutputBtn');
+
+        // Function to fetch tool schema and create input fields
+        function fetchToolSchema() {
+            fetch(`/agents/get_tool_schema/{{ tool.id }}/`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw err; });
+                    }
+                    return response.json();
+                })
+                .then(schema => {
+                    toolInputs.innerHTML = '';
+                    if (schema.error) {
+                        throw new Error(schema.error);
+                    } else if (schema.properties) {
+                        for (const [key, value] of Object.entries(schema.properties)) {
+                            const inputGroup = document.createElement('div');
+                            inputGroup.className = 'mb-3';
+                            
+                            const label = document.createElement('label');
+                            label.className = 'form-label';
+                            label.textContent = value.title || key;
+                            
+                            const input = document.createElement('input');
+                            input.className = 'form-control';
+                            input.name = key;
+                            input.type = value.type === 'number' ? 'number' : 'text';
+                            if (value.description) {
+                                input.placeholder = value.description;
+                            }
+                            
+                            inputGroup.appendChild(label);
+                            inputGroup.appendChild(input);
+                            toolInputs.appendChild(inputGroup);
+                        }
+                    } else {
+                        throw new Error('Invalid schema structure');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching tool schema:', error);
+                    toolInputs.innerHTML = `<p class="text-danger">Error loading tool inputs: ${error.message}</p>`;
+                });
+        }
+
+        // Fetch tool schema on page load
+        fetchToolSchema();
+
+        // Test tool functionality
+        testToolBtn.addEventListener('click', function() {
+            const formData = new FormData(document.getElementById('toolTestForm'));
+            toolOutput.textContent = 'Testing tool...';
+
+            // Pre-process form data
+            for (let [key, value] of formData.entries()) {
+                if (value.startsWith('[') && value.endsWith(']')) {
+                    // It's likely a list, so let's format it as JSON
+                    formData.set(key, JSON.stringify(JSON.parse(value)));
+                }
+            }
+
+            fetch(`/agents/test_tool/{{ tool.id }}/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    toolOutput.textContent = 'Error: ' + data.error;
+                } else {
+                    toolOutput.textContent = JSON.stringify(data.result, null, 2);
+                }
+            })
+            .catch(error => {
+                toolOutput.textContent = 'Error: ' + error.message;
+            });
+        });
+
+        // Copy output to clipboard
+        copyOutputBtn.addEventListener('click', function() {
+            navigator.clipboard.writeText(toolOutput.textContent)
+                .then(() => {
+                    alert('Output copied to clipboard!');
+                })
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+        });
+        {% endif %}
     });
 </script>
 {% endblock extra_js %}

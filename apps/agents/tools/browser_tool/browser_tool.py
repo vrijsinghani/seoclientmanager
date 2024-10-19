@@ -5,8 +5,9 @@ import logging
 
 import requests
 from pydantic import BaseModel, Field
-from trafilatura import extract
-from crewai_tools import BaseTool as CrewAIBaseTool
+#from trafilatura import extract
+import html2text
+from crewai_tools import BaseTool
 from urllib.parse import urljoin, urlparse
 import dotenv
 
@@ -16,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 class BrowserToolSchema(BaseModel):
     """Input for BrowserTool."""
-    website: str = Field(..., description="Full URL of the website to scrape (e.g., https://google.com)")
+    website: str = Field(..., title="Website", description="Full URL of the website to scrape (e.g., https://google.com)")
 
-class BrowserTool(CrewAIBaseTool):
+class BrowserTool(BaseTool):
     name: str = "Scrape website content"
     description: str = "A tool that can be used to scrape website content. Pass a string with only the full URL, no need for a final slash `/`."
     args_schema: Type[BaseModel] = BrowserToolSchema
@@ -51,7 +52,7 @@ class BrowserTool(CrewAIBaseTool):
             response.raise_for_status()
             data = response.json()
             content = data['data'][0]['results'][0]['html']
-            extracted_content = extract(content)
+            extracted_content = html2text.html2text(content)
             return extracted_content
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to fetch content for {url}: {str(e)}")

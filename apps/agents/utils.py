@@ -94,8 +94,12 @@ def get_tool_description(tool_class_obj):
     return default_description
 
 def get_tool_class_obj(tool_class, tool_subclass):
-    module = importlib.import_module(f"apps.agents.tools.{tool_class}.{tool_class}")
-    return getattr(module, tool_subclass)
+    try:
+        module = importlib.import_module(f"apps.agents.tools.{tool_class}")  # Ensure correct module path
+        return getattr(module, tool_subclass)
+    except (ImportError, AttributeError) as e:
+        logger.error(f"Error importing tool class: {e}")
+        return None
 
 def load_tool(tool_model) -> Optional[CrewAIBaseTool]:
     logger.info(f"Attempting to load tool: {tool_model.tool_class}.{tool_model.tool_subclass}")

@@ -254,7 +254,7 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-GOOGLE_CLIENT_SECRETS_FILE = os.getenv('GOOGLE_CLIENT_SECRETS_FILE', default="")
+GOOGLE_CLIENT_SECRETS_FILE = os.getenv('GOOGLE_CLIENT_SECRETS_FILE', default="google_secrets.json")
 
 # ### Async Tasks (Celery) Settings ###
 
@@ -360,39 +360,53 @@ LOGGING = {
             'filename': 'debug.log',
         },
     },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
     'loggers': {
         'django': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
+            'propagate': False,  # Prevents duplicate messages
         },
         'allauth': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
         },
         'apps.crawl_website': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
         },
         'apps.common': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
         },
         'apps.seo_manager': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
         },
-        'apps.agents': {  # Add this new logger for the agents app
+        'apps.agents': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
+        },
+        'apps.agents.tools.google_analytics_tool': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
         },
         'channels': {
-        'handlers': ['console', 'file'],
-        'level': 'DEBUG',
-        'propagate': True,
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,  # Prevents duplicate messages
         },
     },
 }
-
 
 # def show_toolbar(request):
 #     return True
