@@ -203,8 +203,9 @@ def execute_crew(self, execution_id):
                 # Save the result to a file
                 save_result_to_file(execution, result)
                 
-                log_message = f"Crew execution completed successfully. Output: {result}"
+                log_message = f"Crew execution completed successfully. Output: {result}\nToken Usage: {token_usage}"
                 log_crew_message(execution, log_message)
+                
             except Exception as e:
                 handle_execution_error(execution, e)
             finally:
@@ -278,7 +279,6 @@ def initialize_crew(execution):
 
     return Crew(**crew_params)
 
-from apps.agents.tools.google_analytics_tool.google_analytics_tool import GACredentials
 
 def run_crew(task_id, crew, execution):
     log_crew_message(execution, f"Running crew")
@@ -286,29 +286,13 @@ def run_crew(task_id, crew, execution):
     inputs["execution_id"] = execution.id
     inputs["current_date"] = datetime.now().strftime("%Y-%m-%d")
     client = get_object_or_404(Client, id=execution.client_id)
-    inputs["client"] = {
-        "id": client.id,
-        "name": client.name,
-        "website_url": client.website_url,
-        "business_objectives": client.business_objectives,
-        "target_audience": client.target_audience,
-    }
-    ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
-    ga_pydantic= GACredentials(
-            view_id=ga_credentials.view_id,
-            client_id=None,
-            access_token=ga_credentials.access_token,
-            refresh_token=ga_credentials.refresh_token,
-            token_uri=ga_credentials.token_uri,
-            ga_client_id=ga_credentials.ga_client_id,
-            client_secret=ga_credentials.client_secret,
-            use_service_account=ga_credentials.use_service_account,
-            service_account_json=ga_credentials.service_account_json,
-            user_email='',
-            scopes=['https://www.googleapis.com/auth/analytics.readonly']
-        )
-    inputs["client_analytics_credentials"] = ga_pydantic.dict()
-    #inputs["client_searchconsole_credentials"] = model_to_dict(get_object_or_404(SearchConsoleCredentials, client=client))
+    # Directly create flattened client inputs
+    inputs["client_id"] = client.id
+    inputs["client_name"] = client.name
+    inputs["client_website_url"] = client.website_url
+    inputs["client_business_objectives"] = client.business_objectives
+    inputs["client_target_audience"] = client.target_audience
+    
     logger.info(f"Crew inputs: {inputs}")
     logger.info(f"Crew process type: {execution.crew.process}")
     update_execution_status(execution, 'RUNNING')

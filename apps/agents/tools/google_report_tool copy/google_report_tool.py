@@ -8,7 +8,7 @@ from crewai_tools.tools.base_tool import BaseTool
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
-from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest
+from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest, OrderBy
 from google.auth.transport.requests import Request
 from datetime import datetime, timedelta
 
@@ -18,8 +18,8 @@ from apps.seo_manager.models import Client, GoogleAnalyticsCredentials
 
 logger = logging.getLogger(__name__)
 
-class GoogleAnalyticsToolInput(BaseModel):
-    """Input schema for GoogleAnalyticsTool."""
+class GoogleReportToolInput(BaseModel):
+    """Input schema for GoogleReportTool."""
     start_date: str = Field(..., description="The start date for the analytics data (YYYY-MM-DD).")
     end_date: str = Field(..., description="The end date for the analytics data (YYYY-MM-DD).")
     client_id: int = Field(..., description="The ID of the client to fetch Google Analytics data for.")
@@ -32,21 +32,16 @@ class GoogleAnalyticsToolInput(BaseModel):
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
 
-class GoogleAnalyticsTool(BaseTool):
-    name: str = "Google Analytics Data Fetcher"
-    description: str = "Fetches Google Analytics data for a specified client and date range."
-    args_schema: Type[BaseModel] = GoogleAnalyticsToolInput
+class GoogleReportTool(BaseTool):
+    name: str = "Google Analytics Report Fetcher"
+    description: str = "Fetches Google Analytics report for a specified client and date range."
+    args_schema: Type[BaseModel] = GoogleReportToolInput
 
     def __init__(self, **kwargs):
         super().__init__()
-        print("GoogleAnalyticsTool initialized", file=sys.stderr)
-        logger.info("GoogleAnalyticsTool initialized")
 
-    def _get_analytics_service(self, credentials):
-        logger.info("Entering GoogleAnalyticsTool._get_analytics_service")
-        
+    def _get_analytics_service(self, credentials):        
         try:
-            logger.info(f"Creating analytics service for client")
             if credentials.use_service_account:
                 logger.info("Using service account")
                 service_account_info = json.loads(credentials.service_account_json)
@@ -65,13 +60,10 @@ class GoogleAnalyticsTool(BaseTool):
                     scopes=credentials.scopes or ['https://www.googleapis.com/auth/analytics.readonly']
                 )
             
-            logger.info("Credentials created, refreshing...")
             request = Request()
             creds.refresh(request)
-            logger.info("Credentials refreshed successfully")
             
             analytics_client = BetaAnalyticsDataClient(credentials=creds)
-            logger.info("Analytics client created successfully")
             return analytics_client
         except Exception as e:
             logger.error(f"Error creating analytics service: {str(e)}", exc_info=True)
@@ -79,9 +71,6 @@ class GoogleAnalyticsTool(BaseTool):
 
     def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
         try:
-            print(f"GoogleAnalyticsTool._run called with dates: {start_date} to {end_date} for client_id: {client_id}", file=sys.stderr)
-            logger.info(f"GoogleAnalyticsTool._run called with dates: {start_date} to {end_date} for client_id: {client_id}")
-
             # Retrieve the client's GoogleAnalyticsCredentials
             try:
                 client = Client.objects.get(id=client_id)
@@ -92,18 +81,26 @@ class GoogleAnalyticsTool(BaseTool):
             client = self._get_analytics_service(credentials)
             
             property_id = credentials.view_id
-            
-            logger.info(f"Fetching analytics data for Property ID: {property_id}, Start Date: {start_date}, End Date: {end_date}")
-            
+                        
             request = RunReportRequest(
                 property=property_id,
                 date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
-                metrics=[Metric(name="activeUsers"), Metric(name="sessions")],
-                dimensions=[Dimension(name="date")]
+                dimensions=[
+                    Dimension(name="sessionSourceMedium"),
+                ],
+                metrics=[
+                    Metric(name="totalUsers"),
+                    Metric(name="sessions"),
+                    Metric(name="bounceRate"),
+                    Metric(name="averageSessionDuration"),
+                ],
+                order_bys=[
+                    OrderBy(metric=OrderBy.MetricOrderBy(metric_name="totalUsers"), desc=True)
+                ],
+                limit=10
             )        
             response = client.run_report(request)
-            logger.info("Analytics data fetched successfully")
-            
+            logger.info(f"response {response}")
             processed_data = self._process_analytics_data(response)
             
             result = {
@@ -123,21 +120,29 @@ class GoogleAnalyticsTool(BaseTool):
                 'client_id': client_id,
                 'error': str(e)
             }
-
+            
     def _process_analytics_data(self, response):
         processed_data = []
         try:
             for row in response.rows:
-                date = datetime.strptime(row.dimension_values[0].value, '%Y%m%d').strftime('%Y-%m-%d')
-                active_users = int(row.metric_values[0].value)
+                source_medium = row.dimension_values[0].value
+                total_users = int(row.metric_values[0].value)
                 sessions = int(row.metric_values[1].value)
+                bounce_rate = float(row.metric_values[2].value)
+                avg_session_duration = float(row.metric_values[3].value)
+                
                 processed_data.append({
-                    'date': date,
-                    'active_users': active_users,
-                    'sessions': sessions
+                    'source_medium': source_medium,
+                    'total_users': total_users,
+                    'sessions': sessions,
+                    'bounce_rate': bounce_rate,
+                    'avg_session_duration': avg_session_duration
                 })
-            processed_data.sort(key=lambda x: x['date'])
+            
+            # Sort by total_users in descending order
+            processed_data.sort(key=lambda x: x['total_users'], reverse=True)
         except Exception as e:
             logger.error(f"Error processing analytics data: {str(e)}", exc_info=True)
             print(f"Error processing analytics data: {str(e)}")  # Print to stdout for immediate visibility
         return processed_data
+
