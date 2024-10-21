@@ -3,16 +3,17 @@ import logging
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseRedirect
 from .models import Client, SEOData, GoogleAnalyticsCredentials, SearchConsoleCredentials, UserActivity
-from .services import get_analytics_service, get_analytics_data
 from .google_auth import get_google_auth_flow, get_analytics_accounts_oauth, get_analytics_accounts_service_account, get_search_console_properties
 from datetime import datetime
-from google_auth_oauthlib.flow import Flow
-from django.urls import reverse
-from google.auth.exceptions import RefreshError
 from .forms import ClientForm, BusinessObjectiveForm
 from apps.common.tools.user_activity_tool import user_activity_tool
+from .sitemap_extractor import extract_sitemap_and_meta_tags
+from django.urls import reverse
+import os
+from urllib.parse import urlparse
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -69,17 +70,24 @@ def client_detail(request, client_id):
     else:
         form = BusinessObjectiveForm()
     
-    #user_activity_tool.run(request.user, 'view', f"Viewed client details: {client.name}", client=client)
-    
     # Fetch client activities
-    client_activities = UserActivity.objects.filter(client=client).order_by('-timestamp')
+    client_activities = UserActivity.objects.filter(client=client).order_by('-timestamp') 
     
+    # Get the list of meta tags snapshots
+    meta_tags_dir = os.path.join(settings.MEDIA_ROOT, str(request.user.id), 'meta-tags')
+    os.makedirs(meta_tags_dir, exist_ok=True)  # Create the directory if it doesn't exist
+    meta_tags_files = [f for f in os.listdir(meta_tags_dir) if f.startswith(urlparse(client.website_url).netloc)]
+    
+    # Update the file paths to include the 'meta-tags' directory
+    meta_tags_files = ['meta-tags/' + f for f in meta_tags_files]
+
     context = {
         'client': client,
         'seo_data': seo_data,
         'business_objectives': client.business_objectives,
         'form': form,
         'client_activities': client_activities,
+        'meta_tags_files': meta_tags_files,
     }
     
     return render(request, 'seo_manager/client_detail.html', context)
@@ -396,3 +404,28 @@ def activity_log(request):
     activities = UserActivity.objects.all().order_by('-timestamp')
     #user_activity_tool.run(request.user, 'view', "Viewed activity log")
     return render(request, 'seo_manager/activity_log.html', {'activities': activities})
+
+@login_required
+def create_meta_tags_snapshot(request, client_id):
+    if request.method == 'POST':
+        client = get_object_or_404(Client, id=client_id)
+        try:
+            file_path = extract_sitemap_and_meta_tags(client, request.user)
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            return JsonResponse({
+                'success': True,
+                'message': f"Meta tags snapshot created successfully. File saved as {os.path.basename(file_path)}"
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'message': f"An error occurred while creating the snapshot: {str(e)}"
+            })
+    else:
+        return JsonResponse({
+            'success': False,
+            'message': "Invalid request method."
+        })

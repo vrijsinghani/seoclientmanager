@@ -34,4 +34,5 @@ urlpatterns = [
     path('summarize/', views_summarizer.summarize_view, name='summarize_view'),
     path('test/', views.test_view, name='test_view'),
     path('activity-log/', views.activity_log, name='activity_log'),
+    path('client/<int:client_id>/create-meta-tags-snapshot/', views.create_meta_tags_snapshot, name='create_meta_tags_snapshot'),
 ]

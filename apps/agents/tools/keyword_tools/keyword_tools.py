@@ -25,6 +25,10 @@ class KeywordIdeasInput(BaseModel):
     keywords: List[str] = Field(description="List of keywords")
     filters: List[Tuple[str, str, float]] = Field(description="List of filters", default=[])
 
+class SearchVolumeInput(BaseModel):
+    keywords: List[str] = Field(description="List of keywords to get search volume for")
+    sort_by: str = Field(default="relevance", description="Sort results by this field")
+
 class KeywordsForSiteTool(BaseTool):
     name: str = "Keywords for Site"
     description: str = "Provides a list of keywords relevant to the target domain. Each keyword is supplied with relevant categories, search volume data for the last month, cost-per-click, competition, and search volume trend values for the past 12 months"
@@ -60,51 +64,6 @@ class KeywordsForSiteTool(BaseTool):
 
     async def _arun(self, target: str, **kwargs: Any) -> Any:
         raise NotImplementedError("KeywordsForSiteTool does not support async")
-
-    # def transform_keyword_data(self, data: Dict) -> str:
-    #     """Transforms the keyword data into CSV format."""
-    #     try:
-    #         # Extract all results from all tasks
-    #         all_results = [item for task in data.get('tasks', []) for item in task.get('result', [])]
-
-    #         # Convert to DataFrame
-    #         df = pd.DataFrame(all_results)
-
-    #         # Process monthly_searches
-    #         df['monthly_searches'] = df['monthly_searches'].fillna(pd.Series([[] for _ in range(len(df))]))
-    #         df['min_search'] = df['monthly_searches'].apply(lambda x: min((m.get('search_volume', 0) or 0) for m in x) if x else 0)
-    #         df['max_search'] = df['monthly_searches'].apply(lambda x: max((m.get('search_volume', 0) or 0) for m in x) if x else 0)
-    #         df['avg_search_volume'] = df['monthly_searches'].apply(lambda x: sum((m.get('search_volume', 0) or 0) for m in x) / len(x) if x else 0)
-
-    #         # Select and rename columns
-    #         result_df = df[['keyword', 'avg_search_volume', 'min_search', 'max_search', 'competition', 'low_top_of_page_bid', 'high_top_of_page_bid', 'cpc']]
-    #         result_df = result_df.rename(columns={
-    #             'low_top_of_page_bid': 'low_top_bid',
-    #             'high_top_of_page_bid': 'high_top_bid'
-    #         })
-
-    #         # Fill NaN values
-    #         result_df = result_df.fillna({
-    #             'keyword': 'N/A',
-    #             'competition': 'NONE',
-    #             'avg_search_volume': 0,
-    #             'min_search': 0,
-    #             'max_search': 0,
-    #             'low_top_bid': 0,
-    #             'high_top_bid': 0,
-    #             'cpc': 0
-    #         })
-
-    #         # Sort by avg_search_volume in descending order
-    #         result_df = result_df.sort_values('cpc', ascending=False)
-
-    #         # Convert to CSV
-    #         csv_output = result_df.to_csv(index=False)
-    #         return csv_output
-
-    #     except Exception as e:
-    #         logger.error(f"Error transforming keyword data: {e}")
-    #         raise e
         
 class KeywordSuggestionsTool(BaseTool):
     name: str = "Keyword Suggestions"
@@ -174,11 +133,45 @@ class KeywordIdeasTool(BaseTool):
 
     async def _arun(self, keywords: List[str], filters: List[Tuple[str, str, float]] = None, **kwargs: Any) -> Any:
         raise NotImplementedError("KeywordIdeasTool does not support async")
+    
+class SearchVolumeTool(BaseTool):
+    name: str = "Search Volume"
+    description: str = "Provides search volume data for a list of keywords"
+    args_schema: Type[BaseModel] = SearchVolumeInput
+
+    def _run(self, keywords: List[str], sort_by: str = "relevance", **kwargs: Any) -> Any:
+        login, password = KeywordTools._dataforseo_credentials()
+        cred = (login, password)
+        url = f"{BASE_URL}/v3/keywords_data/google_ads/search_volume/live"
+        payload = [
+            {
+                "keywords": keywords,
+                "sort_by": sort_by
+            }
+        ]
+        headers = {"Content-Type": "application/json"}
+        try:
+            response = requests.post(url, json=payload, headers=headers, auth=cred)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Error making request to DataForSEO: {e}")
+            raise e
+
+        try:
+            results = KeywordTools._transform_keyword_data(response.json())
+        except Exception as e:
+            logger.error(f"Error transforming keyword data: {e}")
+            raise e
+        return results
+
+    async def _arun(self, keywords: List[str], sort_by: str = "relevance", **kwargs: Any) -> Any:
+        raise NotImplementedError("SearchVolumeTool does not support async")
 
 class KeywordTools:
     @staticmethod
     def tools():
-        return [KeywordsForSiteTool(), KeywordSuggestionsTool(), KeywordIdeasTool()]
+        return [KeywordsForSiteTool(), KeywordSuggestionsTool(), KeywordIdeasTool(), SearchVolumeTool()]
+
 
     @staticmethod
     def _dataforseo_credentials():
@@ -210,6 +203,8 @@ class KeywordTools:
                     all_results = result[0].get('items', [])
                 else:
                     return "Error: No results found in the response"
+            elif tool_type == "search_volume":
+                all_results = data.get('tasks', [])[0].get('result', [])
             else:
                 return f"Error: Unknown tool type: {tool_type}"
 
@@ -220,23 +215,23 @@ class KeywordTools:
             df = pd.DataFrame(all_results)
 
             # Select columns based on tool type
-            columns = ['keyword']
+            columns = ['keyword', 'search_volume', 'cpc', 'competition']
             if 'keyword_info' in df.columns:
                 df['search_volume'] = df['keyword_info'].apply(lambda x: x.get('search_volume', 0))
                 df['cpc'] = df['keyword_info'].apply(lambda x: x.get('cpc', 0))
                 df['competition'] = df['keyword_info'].apply(lambda x: x.get('competition', 0))
-                columns.extend(['search_volume', 'cpc', 'competition'])
-            else:
-                columns.extend(['search_volume', 'cpc', 'competition'])
-
             if 'keyword_properties' in df.columns:
                 df['keyword_difficulty'] = df['keyword_properties'].apply(lambda x: x.get('keyword_difficulty', 0))
                 columns.append('keyword_difficulty')
+            if 'low_top_of_page_bid' in df.columns:
+                columns.extend(['low_top_of_page_bid', 'high_top_of_page_bid'])
 
             result_df = df[columns]
             result_df = result_df.rename(columns={
                 'search_volume': 'avg_search_volume',
-                'keyword_difficulty': 'difficulty'
+                'keyword_difficulty': 'difficulty',
+                'low_top_of_page_bid': 'low_top_bid',
+                'high_top_of_page_bid': 'high_top_bid'
             })
 
             # Convert competition to numeric value if it's categorical
@@ -259,4 +254,3 @@ class KeywordTools:
         except Exception as e:
             logger.error(f"Error transforming keyword data: {e}")
             return f"Error: {str(e)}"
-
