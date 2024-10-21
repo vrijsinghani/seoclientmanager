@@ -205,9 +205,11 @@ class KeywordTools:
             if tool_type == "keywords_for_site":
                 all_results = data.get('tasks', [])[0].get('result', [])
             elif tool_type in ["keyword_suggestions", "keyword_ideas"]:
-                all_results = data.get('tasks', [])[0].get('result', [])
-                if all_results:
-                    all_results = all_results[0].get('items', [])
+                result = data.get('tasks', [])[0].get('result', [])
+                if result:
+                    all_results = result[0].get('items', [])
+                else:
+                    return "Error: No results found in the response"
             else:
                 return f"Error: Unknown tool type: {tool_type}"
 
@@ -218,30 +220,27 @@ class KeywordTools:
             df = pd.DataFrame(all_results)
 
             # Select columns based on tool type
-            columns = ['keyword', 'search_volume', 'cpc', 'competition']
-            if 'low_top_of_page_bid' in df.columns:
-                columns.extend(['low_top_of_page_bid', 'high_top_of_page_bid'])
-            if 'keyword_difficulty' in df.columns:
-                columns.append('keyword_difficulty')
+            columns = ['keyword']
+            if 'keyword_info' in df.columns:
+                df['search_volume'] = df['keyword_info'].apply(lambda x: x.get('search_volume', 0))
+                df['cpc'] = df['keyword_info'].apply(lambda x: x.get('cpc', 0))
+                df['competition'] = df['keyword_info'].apply(lambda x: x.get('competition', 0))
+                columns.extend(['search_volume', 'cpc', 'competition'])
+            else:
+                columns.extend(['search_volume', 'cpc', 'competition'])
 
-            # Extract nested data if necessary
-            if tool_type in ["keyword_suggestions", "keyword_ideas"]:
-                df['search_volume'] = df['keyword_info'].apply(lambda x: x.get('search_volume', 0) if x else 0)
-                df['cpc'] = df['keyword_info'].apply(lambda x: x.get('cpc', 0) if x else 0)
-                df['competition'] = df['keyword_info'].apply(lambda x: x.get('competition', 0) if x else 0)
-                if 'keyword_difficulty' in columns:
-                    df['keyword_difficulty'] = df['keyword_properties'].apply(lambda x: x.get('keyword_difficulty', 0) if x else 0)
+            if 'keyword_properties' in df.columns:
+                df['keyword_difficulty'] = df['keyword_properties'].apply(lambda x: x.get('keyword_difficulty', 0))
+                columns.append('keyword_difficulty')
 
             result_df = df[columns]
             result_df = result_df.rename(columns={
                 'search_volume': 'avg_search_volume',
-                'keyword_difficulty': 'difficulty',
-                'low_top_of_page_bid': 'low_top_bid',
-                'high_top_of_page_bid': 'high_top_bid'
+                'keyword_difficulty': 'difficulty'
             })
 
             # Convert competition to numeric value if it's categorical
-            if result_df['competition'].dtype == 'object':
+            if 'competition' in result_df.columns and result_df['competition'].dtype == 'object':
                 competition_map = {'LOW': 0, 'MEDIUM': 0.5, 'HIGH': 1}
                 result_df['competition'] = result_df['competition'].map(competition_map)
 
@@ -260,3 +259,4 @@ class KeywordTools:
         except Exception as e:
             logger.error(f"Error transforming keyword data: {e}")
             return f"Error: {str(e)}"
+
