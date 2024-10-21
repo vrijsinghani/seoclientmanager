@@ -211,7 +211,7 @@ class GoogleReportTool(BaseTool):
           
           search_console_data.sort(key=lambda x: x['Impressions'], reverse=True)
           
-          return search_console_data[:25]  # Return top 25 queries or landing pages
+          return search_console_data[:100]  # Return top 25 queries or landing pages
       except HttpError as error:
           logger.error(f"An error occurred while fetching Search Console data: {error}")
           print(f"An error occurred while fetching Search Console data: {error}")

@@ -71,7 +71,11 @@
                             <div class="col-md-6">
                                 <div class="form-group {% if form.llm.errors %}has-error{% endif %}">
                                     <label for="{{ form.llm.id_for_label }}" class="form-control-label">Language Model</label>
-                                    {{ form.llm }}
+                                    <select name="llm" id="{{ form.llm.id_for_label }}" class="form-select">
+                                        {% for value, display in form.llm.field.choices %}
+                                            <option value="{{ value }}" {% if value == form.llm.value %}selected{% endif %}>{{ display }}</option>
+                                        {% endfor %}
+                                    </select>
                                     {% if form.llm.errors %}
                                         <div class="invalid-feedback" style="display: block;">
                                             {{ form.llm.errors|join:", " }}
@@ -82,7 +86,11 @@
                             <div class="col-md-6">
                                 <div class="form-group {% if form.function_calling_llm.errors %}has-error{% endif %}">
                                     <label for="{{ form.function_calling_llm.id_for_label }}" class="form-control-label">Function Calling LLM</label>
-                                    {{ form.function_calling_llm }}
+                                    <select name="function_calling_llm" id="{{ form.function_calling_llm.id_for_label }}" class="form-select">
+                                        {% for value, display in form.function_calling_llm.field.choices %}
+                                            <option value="{{ value }}" {% if value == form.function_calling_llm.value %}selected{% endif %}>{{ display }}</option>
+                                        {% endfor %}
+                                    </select>
                                     {% if form.function_calling_llm.errors %}
                                         <div class="invalid-feedback" style="display: block;">
                                             {{ form.function_calling_llm.errors|join:", " }}
@@ -432,3 +440,4 @@
     });
 </script>
 {% endblock extra_js %}
+

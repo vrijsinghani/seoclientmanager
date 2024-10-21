@@ -203,9 +203,11 @@ def execute_crew(self, execution_id):
                 # Save the result to a file
                 save_result_to_file(execution, result)
                 
-                log_message = f"Crew execution completed successfully. Output: {result}\nToken Usage: {token_usage}"
-                log_crew_message(execution, log_message)
+                log_message = f"Crew execution completed successfully. Output: {result}"
                 
+                log_crew_message(execution, log_message)
+                log_message = f"Token Usage: {token_usage}"
+                log_crew_message(execution, log_message)
             except Exception as e:
                 handle_execution_error(execution, e)
             finally:
@@ -263,10 +265,17 @@ def initialize_crew(execution):
         'execution_id': execution.id,
     }
 
+    # Handle additional LLM fields for Crew
+    llm_fields = ['manager_llm', 'function_calling_llm', 'planning_llm']
+    for field in llm_fields:
+        value = getattr(execution.crew, field)
+        if value:
+            crew_llm, _ = get_llm(value)
+            crew_params[field] = crew_llm
+
     optional_params = [
         'memory', 'max_rpm', 'language', 'language_file', 'full_output',
-        'share_crew', 'output_log_file', 'planning', 'planning_llm',
-        'function_calling_llm', 'manager_llm', 'manager_agent',
+        'share_crew', 'output_log_file', 'planning', 'manager_agent',
         'manager_callbacks', 'prompt_file', 'cache', 'embedder'
     ]
 
@@ -274,8 +283,6 @@ def initialize_crew(execution):
         value = getattr(execution.crew, param, None)
         if value is not None:
             crew_params[param] = value
-
-    #logger.debug(f"Creating Crew with parameters: {crew_params}")
 
     return Crew(**crew_params)
 
@@ -328,35 +335,41 @@ def create_crewai_agents(agent_models, execution_id):
     agents = []
     for agent_model in agent_models:
         try:
-            model_name = agent_model.llm
-            crewai_agent_llm, _ = get_llm(model_name)
-            
-            agent_tools = []
-            for tool in agent_model.tools.all():
-                loaded_tool = load_tool_in_task(tool)
-                if loaded_tool:
-                    agent_tools.append(loaded_tool)
-                    logger.debug(f"Added tool {tool.name} to agent {agent_model.name}")
-                else:
-                    logger.warning(f"Failed to load tool {tool.name} for agent {agent_model.name}")
-
             agent_params = {
                 'role': agent_model.role,
                 'goal': agent_model.goal,
                 'backstory': agent_model.backstory,
                 'verbose': agent_model.verbose,
                 'allow_delegation': agent_model.allow_delegation,
-                'llm': crewai_agent_llm,
                 'step_callback': partial(detailed_step_callback, execution_id=execution_id),
                 'human_input_handler': partial(human_input_handler, execution_id=execution_id),
-                'tools': agent_tools,
+                'tools': [],
                 'execution_id': execution_id
             }
-            optional_params = ['max_iter', 'max_rpm', 'function_calling_llm']
+
+            # Handle LLM fields for Agent
+            llm_fields = ['llm', 'function_calling_llm']
+            for field in llm_fields:
+                value = getattr(agent_model, field)
+                if value:
+                    logger.debug(f"Using LLM: {value}")
+                    agent_llm, _ = get_llm(value)
+                    agent_params[field] = agent_llm
+
+            # Load tools
+            for tool in agent_model.tools.all():
+                loaded_tool = load_tool_in_task(tool)
+                if loaded_tool:
+                    agent_params['tools'].append(loaded_tool)
+                    logger.debug(f"Added tool {tool.name} to agent {agent_model.name}")
+                else:
+                    logger.warning(f"Failed to load tool {tool.name} for agent {agent_model.name}")
+
+            optional_params = ['max_iter', 'max_rpm', 'system_template', 'prompt_template', 'response_template']
             agent_params.update({param: getattr(agent_model, param) for param in optional_params if getattr(agent_model, param) is not None})
             
             agent = Agent(**agent_params)
-            logger.debug(f"CrewAI Agent created successfully for agent id: {agent_model.id} with {len(agent_tools)} tools")
+            logger.debug(f"CrewAI Agent created successfully for agent id: {agent_model.id} with {len(agent_params['tools'])} tools")
             agents.append(agent)
         except Exception as e:
             logger.error(f"Error creating CrewAI Agent for agent {agent_model.id}: {str(e)}")
@@ -567,3 +580,4 @@ def tool_error_callback(source, event: ToolUsageError):
     
     log_crew_message(execution, error_message, agent='System')
     logger.error(error_message)
+

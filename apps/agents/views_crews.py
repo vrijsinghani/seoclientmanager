@@ -9,6 +9,7 @@ from .models import Crew, CrewTask
 from .forms import CrewForm
 import json
 from apps.seo_manager.models import Client
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,12 @@ def add_crew(request):
             messages.success(request, 'Crew added successfully.')
             return redirect('agents:manage_crews')
     else:
-        form = CrewForm()
+        initial_data = {
+            'manager_llm': settings.GENERAL_MODEL,
+            'function_calling_llm': settings.GENERAL_MODEL
+        }
+        logger.debug(f"Initial data for form: {initial_data}")
+        form = CrewForm(initial=initial_data)
     return render(request, 'agents/crew_form.html', {'form': form})
 
 @login_required
@@ -59,7 +65,10 @@ def edit_crew(request, crew_id):
             messages.success(request, 'Crew updated successfully.')
             return redirect('agents:manage_crews')
     else:
-        form = CrewForm(instance=crew)
+        form = CrewForm(instance=crew, initial={
+            'manager_llm': settings.GENERAL_MODEL,
+            'function_calling_llm': settings.GENERAL_MODEL
+        })
     return render(request, 'agents/crew_form.html', {'form': form, 'crew': crew})
 
 @login_required
@@ -118,40 +127,33 @@ def crew_create_or_update(request, crew_id=None):
     else:
         crew = None
 
-    # Get the 'next' parameter from the URL
     next_url = request.GET.get('next') or request.POST.get('next')
 
     if request.method == 'POST':
         form = CrewForm(request.POST, instance=crew)
-        logger.debug(f"POST data: {request.POST}")
         if form.is_valid():
             crew = form.save(commit=False)
             
-            # Handle input_variables
+            # Handle input variables
             input_variables = request.POST.getlist('input_variables[]')
-            logger.debug(f"Input variables received: {input_variables}")
             crew.input_variables = input_variables
             
             crew.save()
-            form.save_m2m()  # Save many-to-many relationships
+            form.save_m2m()  # This is important for saving many-to-many relationships
             
-            # Handle task ordering
+            # Handle task order
             task_order = request.POST.getlist('task_order[]')
-            logger.debug(f"Task order received: {task_order}")
             CrewTask.objects.filter(crew=crew).delete()
             for index, task_id in enumerate(task_order):
                 CrewTask.objects.create(crew=crew, task_id=task_id, order=index)
             
-            logger.info(f"Crew {'updated' if crew_id else 'created'} with id: {crew.id}, input_variables: {crew.input_variables}")
             messages.success(request, f'Crew {"updated" if crew_id else "created"} successfully.')
             
-            # Redirect to the 'next' URL if provided, otherwise to manage_crews
             if next_url:
                 return redirect(next_url)
             else:
                 return redirect('agents:manage_crews')
         else:
-            logger.error(f"Form errors: {form.errors}")
             messages.error(request, f'Error {"updating" if crew_id else "creating"} crew. Please check the form.')
     else:
         form = CrewForm(instance=crew)
@@ -161,7 +163,7 @@ def crew_create_or_update(request, crew_id=None):
         'form': form,
         'crew': crew,
         'input_variables_json': json.dumps(input_variables),
-        'next': next_url,  # Include the 'next' URL in the context
+        'next': next_url,
     }
 
     return render(request, 'agents/crew_form.html', context)

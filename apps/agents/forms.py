@@ -1,4 +1,5 @@
 import random
+from django.conf import settings
 from django import forms
 from .models import CrewExecution, Agent, Task, Tool, Crew, get_available_tools, AVATAR_CHOICES
 from apps.seo_manager.models import Client
@@ -80,6 +81,10 @@ class AgentForm(forms.ModelForm):
         # Ensure avatar choices are set
         self.fields['avatar'].choices = [(choice, choice) for choice in AVATAR_CHOICES]
 
+        # Ensure the initial values are set correctly
+        self.initial['llm'] = self.initial.get('llm', settings.GENERAL_MODEL)
+        self.initial['function_calling_llm'] = self.initial.get('function_calling_llm', settings.GENERAL_MODEL)
+
     def clean(self):
         cleaned_data = super().clean()
         logger.debug(f"Cleaned form data: {cleaned_data}")
@@ -88,6 +93,9 @@ class AgentForm(forms.ModelForm):
     def save(self, commit=True):
         logger.debug(f"Saving form with data: {self.cleaned_data}")
         instance = super().save(commit=False)
+        # Ensure LLM values are set on the instance
+        instance.llm = self.cleaned_data.get('llm')
+        instance.function_calling_llm = self.cleaned_data.get('function_calling_llm')
         if commit:
             instance.save()
             self.save_m2m()
@@ -194,6 +202,11 @@ class ToolForm(forms.ModelForm):
 class CrewForm(forms.ModelForm):
     config = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=False)
     manager_callbacks = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), required=False)
+    agents = forms.ModelMultipleChoiceField(
+        queryset=Agent.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={'class': 'form-control form-select'})
+    )
 
     class Meta:
         model = Crew
@@ -233,6 +246,13 @@ class CrewForm(forms.ModelForm):
             self.initial['manager_callbacks'] = json.dumps(self.instance.manager_callbacks, indent=2)
         if self.instance.embedder:
             self.initial['embedder'] = json.dumps(self.instance.embedder, indent=2)
+
+        # Remove the 'required' attribute from the agents field
+        if 'agents' in self.fields:
+            self.fields['agents'].required = False
+
+        print(f"Initial manager_llm: {self.initial.get('manager_llm')}")  # Debugging line
+        print(f"Initial function_calling_llm: {self.initial.get('function_calling_llm')}")  # Debugging line
 
     def clean_config(self):
         return self._clean_json_field('config')

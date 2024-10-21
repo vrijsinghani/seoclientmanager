@@ -9,13 +9,20 @@ import csv
 import io
 import pandas as pd
 import numpy as np
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = os.getenv('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com')
 
 class KeywordsForSiteInput(BaseModel):
-    target: str = Field(description="Target domain for keyword analysis")
+  website_url: str = Field(description="Fully qualified domain name (FQDN) for keyword analysis")
+
+  @classmethod
+  def get_fqdn(cls, url: str) -> str:
+      parsed_url = urlparse(url)
+      return parsed_url.netloc or parsed_url.path
+
 
 class KeywordSuggestionsInput(BaseModel):
     seed_keyword: str = Field(description="Seed keyword for suggestions")
@@ -34,13 +41,17 @@ class KeywordsForSiteTool(BaseTool):
     description: str = "Provides a list of keywords relevant to the target domain. Each keyword is supplied with relevant categories, search volume data for the last month, cost-per-click, competition, and search volume trend values for the past 12 months"
     args_schema: Type[BaseModel] = KeywordsForSiteInput
 
-    def _run(self, target: str, **kwargs: Any) -> Any:
+    def _run(self, website_url: str, **kwargs: Any) -> Any:
         login, password = KeywordTools._dataforseo_credentials()
         cred = (login, password)
         url = f"{BASE_URL}/v3/keywords_data/google_ads/keywords_for_site/live"
+        
+        # Extract FQDN from the provided URL
+        fqdn = KeywordsForSiteInput.get_fqdn(website_url)
+        
         payload = [
             {
-                "target": target,
+                "target": fqdn,
                 "language_code": "en",
                 "location_code": 2840,
             }
@@ -57,6 +68,7 @@ class KeywordsForSiteTool(BaseTool):
         try:
             results = KeywordTools._transform_keyword_data(response.json())
         except Exception as e:
+            # Handle the exception as needed
             logger.error(f"Error transforming keyword data: {e}")
             raise e
 
@@ -245,7 +257,8 @@ class KeywordTools:
             result_df = result_df.fillna(fill_values)
 
             # Sort by avg_search_volume in descending order
-            result_df = result_df.sort_values('avg_search_volume', ascending=False)
+            result_df = result_df.sort_values('cpc', ascending=False)
+            result_df = result_df[result_df['avg_search_volume'] >= 500]
 
             # Convert to CSV
             csv_output = result_df.to_csv(index=False)

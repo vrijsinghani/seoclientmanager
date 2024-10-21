@@ -76,9 +76,9 @@ class Agent(models.Model):
     role = models.CharField(max_length=100)
     goal = models.TextField()
     backstory = models.TextField()
-    llm = models.CharField(max_length=100, default="gpt-3.5-turbo")
+    llm = models.CharField(max_length=100, default=settings.GENERAL_MODEL)
     tools = models.ManyToManyField(Tool, blank=True)
-    function_calling_llm = models.CharField(max_length=100, null=True, blank=True)
+    function_calling_llm = models.CharField(max_length=100, null=True, blank=True, default=settings.GENERAL_MODEL)
     max_iter = models.IntegerField(default=25)
     max_rpm = models.IntegerField(null=True, blank=True)
     max_execution_time = models.IntegerField(null=True, blank=True)
@@ -147,8 +147,8 @@ class Crew(models.Model):
     tasks = models.ManyToManyField(Task, through='CrewTask')
     process = models.CharField(max_length=20, choices=[('sequential', 'Sequential'), ('hierarchical', 'Hierarchical')], default='sequential')
     verbose = models.BooleanField(default=False)
-    manager_llm = models.CharField(max_length=100, null=True, blank=True)
-    function_calling_llm = models.CharField(max_length=100, null=True, blank=True)
+    manager_llm = models.CharField(max_length=100, null=True, blank=True, default=settings.GENERAL_MODEL)
+    function_calling_llm = models.CharField(max_length=100, null=True, blank=True, default=settings.GENERAL_MODEL)
     config = models.JSONField(null=True, blank=True)
     max_rpm = models.IntegerField(null=True, blank=True)
     language = models.CharField(max_length=50, default='English')
@@ -163,7 +163,7 @@ class Crew(models.Model):
     manager_callbacks = models.JSONField(null=True, blank=True)
     prompt_file = models.CharField(max_length=255, null=True, blank=True)
     planning = models.BooleanField(default=False)
-    planning_llm = models.CharField(max_length=100, null=True, blank=True)
+    planning_llm = models.CharField(max_length=100, null=True, blank=True, default=settings.GENERAL_MODEL)
     input_variables = ArrayField(
         models.CharField(max_length=100),
         blank=True,

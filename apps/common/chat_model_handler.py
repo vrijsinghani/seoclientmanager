@@ -1,5 +1,5 @@
-from langchain_community.chat_models.openai import ChatOpenAI
-import openai
+from apps.common.utils import get_llm
+
 from langchain.prompts.chat import (
     ChatPromptTemplate,
     SystemMessagePromptTemplate,
@@ -10,7 +10,7 @@ from langchain.schema import AIMessage, HumanMessage, SystemMessage
 class ChatModelHandler:
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self.chat_model = ChatOpenAI(model=model, base_url=settings.OPENAI_API_BASE, temperature=0.05)
+        self.chat_model, _ = get_llm(model=model_name, temperature=0.05)
         self.summarize_prompt = self._create_summarize_prompt()
 
     def _create_summarize_prompt(self) -> ChatPromptTemplate:
