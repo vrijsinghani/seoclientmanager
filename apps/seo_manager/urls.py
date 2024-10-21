@@ -35,4 +35,5 @@ urlpatterns = [
     path('test/', views.test_view, name='test_view'),
     path('activity-log/', views.activity_log, name='activity_log'),
     path('client/<int:client_id>/create-meta-tags-snapshot/', views.create_meta_tags_snapshot, name='create_meta_tags_snapshot'),
+    path('create-meta-tags-snapshot-url/', views.create_meta_tags_snapshot_url, name='create_meta_tags_snapshot_url'),
 ]

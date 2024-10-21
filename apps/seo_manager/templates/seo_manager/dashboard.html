@@ -7,8 +7,8 @@
 <div class="container-fluid py-4">
   <div class="row">
     <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-      <div class="card">
-        <div class="card-body p-3">
+      <div class="card h-100">
+        <div class="card-body p-3 d-flex flex-column justify-content-between">
           <div class="row">
             <div class="col-8">
               <div class="numbers">
@@ -21,6 +21,29 @@
             <div class="col-4 text-end">
               <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
                 <i class="ni ni-money-coins text-lg opacity-10" aria-hidden="true"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Updated Meta-Tags Snapshot Card -->
+    <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+      <div class="card h-100">
+        <div class="card-body p-3 d-flex flex-column justify-content-between">
+          <div class="row">
+            <div class="col-8">
+              <div class="numbers">
+                <p class="text-sm mb-0 text-capitalize font-weight-bold">Meta-Tags Snapshot</p>
+                <div class="input-group input-group-sm mt-2">
+                  <input type="url" id="snapshotUrl" class="form-control" placeholder="Enter URL">
+                </div>
+              </div>
+            </div>
+            <div class="col-4 text-end">
+              <div id="createSnapshotBtn" class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md" style="cursor: pointer;">
+                <i class="ni ni-paper-diploma text-lg opacity-10" aria-hidden="true"></i>
               </div>
             </div>
           </div>
@@ -88,13 +111,98 @@
 </div>
 {% endblock content %}
 
+{% block extra_css %}
+<style>
+  .card.h-100 {
+    display: flex;
+    flex-direction: column;
+  }
+  .card-body {
+    flex: 1 0 auto;
+  }
+</style>
+{% endblock extra_css %}
+
 {% block extra_js %}
+  {{ block.super }}
   <script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
   <script>
     const dataTableSearch = new simpleDatatables.DataTable("#clients-table", {
       searchable: true,
       fixedHeight: true,
       perPage: 10
+    });
+
+    // Meta-Tags Snapshot functionality
+    document.addEventListener('DOMContentLoaded', function() {
+      var createSnapshotBtn = document.getElementById('createSnapshotBtn');
+      var snapshotUrlInput = document.getElementById('snapshotUrl');
+
+      if (createSnapshotBtn && snapshotUrlInput) {
+        createSnapshotBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          var url = snapshotUrlInput.value.trim();
+          if (!url) {
+            Swal.fire({
+              title: 'Error!',
+              text: 'Please enter a valid URL.',
+              icon: 'error',
+              confirmButtonText: 'OK'
+            });
+            return;
+          }
+
+          // Show a loading message
+          Swal.fire({
+            title: 'Creating snapshot...',
+            text: 'This may take a few minutes.',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            willOpen: () => {
+              Swal.showLoading();
+            }
+          });
+          
+          // Send the request to create the snapshot
+          fetch('{% url "seo_manager:create_meta_tags_snapshot_url" %}', {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': '{{ csrf_token }}',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url: url })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              Swal.fire({
+                title: 'Success!',
+                text: data.message,
+                icon: 'success',
+                confirmButtonText: 'OK'
+              });
+            } else {
+              Swal.fire({
+                title: 'Error!',
+                text: data.message,
+                icon: 'error',
+                confirmButtonText: 'OK'
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+              title: 'Error!',
+              text: 'An error occurred while creating the snapshot.',
+              icon: 'error',
+              confirmButtonText: 'OK'
+            });
+          });
+        });
+      }
     });
   </script>
 {% endblock extra_js %}

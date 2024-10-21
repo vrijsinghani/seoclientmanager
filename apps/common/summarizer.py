@@ -1,15 +1,12 @@
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts.chat import (
     ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
 )
 from langchain_core.output_parsers import StrOutputParser
 import re
 import tiktoken
 
 from langchain_community.document_loaders import YoutubeLoader
-import io
 from .browser_tool import BrowserTools
 from django.utils import timezone
 from apps.seo_manager.models import SummarizerUsage
