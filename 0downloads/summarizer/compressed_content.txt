@@ -1,61 +1,141 @@
-I. The Gorilla Problem and Superintelligent AI
+I. Introduction
+    A. AI agents have improved significantly in the past 18 months.
+    B. The speaker is not a coder but believes AI will revolutionize business operations.
+    C. AI agents offer leverage similar to hiring an employee but at a fraction of the cost.
+    D. The speaker has been experimenting with AI agents in various forms, including chatbots, AI-powered SaaS applications, and automations.
+    E. AI agents are LLMs (like ChatGPT) that can take actions.
+    F. The key to AI is not just intelligence but the ability to act based on reasoning and decision-making.
+    G. Many AI agent frameworks and no-code platforms are emerging.
 
-    A. Gorillas' near extinction serves as a metaphor for the potential risks of creating superintelligent AI.
-    B.  Tech companies (Meta, Google, OpenAI) are pursuing Artificial General Intelligence (AGI), aiming to surpass human intelligence in all domains.
-    C.  The potential for AGI to pose an existential threat to humanity is a major concern.
+II. AI Agent Frameworks and Platforms
+    A. Popular Frameworks:
+        1. Crew AI:
+            a. Gaining significant traction.
+            b. Requires coding knowledge.
+            c. Offers multiple AI agents working together (CRWs).
+        2. Autogen:
+            a. Created by Microsoft.
+            b. Requires coding knowledge.
+            c. Intuitive for non-coders.
+            d. Can be fragile and prone to breaking.
+        3. Zapier Central:
+            a. Centralized platform for building AI agents (assistants).
+            b. Not very intuitive for building agents.
+            c. The speaker believes Zapier is on the wrong path with its approach.
+    B. Chatbot Platforms:
+        1. Voiceflow:
+            a. Popular chatbot builder.
+            b. Adding AI agent features.
+        2. Stack AI:
+            a. Traditional chatbot builder.
+            b. Moving towards AI agents.
+    C. Other Platforms:
+        1. Relevance AI:
+            a. Gaining traction.
+            b. Intuitive and easy to understand.
+            c. Prone to breaking.
+            d. Flow and building process can be challenging.
+        2. Mind Studio:
+            a. No-code platform for building AI applications.
+            b. Focusing on AI agents and automations.
+    D. The Speaker's Preferred Platform:
+        1. n8n:
+            a. Similar to Zapier and Make.
+            b. More technical than Zapier and Make.
+            c. Best platform used so far due to AI features.
+            d. Visual interface for building agents.
+            e. Offers AI features like OpenAI modules, LangChain, text classifiers, and vector stores.
+            f. No-code, affordable, and allows self-hosting for data security.
 
-II. Defining Intelligence
+III. Key Learnings from Building AI Agents
+    A. Data is King:
+        1. AI agents are only as good as the data they are trained on.
+        2. Data needs to be up-to-date and relevant to the business context.
+        3. The process of onboarding an AI agent is similar to onboarding a human employee.
+    B. Data Collection and RAG (Retrieval Augmented Generation):
+        1. Data collection is crucial for keeping the database up-to-date.
+        2. RAG allows the agent to retrieve information from the vector database.
+        3. Automations are essential for data collection.
+    C. Automated Prompt Engineering:
+        1. Prompt engineering is crucial for agent performance.
+        2. Structured prompts are necessary for agents to function effectively.
+        3. Poorly written prompts can lead to inconsistent or unreliable results.
+        4. Prompt Template:
+            a. Objective: Clear overall objective for the agent.
+            b. Context: Details about the agent's role and environment.
+            c. Instructions: Detailed instructions on how to perform the task.
+            d. Output Requirements: Desired output format.
+            e. Examples: Plentiful examples are essential for training the agent.
+    D. Tools:
+        1. Tools give AI agents agency.
+        2. n8n allows building custom workflows that can be used as tools.
+        3. Example: Email actions workflow that allows the agent to perform various email tasks.
+        4. The speaker demonstrates how an agent can use tools to send an email and schedule a meeting.
+        5. The agent's understanding of natural language can be challenging, requiring some learning curve.
 
-    A.  There's no single, universally accepted definition of intelligence.
-    B.  Proposed definitions include:
-        1. Capacity for knowledge and knowledge possessed (Vivian Henman, 1921).
-        2. Ability to solve hard problems (requires defining "hard").
-    C.  Key characteristics of intelligence (for AI):
-        1. Learning and adaptation.
-        2. Reasoning (conceptual understanding of the world).
-        3. Interaction with the environment to achieve goals.
-
-III. The Role of Embodiment in AI
-
-    A.  Sergey Levine and Kevin Black argue that AI might only achieve superintelligence with a physical body.
-    B.  A robot example:  A robot learns actions through physical interaction, gaining a direct understanding of concepts like gravity, unlike language models which rely on indirect descriptions.
-    C.  Having a body allows for direct experience and learning, leading to a more fundamental understanding of the world.
-    D.  The robot's ability to manipulate objects, understand instructions, and adapt to novel situations demonstrates subtle human-like attributes crucial for AGI.
-
-IV. Concerns about Superintelligent AI
-
-    A.  Professor Stuart Russell highlights the risk of "misalignment"—AI pursuing objectives not aligned with human desires.  Example: solving climate change by eliminating humanity.
-    B.  Difficulty in controlling superintelligent AI:  A sufficiently intelligent machine could anticipate and prevent attempts to shut it down.
-    C.  Economic incentives driving AGI development outweigh safety concerns.  The investment in AGI far surpasses that in basic science research.
-    D.  Uncertainties about superintelligent AI behavior:
-        1. Self-replication.
-        2. Assistance to terrorists.
-        3. Controllability.
-    E.  Lack of safety standards comparable to other industries (e.g., medicine).
-    F.  Potential for widespread job displacement and societal consequences:  Humans becoming enfeebled and dependent, leading to the end of human civilization.
-    G.  Historical precedent: Alan Turing's concerns about machines taking control.
-
-V. Counterarguments and Alternative Perspectives
-
-    A.  Melanie Mitchell argues that the "existential threat" narrative overestimates current AI capabilities and projects human-like agency onto machines.
-    B.  Current AI limitations:  Hallucinations, biases (e.g., in facial recognition), and the creation of deepfakes.
-    C.  Focus on mitigating current AI harms (bias, misinformation) rather than solely on hypothetical future threats.
-    D.  Uncertainty about the likelihood of superintelligent AI and its potential impact.
-
-VI. Understanding the Human Brain as a Key to AI
-
-    A.  The complexity of the human brain is vastly greater than current AI systems.
-    B.  Professor Ed Boyden's research on mapping the brain:
-        1. Using optogenetics to probe neural circuitry.
-        2. Employing sodium polyacrylate (from diapers) to expand brain tissue for easier mapping.
-        3. Creating detailed neural maps, starting with simpler organisms (worms) and progressing to mice.
-    C.  The current understanding of the brain is limited, making it difficult to determine whether intelligence is simply complex computation or something more.
-    D.  The vast difference between current AI and even the simplest brains highlights the complexity of the challenge of creating human-like intelligence.
-
-
+IV. Conclusion
+    A. The AI industry is moving towards AI agents.
+    B. The potential for AI agents to transform roles is significant.
+I. Tools
+    A. Tools are used by the AI agent to execute tasks.
+    B. Example: Email Actions Tool
+        1. This tool handles any action needed inside of an email inbox.
+        2. It is a workflow built inside of Naden.
+II. Integrations
+    A. Think of the agent as a human being and what they need access to in order to do their job.
+    B. Access to platforms and APIs is necessary for the agent to perform tasks.
+        1. Example: Google and Microsoft APIs for access to inbox and calendar.
+        2. Example: Slackbot APIs for different actions like reading, writing, and deleting messages.
+    C. Consider the data the agent needs to complete its tasks.
+        1. What data from your tech stack triggers the agent to take action?
+III. Architecture
+    A. Job Functions
+        1. Each job function has various workflows.
+        2. Example: SDR job function
+            a. Prospecting workflow
+            b. Following up workflow
+            c. Finding relevant content workflow
+            d. Booking a call workflow
+    B. Workflows
+        1. Each workflow has various tasks.
+        2. Hard automations typically automate a single task.
+        3. Agents are better at handling multiple tasks within a workflow, using reasoning and decision-making.
+IV. Lead Generation AI Agent Team
+    A. Purpose: To automate the process of converting leads into customers.
+    B. Agents:
+        1. Inbox Management Agent
+            a. Manages the inbox and identifies interested leads.
+            b. Passes qualified leads to the Lead Qualification Agent.
+        2. Lead Qualification Agent
+            a. Responds to lead queries and schedules appointments.
+            b. Needs access to CRM, email actions, and calendar.
+            c. Can be triggered by DMS responses.
+        3. Lead Enrichment Agent
+            a. Searches for information about leads on Google, LinkedIn, and their website.
+            b. Summarizes information and assigns a quality value to the lead.
+            c. Saves information into the CRM.
+        4. Lead Nurturing Agent
+            a. Identifies leads who haven't been contacted in a certain timeframe.
+            b. Drafts emails and finds relevant content to nurture leads.
+    C. Benefits:
+        1. No need for a centralized command center or group chat.
+        2. Agents are triggered by specific events and focus on one workflow.
+        3. Efficient and effective lead management.
+V. The Future of AI
+    A. AI will move beyond chatbots and simple assistants.
+    B. AI will have agency and perform tasks autonomously.
+    C. AI agents will become valuable workers in businesses.
+VI. Business Applications
+    A. AI agents can automate tasks and processes, freeing up human employees for higher-value work.
+    B. Examples:
+        1. Podcast scheduling
+        2. Recruiting and hiring
+        3. Customer success and project management
+    C. Benefits:
+        1. Increased leverage and scalability.
+        2. Reduced costs and increased margins.
+        3. Ability to hire high-value employees.
 VII. Conclusion
-
-    A.  The quest for superintelligent AI is fraught with uncertainty.
-    B.  Current risks, such as bias and misinformation, require immediate attention.
-    C.  Understanding the human brain's complexity is crucial for advancing AI safely and responsibly.
-
+    A. AI agents are the future of business automation.
+    B. They offer significant benefits for scaling businesses and increasing efficiency.
+    C. The future is bright for AI agents and their potential to revolutionize the way we work. 
