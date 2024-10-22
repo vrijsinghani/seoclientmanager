@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-8 col-xl-6">
+        <div class="col-lg-12 col-xl-12">
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">{% if tool %}Edit Tool{% else %}Add Tool{% endif %}</h5>
@@ -38,7 +38,7 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label">Description</label><br>
-                            <textarea id="tool_description" name="description" class="form-control" readonly rows="4"></textarea>
+                            <textarea id="tool_description" name="description" class="form-control" readonly rows="2"></textarea>
                         </div>
                         <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
                         <div class="d-flex justify-content-end">
@@ -89,6 +89,10 @@
                     </div>
                 </div>
             </div>
+            <!-- Add this new container for output tables -->
+            <div id="outputTableContainer" class="col-12 mt-4" style="display: none;">
+                <!-- Tables will be dynamically inserted here -->
+            </div>
             {% endif %}
         </div>
     </div>
@@ -96,6 +100,7 @@
 {% endblock content %}
 
 {% block extrastyle %}
+{{ block.super }}
 <style>
     .card {
         box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -170,7 +175,9 @@
 {% endblock extrastyle %}
 
 {% block extra_js %}
+{{ block.super }}
 <script src="{% static 'assets/js/plugins/choices.min.js' %}"></script>
+<script src="{% static 'assets/js/plugins/datatables.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         var toolClassSelect = document.getElementById('{{ form.tool_class.id_for_label }}');
@@ -260,6 +267,8 @@
         const toolOutput = document.getElementById('toolOutput');
         const copyOutputBtn = document.getElementById('copyOutputBtn');
         const tokenCountSpan = document.getElementById('tokenCount');
+        const outputTableContainer = document.getElementById('outputTableContainer');
+        let outputTables = [];
 
         // Function to fetch tool schema and create input fields
         function fetchToolSchema() {
@@ -308,8 +317,115 @@
         // Fetch tool schema on page load
         fetchToolSchema();
 
-        // Test tool functionality
+        function isJSON(str) {
+            try {
+                JSON.parse(str);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function parseJSON(jsonStr) {
+            return JSON.parse(jsonStr);
+        }
+
+        function createTable(data, tableName) {
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'col-12 mt-4';
+            tableContainer.innerHTML = `
+                <div class="card mb-4">
+                    <div class="card-header pb-0">
+                        <h6>${tableName}</h6>
+                    </div>
+                    <div class="card-body px-0 pt-0 pb-2">
+                        <div class="table-responsive p-0">
+                            <table class="table align-items-center mb-0" id="${tableName.replace(/\s+/g, '-').toLowerCase()}">
+                                <thead>
+                                    <tr>
+                                        ${Object.keys(data[0]).map(key => `<th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">${key}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.map(row => `
+                                        <tr>
+                                            ${Object.values(row).map(value => `<td class="text-sm font-weight-normal">${value}</td>`).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return tableContainer;
+        }
+
+        function displayMultipleTables(data) {
+            console.log('Displaying multiple tables. Data:', data);
+            if (!outputTableContainer) {
+                console.error('Output table container not found');
+                return;
+            }
+            outputTableContainer.innerHTML = '';
+
+            for (const [key, value] of Object.entries(data)) {
+                if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
+                    const table = createTable(value, key);
+                    outputTableContainer.appendChild(table);
+
+                    outputTables.push(new simpleDatatables.DataTable(`#${key.replace(/\s+/g, '-').toLowerCase()}`, {
+                        searchable: true,
+                        fixedHeight: false,
+                        perPage: 10
+                    }));
+                } else {
+                    console.warn(`Skipping table for key "${key}" due to invalid data structure`);
+                }
+            }
+
+            outputTableContainer.style.display = 'block';
+        }
+
+        function isCSV(str) {
+            const lines = str.trim().split('\n');
+            return lines.length > 1 && lines[0].includes(',') && lines[1].includes(',');
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            return lines.map(line => line.split(',').map(cell => cell.trim()));
+        }
+
+        function displayTable(data, tableName = 'CSV Data') {
+            if (!outputTableContainer) {
+                console.error('Output table container not found');
+                return;
+            }
+            outputTableContainer.innerHTML = '';
+
+            const tableData = data.slice(1).map(row => {
+                const obj = {};
+                data[0].forEach((header, index) => {
+                    obj[header] = row[index];
+                });
+                return obj;
+            });
+
+            const table = createTable(tableData, tableName);
+            outputTableContainer.appendChild(table);
+
+            outputTables.push(new simpleDatatables.DataTable(`#${tableName.replace(/\s+/g, '-').toLowerCase()}`, {
+                searchable: true,
+                fixedHeight: false,
+                perPage: 10
+            }));
+
+            outputTableContainer.style.display = 'block';
+        }
+
         testToolBtn.addEventListener('click', function() {
+            console.log('Test button clicked');
             const formData = new FormData(document.getElementById('toolTestForm'));
             toolOutput.textContent = 'Testing tool...';
             tokenCountSpan.textContent = 'Token Count: ...';
@@ -323,18 +439,52 @@
             })
             .then(response => response.json())
             .then(data => {
+                console.log('Received data:', data);
                 if (data.error) {
                     toolOutput.textContent = 'Error: ' + data.error;
                     tokenCountSpan.textContent = 'Token Count: 0';
+                    if (outputTableContainer) outputTableContainer.style.display = 'none';
                 } else {
-                    const outputText = JSON.stringify(data.result, null, 2);
-                    toolOutput.textContent = outputText;
-                    tokenCountSpan.textContent = `Token Count: ${data.token_count}`;
+                    toolOutput.textContent = data.result;
+                    tokenCountSpan.textContent = `Token Count: ${data.token_count || 0}`;
+                    
+                    // Destroy existing DataTables
+                    outputTables.forEach(table => table.destroy());
+                    outputTables = [];
+
+                    try {
+                        // Parse the string representation of the Python dictionary
+                        const parsedResult = eval('(' + data.result + ')');
+                        console.log('Parsed result:', parsedResult);
+                        
+                        const finalResult = {};
+                        for (const [key, value] of Object.entries(parsedResult)) {
+                            try {
+                                finalResult[key] = JSON.parse(value);
+                            } catch (e) {
+                                finalResult[key] = value;
+                            }
+                        }
+                        console.log('Final parsed result:', finalResult);
+                        
+                        if (typeof finalResult === 'object' && finalResult !== null) {
+                            console.log('Data is an object');
+                            displayMultipleTables(finalResult);
+                        } else {
+                            console.log('Parsed data is not an object');
+                            if (outputTableContainer) outputTableContainer.style.display = 'none';
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse result:', e);
+                        if (outputTableContainer) outputTableContainer.style.display = 'none';
+                    }
                 }
             })
             .catch(error => {
+                console.error('Fetch error:', error);
                 toolOutput.textContent = 'Error: ' + error.message;
                 tokenCountSpan.textContent = 'Token Count: 0';
+                if (outputTableContainer) outputTableContainer.style.display = 'none';
             });
         });
 
@@ -348,7 +498,9 @@
                     console.error('Failed to copy text: ', err);
                 });
         });
+
         {% endif %}
     });
 </script>
 {% endblock extra_js %}
+

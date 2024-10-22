@@ -12,6 +12,8 @@ from pydantic import BaseModel
 import inspect
 import json
 import tiktoken
+import csv
+from io import StringIO
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +221,12 @@ def test_tool(request, tool_id):
             # If no args_schema, pass inputs directly
             result = tool_instance._run(**inputs)
         
-        # Convert result to JSON string for consistent token counting
-        result_json = json.dumps(result, ensure_ascii=False)
-        token_count = count_tokens(result_json)
+        # Convert result to string if it's not already
+        if not isinstance(result, str):
+            result = str(result)
+        
+        # Count tokens
+        token_count = count_tokens(result)
         
         return JsonResponse({'result': result, 'token_count': token_count})
     except Exception as e:
