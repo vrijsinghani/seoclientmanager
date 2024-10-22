@@ -452,31 +452,37 @@
                     outputTables.forEach(table => table.destroy());
                     outputTables = [];
 
-                    try {
-                        // Parse the string representation of the Python dictionary
-                        const parsedResult = eval('(' + data.result + ')');
-                        console.log('Parsed result:', parsedResult);
-                        
-                        const finalResult = {};
-                        for (const [key, value] of Object.entries(parsedResult)) {
-                            try {
-                                finalResult[key] = JSON.parse(value);
-                            } catch (e) {
-                                finalResult[key] = value;
+                    if (isCSV(data.result)) {
+                        console.log('Data is CSV');
+                        const tableData = parseCSV(data.result);
+                        displayTable(tableData);
+                    } else {
+                        try {
+                            // Parse the string representation of the Python dictionary
+                            const parsedResult = eval('(' + data.result + ')');
+                            console.log('Parsed result:', parsedResult);
+                            
+                            const finalResult = {};
+                            for (const [key, value] of Object.entries(parsedResult)) {
+                                try {
+                                    finalResult[key] = JSON.parse(value);
+                                } catch (e) {
+                                    finalResult[key] = value;
+                                }
                             }
-                        }
-                        console.log('Final parsed result:', finalResult);
-                        
-                        if (typeof finalResult === 'object' && finalResult !== null) {
-                            console.log('Data is an object');
-                            displayMultipleTables(finalResult);
-                        } else {
-                            console.log('Parsed data is not an object');
+                            console.log('Final parsed result:', finalResult);
+                            
+                            if (typeof finalResult === 'object' && finalResult !== null) {
+                                console.log('Data is an object');
+                                displayMultipleTables(finalResult);
+                            } else {
+                                console.log('Parsed data is not an object');
+                                if (outputTableContainer) outputTableContainer.style.display = 'none';
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse result:', e);
                             if (outputTableContainer) outputTableContainer.style.display = 'none';
                         }
-                    } catch (e) {
-                        console.error('Failed to parse result:', e);
-                        if (outputTableContainer) outputTableContainer.style.display = 'none';
                     }
                 }
             })
