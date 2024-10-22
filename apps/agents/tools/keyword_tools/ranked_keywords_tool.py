@@ -75,7 +75,7 @@ class RankedKeywordsTool(BaseTool):
             # Define the columns to include in the output
             columns = [
                 'keyword', 'search_volume', 'keyword_difficulty', 'competition_level',
-                'main_intent', 'serp_features', 'absolute_rank', 'etv'
+                'main_intent', 'absolute_rank', 'etv'
             ]
             result_df = df[columns]
 
