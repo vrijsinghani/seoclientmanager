@@ -202,16 +202,18 @@ def test_tool(request, tool_id):
         # Check if the tool has an args_schema
         if hasattr(tool_instance, 'args_schema'):
             # Pre-process inputs
+            processed_inputs = {}
             for key, value in inputs.items():
-                try:
-                    # Try to parse as JSON (for lists and dicts)
-                    inputs[key] = json.loads(value)
-                except json.JSONDecodeError:
-                    # If it's not valid JSON, keep the original string
-                    pass
+                if value != '':
+                    try:
+                        # Try to parse as JSON (for lists and dicts)
+                        processed_inputs[key] = json.loads(value)
+                    except json.JSONDecodeError:
+                        # If it's not valid JSON, keep the original string
+                        processed_inputs[key] = value
 
             # Validate and convert inputs using the args_schema
-            validated_inputs = tool_instance.args_schema(**inputs)
+            validated_inputs = tool_instance.args_schema(**processed_inputs)
             result = tool_instance._run(**validated_inputs.dict())
         else:
             # If no args_schema, pass inputs directly
