@@ -69,7 +69,6 @@ class RankedKeywordsTool(BaseTool):
             df['keyword_difficulty'] = df['keyword_data'].apply(lambda x: x.get('keyword_properties', {}).get('keyword_difficulty', 0))
             df['competition_level'] = df['keyword_data'].apply(lambda x: x.get('keyword_info', {}).get('competition_level', 'N/A'))
             df['main_intent'] = df['keyword_data'].apply(lambda x: x.get('search_intent_info', {}).get('main_intent', 'N/A'))
-            df['serp_features'] = df['ranked_serp_element'].apply(lambda x: x.get('serp_item', {}).get('serp_item_types', []))
             df['absolute_rank'] = df['ranked_serp_element'].apply(lambda x: x.get('serp_item', {}).get('rank_absolute', 0))
             df['etv'] = df['ranked_serp_element'].apply(lambda x: x.get('serp_item', {}).get('etv', 0))
 
