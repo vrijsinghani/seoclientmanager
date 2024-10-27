@@ -15,6 +15,7 @@ import pandas as pd
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
+import google.auth.transport.requests
 
 # Import Django models
 from django.core.exceptions import ObjectDoesNotExist
@@ -48,6 +49,27 @@ class GoogleReportTool(BaseTool):
     def __init__(self, **kwargs):
         super().__init__()
 
+    def _refresh_oauth_credentials(self, credentials_obj, stored_credentials):
+        """Helper method to refresh OAuth credentials"""
+        try:
+            # Create a session for token validation
+            session = google.auth.transport.requests.AuthorizedSession(credentials_obj)
+            
+            # Force token refresh
+            request = google.auth.transport.requests.Request()
+            credentials_obj.refresh(request)
+            
+            # Update stored credentials
+            stored_credentials.access_token = credentials_obj.token
+            stored_credentials.save()
+            
+            logger.info("Successfully refreshed and validated OAuth credentials")
+            return credentials_obj
+            
+        except Exception as e:
+            logger.error(f"Failed to refresh OAuth credentials: {str(e)}")
+            raise AuthError(f"Failed to refresh OAuth credentials: {str(e)}")
+
     def _get_analytics_service(self, credentials):        
         try:
             if credentials.use_service_account:
@@ -59,6 +81,8 @@ class GoogleReportTool(BaseTool):
                 )
             else:
                 logger.info("Using OAuth credentials for Google Analytics")
+                
+                # Create credentials object
                 creds = Credentials(
                     token=credentials.access_token,
                     refresh_token=credentials.refresh_token,
@@ -67,19 +91,22 @@ class GoogleReportTool(BaseTool):
                     client_secret=credentials.client_secret,
                     scopes=['https://www.googleapis.com/auth/analytics.readonly']
                 )
+                
+                # Always refresh token before use
+                creds = self._refresh_oauth_credentials(creds, credentials)
             
             analytics_client = BetaAnalyticsDataClient(credentials=creds)
             return analytics_client
-        except RefreshError as e:
-            logger.error(f"Failed to refresh GA credentials: {str(e)}")
-            raise AuthError("Google Analytics authorization has expired. Please reauthorize the application.")
+
         except Exception as e:
-            logger.error(f"Error creating analytics service: {str(e)}", exc_info=True)
-            raise
+            logger.error(f"Error in _get_analytics_service: {str(e)}", exc_info=True)
+            raise AuthError(f"Failed to initialize Analytics service: {str(e)}")
 
     def _get_search_console_service(self, credentials):
         try:
             logger.info("Using OAuth credentials for Search Console")
+            
+            # Create credentials object
             creds = Credentials(
                 token=credentials.access_token,
                 refresh_token=credentials.refresh_token,
@@ -89,13 +116,14 @@ class GoogleReportTool(BaseTool):
                 scopes=['https://www.googleapis.com/auth/webmasters.readonly']
             )
             
+            # Always refresh token before use
+            creds = self._refresh_oauth_credentials(creds, credentials)
+            
             return build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
-        except RefreshError as e:
-            logger.error(f"Failed to refresh SC credentials: {str(e)}")
-            raise AuthError("Search Console authorization has expired. Please reauthorize the application.")
+
         except Exception as e:
-            logger.error(f"Error creating Search Console service: {str(e)}", exc_info=True)
-            raise
+            logger.error(f"Error in _get_search_console_service: {str(e)}", exc_info=True)
+            raise AuthError(f"Failed to initialize Search Console service: {str(e)}")
 
     def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
         try:
@@ -107,6 +135,10 @@ class GoogleReportTool(BaseTool):
                 
                 if not ga_credentials or not sc_credentials:
                     raise ValueError("Missing Google Analytics or Search Console credentials")
+                
+                # Log credential details for debugging
+                logger.info(f"GA Credentials - Token URI: {ga_credentials.token_uri}, Has refresh token: {bool(ga_credentials.refresh_token)}")
+                logger.info(f"SC Credentials - Token URI: {sc_credentials.token_uri}, Has refresh token: {bool(sc_credentials.refresh_token)}")
                 
             except ObjectDoesNotExist:
                 raise ValueError(f"Client with id {client_id} not found or has missing credentials")
@@ -162,17 +194,17 @@ class GoogleReportTool(BaseTool):
                     limit=10
                 )        
                 general_response = analytics_client.run_report(general_request)
-            except RefreshError as e:
-                logger.error(f"Failed to refresh credentials while fetching analytics data: {str(e)}")
-                raise AuthError("Authorization has expired while fetching analytics data. Please reauthorize the application.")
+            except Exception as e:
+                logger.error(f"Failed to fetch analytics data: {str(e)}")
+                raise
             
             # Fetch Search Console data
             try:
                 keyword_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'query')
                 landing_page_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'page')
-            except RefreshError as e:
-                logger.error(f"Failed to refresh credentials while fetching Search Console data: {str(e)}")
-                raise AuthError("Authorization has expired while fetching Search Console data. Please reauthorize the application.")
+            except Exception as e:
+                logger.error(f"Failed to fetch Search Console data: {str(e)}")
+                raise
             
             processed_general_data = self._process_analytics_data(general_response)
             
@@ -266,7 +298,7 @@ class GoogleReportTool(BaseTool):
                 })
             
             search_console_data.sort(key=lambda x: x['Impressions'], reverse=True)
-            return search_console_data[:100]
+            return search_console_data[:50]
         except HttpError as error:
             logger.error(f"An error occurred while fetching Search Console data: {error}")
             print(f"An error occurred while fetching Search Console data: {error}")
