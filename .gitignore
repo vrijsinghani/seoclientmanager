@@ -183,3 +183,5 @@ celerybeat-schedule.dir
 experiments/crewAI-examples
 google_secrets.json
 response.json
+keyword_data.csv
+landing_page_data.csv
