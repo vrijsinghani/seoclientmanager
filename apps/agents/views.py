@@ -18,14 +18,15 @@ from channels.layers import get_channel_layer
 from django.conf import settings
 import os
 from apps.seo_manager.models import Client  # Import the Client model
+import markdown  # Add this import at the top
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
 
 @login_required
 def crewai_home(request):
-    crews = Crew.objects.all()[:3]  # Get the first 3 crews for the summary
-    recent_executions = CrewExecution.objects.filter(user=request.user).order_by('-created_at')[:5]
+    crews = Crew.objects.all()  # Get the first 3 crews for the summary
+    recent_executions = CrewExecution.objects.filter(user=request.user).order_by('-created_at')[:10]
     clients = Client.objects.all()  # Get all clients
     
     # Get the selected client_id from the request, fallback to session
@@ -121,8 +122,45 @@ def execution_list(request):
 @login_required
 def execution_detail(request, execution_id):
     execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
+    messages = CrewMessage.objects.filter(execution=execution).order_by('timestamp')
+    
+    # Convert markdown to HTML for each message
+    md = markdown.Markdown(extensions=[
+        'markdown.extensions.extra',
+        'markdown.extensions.codehilite',
+        'markdown.extensions.fenced_code',
+        'markdown.extensions.tables'
+    ])
+    
+    for message in messages:
+        # Add debug print
+        message.content_html = md.convert(message.content)
+    # Convert markdown in outputs if they exist
+    if execution.outputs:
+        outputs_html = {}
+        for key, value in execution.outputs.items():
+            if isinstance(value, (str, int, float, bool)):
+                outputs_html[key] = md.convert(str(value))
+            elif value is None:
+                outputs_html[key] = ''
+            else:
+                # For complex types like dicts or lists, format them nicely
+                outputs_html[key] = f'<pre>{json.dumps(value, indent=2)}</pre>'
+        execution.outputs_html = outputs_html
+    
+    status_classes = {
+        'PENDING': 'info',
+        'RUNNING': 'primary',
+        'WAITING_FOR_HUMAN_INPUT': 'warning',
+        'COMPLETED': 'success',
+        'FAILED': 'danger'
+    }
+    status_class = status_classes.get(execution.status, 'secondary')
+
     context = {
         'execution': execution,
+        'messages': messages,
+        'status_class': status_class,
     }
     return render(request, 'agents/execution_detail.html', context)
 
@@ -130,12 +168,43 @@ def execution_detail(request, execution_id):
 def execution_status(request, execution_id):
     try:
         execution = CrewExecution.objects.get(id=execution_id, user=request.user)
-        recent_messages = CrewMessage.objects.filter(execution=execution).order_by('-timestamp')[:10]
+        
+        # Get the last message ID from the request
+        last_message_id = request.GET.get('last_message_id')
+        
+        # Only fetch new messages if there are any
+        if last_message_id:
+            messages = CrewMessage.objects.filter(
+                execution=execution,
+                id__gt=last_message_id
+            ).order_by('timestamp')
+        else:
+            messages = CrewMessage.objects.filter(
+                execution=execution
+            ).order_by('timestamp')
+        
+        # Get status badge class
+        status_classes = {
+            'PENDING': 'info',
+            'RUNNING': 'primary',
+            'WAITING_FOR_HUMAN_INPUT': 'warning',
+            'COMPLETED': 'success',
+            'FAILED': 'danger'
+        }
+        status_class = status_classes.get(execution.status, 'secondary')
+        
         response_data = {
-            'status': execution.status,
+            'status': execution.get_status_display(),
+            'status_class': status_class,
+            'updated_at': execution.updated_at.isoformat(),
             'outputs': execution.outputs,
             'human_input_request': execution.human_input_request,
-            'messages': [{'agent': msg.agent, 'content': msg.content} for msg in recent_messages],
+            'messages': [{
+                'id': msg.id,
+                'agent': msg.agent,
+                'content': msg.content,
+                'timestamp': msg.timestamp.strftime("%d %b %H:%M")
+            } for msg in messages],
         }
         return JsonResponse(response_data)
     except CrewExecution.DoesNotExist:
@@ -262,50 +331,16 @@ def submit_human_input(request, execution_id):
     # Verify that the input was stored correctly
     stored_value = cache.get(cache_key)
     logger.info(f"Stored human input in cache for execution {execution_id}: key={cache_key}, value={response}")
-    logger.info(f"Verified stored value: {stored_value}")
     
-    # Create a CrewMessage for the human input
-    CrewMessage.objects.create(
-        execution=execution,
-        agent='Human',
-        content=f"Human input received: {response}"
-    )
-    
-    # Notify the WebSocket that human input has been received
-    async_to_sync(channel_layer.group_send)(
-        f'crew_execution_{execution_id}',
-        {
-            'type': 'crew_execution_update',
-            'status': 'RUNNING',
-            'messages': [{'agent': 'Human', 'content': f'Input provided: {response}'}],
-        }
-    )
+    # Update execution status
+    execution.status = 'RUNNING'
+    execution.save()
     
     return JsonResponse({'message': 'Human input received and processed'})
 
-def task_create_or_update(request, task_id=None):
-    # ... existing view code ...
 
-    if form.is_valid():
-        task = form.save(commit=False)
-        
-        # Handle the output_file path
-        output_file_path = form.cleaned_data['output_file']
-        if output_file_path:
-            # Ensure the path is relative to MEDIA_ROOT
-            full_path = os.path.join(settings.MEDIA_ROOT, output_file_path)
-            
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            # Create an empty file if it doesn't exist
-            if not os.path.exists(full_path):
-                open(full_path, 'a').close()
-            
-            # Save the relative path to the model
-            task.output_file = output_file_path
 
-        task.save()
-        # ... rest of your view logic ...
 
-    # ... rest of your view ...
+
+
+

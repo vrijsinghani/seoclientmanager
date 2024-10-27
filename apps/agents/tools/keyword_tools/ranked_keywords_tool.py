@@ -5,29 +5,34 @@ from pydantic.v1 import BaseModel, Field
 from crewai_tools.tools.base_tool import BaseTool
 import logging
 import pandas as pd
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = os.getenv('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com')
 
 class RankedKeywordsInput(BaseModel):
-    target: str = Field(description="Domain or webpage for keyword ranking analysis")
-    location_code: int = Field(default=2840, description="Location code for the analysis", exclude=True)
-    language_code: str = Field(default="en", description="Language code for the analysis", exclude=True)
+    website_url: str = Field(description="Domain or webpage for keyword ranking analysis")
+
+    @classmethod
+    def get_fqdn(cls, url: str) -> str:
+        parsed_url = urlparse(url)
+        return parsed_url.netloc or parsed_url.path
 
 class RankedKeywordsTool(BaseTool):
     name: str = "Ranked Keywords"
     description: str = "Provides a list of ranked keywords with various metrics"
     args_schema: Type[BaseModel] = RankedKeywordsInput
 
-    def _run(self, target: str, location_code: int = 2840, language_code: str = "en", **kwargs: Any) -> Any:
+    def _run(self, website_url: str, location_code: int = 2840, language_code: str = "en", **kwargs: Any) -> Any:
         login, password = KeywordTools._dataforseo_credentials()
         cred = (login, password)
         url = f"{BASE_URL}/v3/dataforseo_labs/google/ranked_keywords/live"
-        
+        fqdn = RankedKeywordsInput.get_fqdn(website_url)
+
         payload = [
             {
-                "target": target,
+                "target": fqdn,
                 "location_code": location_code,
                 "language_code": language_code,
                 "limit": 100,
@@ -71,6 +76,7 @@ class RankedKeywordsTool(BaseTool):
             df['main_intent'] = df['keyword_data'].apply(lambda x: x.get('search_intent_info', {}).get('main_intent', 'N/A'))
             df['absolute_rank'] = df['ranked_serp_element'].apply(lambda x: x.get('serp_item', {}).get('rank_absolute', 0))
             df['etv'] = df['ranked_serp_element'].apply(lambda x: x.get('serp_item', {}).get('etv', 0))
+            df['cpc'] = df['keyword_data'].apply(lambda x: x.get('keyword_info', {}).get('cpc', 0))
 
             # Define the columns to include in the output
             columns = [
@@ -80,7 +86,7 @@ class RankedKeywordsTool(BaseTool):
             result_df = df[columns]
 
             # Convert the DataFrame to CSV format
-            csv_output = result_df.to_csv(index=False)
+            csv_output = result_df.to_csv(index=False, lineterminator='\n')
             return csv_output
 
         except Exception as e:

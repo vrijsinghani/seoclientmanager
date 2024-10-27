@@ -239,7 +239,7 @@ def save_result_to_file(execution, result):
     # Log the file creation
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT)
     log_message = f"Final output saved to: {relative_path}"
-    log_crew_message(execution, log_message, agent='System')
+    log_crew_message(execution, log_message)
     logger.info(log_message)
 
 def initialize_crew(execution):
@@ -325,7 +325,6 @@ def run_crew(task_id, crew, execution):
         else:
             raise ValueError(f"Unknown process type: {execution.crew.process}")
 
-        log_crew_message(execution, f"Crew execution completed with result: {result}")
         return result
     except Exception as e:
         logger.error(f"Error during crew execution: {str(e)}", exc_info=True)
@@ -462,7 +461,7 @@ def create_crewai_tasks(task_models, agents, execution):
 def step_callback(step_output, execution_id):
     logger.info(f"Step callback: {step_output}")
     execution = CrewExecution.objects.get(id=execution_id)
-    log_crew_message(execution, f"Step callback: {step_output}", agent='System')
+    log_crew_message(execution, f"Step callback: {step_output}", agent='Interim Step')
 
 def task_callback(task_output: TaskOutput, execution_id):
     execution = CrewExecution.objects.get(id=execution_id)

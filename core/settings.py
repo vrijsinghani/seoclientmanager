@@ -321,7 +321,7 @@ DATAFORSEO_EMAIL = os.environ.get('DATAFORSEO_EMAIL')
 DATAFORSEO_PASSWORD = os.environ.get('DATAFORSEO_PASSWORD')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-
+PERPLEXITYAI_API_KEY = os.environ.get('PERPLEXITYAI_API_KEY')
 SONNET=os.environ.get('SONNET')
 OPUS=os.environ.get('OPUS')
 HAIKU=os.environ.get('HAIKU')
@@ -410,7 +410,8 @@ LOGGING = {
         },
     },
 }
-
+TIME_ZONE = 'America/New_York'
+USE_TZ = True
 # def show_toolbar(request):
 #     return True
 

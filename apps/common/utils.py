@@ -102,8 +102,7 @@ def is_pdf_url(url: str) -> bool:
         return False
 
 def is_youtube(url: str) -> bool:
-    youtube_regex = r"(?:https?:\/\/)?(?:www\.)?youtu(?:\.be|be\.com)\/(?:watch\?v=)?([\w-]{11})"
-    return re.match(youtube_regex, url)
+    return "youtube.com" in url or "youtu.be" in url
 
 def is_stock_symbol(query):
     url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={query}&apikey={settings.ALPHA_VANTAGE_API_KEY}'

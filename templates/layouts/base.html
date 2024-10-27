@@ -46,6 +46,7 @@
   {% endblock fixed_plugin %}
 
   <!-- Toast Container -->
+  {% comment %}
   {% if messages %}
   <div aria-live="polite" aria-atomic="true" class="position-relative">
     <div class="toast-container position-fixed top-0 end-0 p-3">
@@ -63,6 +64,7 @@
     </div>
   </div>
   {% endif %}
+  {% endcomment %}
 
   {% include 'includes/scripts.html' %}
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -78,10 +80,12 @@
       document.addEventListener('DOMContentLoaded', function() {
         initialDarkMode();
       });
-      console.log({{ reqest.user.profile.dark_mode }})
+      // Fix typo in request
+      console.log('{{ request.user.profile.dark_mode }}');  // Fixed typo from reqest to request
     }
   </script>
   <!-- Initialize and show toasts -->
+  {% comment %}
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var toastElList = [].slice.call(document.querySelectorAll('.toast'));
@@ -94,6 +98,7 @@
       toastList.forEach(toast => toast.show());
     });
   </script>
+  {% endcomment %}
 
 </body>
 </html>
