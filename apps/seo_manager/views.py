@@ -23,6 +23,12 @@ import io
 from .models import TargetedKeyword, SEOProject
 from .forms import RankingImportForm
 from django.db.models import Avg
+from django.db.models import Prefetch
+from .models import KeywordRankingHistory
+from django.utils import timezone
+from dateutil.relativedelta import relativedelta
+from django.template.loader import render_to_string
+from apps.agents.tools.google_report_tool.google_rankings_tool import GoogleRankingsTool
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +59,19 @@ def add_client(request):
 
 @login_required
 def client_detail(request, client_id):
-    client = get_object_or_404(Client, id=client_id)
+    client = get_object_or_404(Client.objects.prefetch_related(
+        Prefetch(
+            'targeted_keywords',
+            queryset=TargetedKeyword.objects.prefetch_related(
+                Prefetch(
+                    'ranking_history',
+                    queryset=KeywordRankingHistory.objects.filter(
+                        date__gte=timezone.now().date() - relativedelta(months=12)
+                    ).order_by('date')
+                )
+            )
+        )
+    ), id=client_id)
     
     # Get client activities
     client_activities = UserActivity.objects.filter(
@@ -502,13 +520,26 @@ class KeywordUpdateView(LoginRequiredMixin, UpdateView):
     form_class = TargetedKeywordForm
     template_name = 'seo_manager/keywords/keyword_form.html'
 
+    def get_queryset(self):
+        # Ensure the keyword belongs to the correct client
+        return TargetedKeyword.objects.filter(
+            client_id=self.kwargs['client_id']
+        )
+
     def form_valid(self, form):
         response = super().form_valid(form)
-        user_activity_tool.run(self.request.user, 'update', f"Updated keyword: {form.instance.keyword}", client=form.instance.client)
+        user_activity_tool.run(
+            self.request.user, 
+            'update', 
+            f"Updated keyword: {form.instance.keyword}", 
+            client=form.instance.client
+        )
+        messages.success(self.request, "Keyword updated successfully.")
         return response
 
     def get_success_url(self):
-        return reverse_lazy('seo_manager:client_detail', kwargs={'client_id': self.object.client.id})
+        return reverse_lazy('seo_manager:client_detail', 
+                          kwargs={'client_id': self.kwargs['client_id']})
 
 @login_required
 def keyword_import(request, client_id):
@@ -725,3 +756,165 @@ def delete_project(request, client_id, project_id):
         return redirect('seo_manager:client_detail', client_id=client_id)
     
     return redirect('seo_manager:client_detail', client_id=client_id)
+
+@login_required
+def debug_keyword_data(request, client_id, keyword_id):
+    """Debug view to check keyword data"""
+    keyword = get_object_or_404(TargetedKeyword, id=keyword_id, client_id=client_id)
+    
+    rankings = KeywordRankingHistory.objects.filter(
+        keyword=keyword
+    ).order_by('-date')
+    
+    data = {
+        'keyword': keyword.keyword,
+        'current_position': keyword.current_position,
+        'position_change': keyword.get_position_change(),
+        'rankings': [
+            {
+                'date': r.date.strftime('%Y-%m-%d'),
+                'position': r.average_position,
+                'impressions': r.impressions,
+                'clicks': r.clicks,
+                'ctr': r.ctr
+            }
+            for r in rankings
+        ]
+    }
+    
+    return JsonResponse(data)
+
+@login_required
+@require_http_methods(["POST"])
+def collect_rankings(request, client_id):
+    try:
+        tool = GoogleRankingsTool()
+        # Get just the last 30 days of data
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=30)
+        
+        result = tool._run(
+            start_date=start_date.strftime('%Y-%m-%d'),
+            end_date=end_date.strftime('%Y-%m-%d'),
+            client_id=client_id
+        )
+        
+        if result['success']:
+            messages.success(request, "Latest rankings collected successfully")
+            return JsonResponse({
+                'success': True,
+                'message': "Latest rankings data has been collected and stored"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'Unknown error occurred')
+            })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+@login_required
+@require_http_methods(["POST"])
+def generate_report(request, client_id):
+    try:
+        client = get_object_or_404(Client.objects.select_related(), id=client_id)
+        
+        # Get the report data
+        today = timezone.now().date()
+        last_month = today - relativedelta(months=1)
+        
+        # Use select_related to optimize queries
+        keywords = client.targeted_keywords.select_related().all()
+        
+        report = {
+            'period': last_month.strftime('%B %Y'),
+            'keywords': {
+                'total': keywords.count(),
+                'improved': 0,
+                'declined': 0,
+                'unchanged': 0
+            },
+            'top_improvements': [],
+            'needs_attention': []
+        }
+
+        # Process keyword data
+        for keyword in keywords:
+            change = keyword.get_position_change()
+            if change:
+                if change > 0:
+                    report['keywords']['improved'] += 1
+                    if change > 5:
+                        report['top_improvements'].append({
+                            'keyword': keyword.keyword,
+                            'improvement': change
+                        })
+                elif change < 0:
+                    report['keywords']['declined'] += 1
+                    if change < -5:
+                        report['needs_attention'].append({
+                            'keyword': keyword.keyword,
+                            'decline': abs(change)
+                        })
+                else:
+                    report['keywords']['unchanged'] += 1
+
+        # Sort improvements and needs attention lists
+        report['top_improvements'].sort(key=lambda x: x['improvement'], reverse=True)
+        report['needs_attention'].sort(key=lambda x: x['decline'], reverse=True)
+
+        # Limit to top 5 for each list
+        report['top_improvements'] = report['top_improvements'][:5]
+        report['needs_attention'] = report['needs_attention'][:5]
+
+        # Render the report template
+        report_html = render_to_string(
+            'seo_manager/reports/monthly_report.html',
+            {'report': report, 'client': client},
+            request=request
+        )
+
+        return JsonResponse({
+            'success': True,
+            'report_html': report_html
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating report: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f"Error generating report: {str(e)}"
+        })
+
+@login_required
+@require_http_methods(["POST"])
+def backfill_rankings(request, client_id):
+    try:
+        tool = GoogleRankingsTool()
+        # Pass None for start_date and end_date to trigger 12-month backfill
+        result = tool._run(
+            start_date=None,
+            end_date=None,
+            client_id=client_id
+        )
+        
+        if result['success']:
+            messages.success(request, "Historical rankings collected successfully")
+            return JsonResponse({
+                'success': True,
+                'message': "12 months of historical ranking data has been collected and stored"
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'Unknown error occurred')
+            })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+

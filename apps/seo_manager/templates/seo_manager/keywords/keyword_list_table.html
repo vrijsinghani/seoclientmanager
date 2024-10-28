@@ -1,10 +1,12 @@
+{% load seo_tags %}
+
 <table class="table table-flush" id="keywords-table">
   <thead class="thead-light">
     <tr>
       <th>Keyword</th>
       <th>Priority</th>
-      <th>Current Position</th>
-      <th>30d Change</th>
+      <th class="text-center">Current Position</th>
+      <th class="text-center">30d Change</th>
       <th>Notes</th>
       <th>Actions</th>
     </tr>
@@ -22,33 +24,220 @@
           {{ keyword.get_priority_display }}
         </span>
       </td>
-      <td>
-        {% with latest_ranking=keyword.ranking_history.first %}
-          {% if latest_ranking %}
-            {{ latest_ranking.average_position|floatformat:1 }}
-          {% else %}
-            -
-          {% endif %}
-        {% endwith %}
+      <td class="text-center">
+        {% if keyword.current_position %}
+          <span class="text-sm">{{ keyword.current_position }}</span>
+        {% else %}
+          <span class="text-sm text-secondary">-</span>
+        {% endif %}
       </td>
-      <td>
-        {% with change=keyword.get_30_day_change %}
+      <td class="text-center">
+        {% with change=keyword.get_position_change %}
           {% if change %}
-            <span class="text-{% if change < 0 %}success{% elif change > 0 %}danger{% else %}secondary{% endif %}">
-              {{ change|floatformat:1 }}
-            </span>
+            <div class="d-flex align-items-center justify-content-center">
+              {% if keyword.position_trend == 'up' %}
+                <i class="fas fa-arrow-up text-success me-1"></i>
+              {% elif keyword.position_trend == 'down' %}
+                <i class="fas fa-arrow-down text-danger me-1"></i>
+              {% else %}
+                <i class="fas fa-minus text-secondary me-1"></i>
+              {% endif %}
+              <span class="text-sm {% if change > 0 %}text-success{% elif change < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                {{ change|floatformat:1 }}
+              </span>
+            </div>
           {% else %}
-            -
+            <span class="text-sm text-secondary">-</span>
           {% endif %}
         {% endwith %}
       </td>
       <td class="text-sm">{{ keyword.notes|truncatechars:50 }}</td>
       <td>
-        <a href="#" class="text-secondary font-weight-bold text-xs" data-bs-toggle="modal" data-bs-target="#edit-keyword-{{ keyword.id }}">
-          Edit
-        </a>
+        <div class="d-flex">
+          <a href="#" class="text-secondary font-weight-bold text-xs me-3" data-bs-toggle="modal" data-bs-target="#edit-keyword-{{ keyword.id }}">
+            Edit
+          </a>
+          <a href="#" class="text-info font-weight-bold text-xs" data-bs-toggle="modal" data-bs-target="#view-history-{{ keyword.id }}">
+            History
+          </a>
+        </div>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Keyword History Modals -->
+{% for keyword in keywords %}
+<div class="modal fade" id="view-history-{{ keyword.id }}" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ranking History: {{ keyword.keyword }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="chart-container-{{ keyword.id }}" class="chart-container" style="position: relative; height: 300px;">
+          <canvas id="keyword-chart-{{ keyword.id }}" class="chart-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Edit Keyword Modals -->
+{% for keyword in keywords %}
+<div class="modal fade" id="edit-keyword-{{ keyword.id }}" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Keyword: {{ keyword.keyword }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:keyword_update' client_id=client.id pk=keyword.id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="keyword-{{ keyword.id }}">Keyword</label>
+            <input type="text" class="form-control" id="keyword-{{ keyword.id }}" name="keyword" value="{{ keyword.keyword }}" required>
+          </div>
+          <div class="form-group mt-3">
+            <label for="priority-{{ keyword.id }}">Priority</label>
+            <select class="form-control" id="priority-{{ keyword.id }}" name="priority">
+              {% for value, label in keyword.PRIORITY_CHOICES %}
+                <option value="{{ value }}" {% if keyword.priority == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group mt-3">
+            <label for="notes-{{ keyword.id }}">Notes</label>
+            <textarea class="form-control" id="notes-{{ keyword.id }}" name="notes" rows="3">{{ keyword.notes }}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Add this at the bottom of the file -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const charts = {};
+    
+    {% for keyword in keywords %}
+    const modal{{ keyword.id }} = document.getElementById('view-history-{{ keyword.id }}');
+    const chartData{{ keyword.id }} = [
+        {% with monthly_data=keyword.get_monthly_rankings %}
+            {% for entry in monthly_data %}
+                {
+                    x: '{{ entry.date|date:"F Y" }}',
+                    y: {{ entry.position }},
+                    impressions: {{ entry.impressions }},
+                    clicks: {{ entry.clicks }},
+                    ctr: {{ entry.ctr }}
+                }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        {% endwith %}
+    ];
+
+    if (modal{{ keyword.id }}) {
+        modal{{ keyword.id }}.addEventListener('show.bs.modal', function() {
+            const chartContainer = document.getElementById('chart-container-{{ keyword.id }}');
+            let canvas = document.getElementById('keyword-chart-{{ keyword.id }}');
+            
+            // Destroy existing chart if it exists
+            if (charts['{{ keyword.id }}']) {
+                charts['{{ keyword.id }}'].destroy();
+                delete charts['{{ keyword.id }}'];
+            }
+
+            if (chartData{{ keyword.id }}.length > 0) {
+                // Create new canvas if needed
+                if (!canvas || !canvas.getContext) {
+                    // Remove old canvas if it exists
+                    if (canvas) {
+                        canvas.remove();
+                    }
+                    canvas = document.createElement('canvas');
+                    canvas.id = 'keyword-chart-{{ keyword.id }}';
+                    canvas.className = 'chart-canvas';
+                    chartContainer.innerHTML = '';
+                    chartContainer.appendChild(canvas);
+                }
+
+                const ctx = canvas.getContext('2d');
+                charts['{{ keyword.id }}'] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: 'Position',
+                            data: chartData{{ keyword.id }},
+                            borderColor: '#5e72e4',
+                            backgroundColor: 'rgba(94, 114, 228, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        parsing: {
+                            xAxisKey: 'x',
+                            yAxisKey: 'y'
+                        },
+                        scales: {
+                            y: {
+                                reverse: true,
+                                beginAtZero: false,
+                                grid: {
+                                    drawBorder: false,
+                                    display: true,
+                                    drawOnChartArea: true,
+                                    drawTicks: false,
+                                    borderDash: [5, 5]
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const data = context.raw;
+                                        return [
+                                            `Position: ${data.y.toFixed(1)}`,
+                                            `Impressions: ${data.impressions}`,
+                                            `Clicks: ${data.clicks}`,
+                                            `CTR: ${(data.ctr * 100).toFixed(1)}%`
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                chartContainer.innerHTML = '<p class="text-center text-muted my-5">No ranking data available for this period</p>';
+            }
+        });
+
+        modal{{ keyword.id }}.addEventListener('hidden.bs.modal', function() {
+            if (charts['{{ keyword.id }}']) {
+                charts['{{ keyword.id }}'].destroy();
+                delete charts['{{ keyword.id }}'];
+            }
+        });
+    }
+    {% endfor %}
+});
+</script>

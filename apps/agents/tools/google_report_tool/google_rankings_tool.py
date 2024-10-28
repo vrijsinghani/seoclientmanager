@@ -28,6 +28,9 @@ from apps.seo_manager.models import (
 )
 from django.db import transaction
 
+# Add this import at the top with other imports
+from apps.seo_manager.utils import get_monthly_date_ranges
+
 logger = logging.getLogger(__name__)
 
 class AuthError(Exception):
@@ -102,85 +105,83 @@ class GoogleRankingsTool(BaseTool):
 
     def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
         try:
-            # Retrieve the client's credentials
-            try:
-                client = Client.objects.get(id=client_id)
-                sc_credentials = client.sc_credentials
-                
-                if not sc_credentials:
-                    raise ValueError("Missing Search Console credentials")
-                
-                # Log credential details for debugging
-                logger.info(f"SC Credentials - Token URI: {sc_credentials.token_uri}, Has refresh token: {bool(sc_credentials.refresh_token)}")
-                
-            except ObjectDoesNotExist:
-                raise ValueError(f"Client with id {client_id} not found or has missing credentials")
-
-            # Initialize services with proper error handling
-            try:
-                search_console_service = self._get_search_console_service(sc_credentials)
-                property_url = sc_credentials.property_url
-                if not property_url:
-                    raise ValueError("Missing Search Console property URL")
-            except AuthError as e:
-                logger.error(f"Failed to initialize Search Console service: {str(e)}")
-                raise
-            except Exception as e:
-                logger.error(f"Failed to initialize Search Console service: {str(e)}")
-                raise
-                      
-            # Fetch Search Console data
-            try:
-                keyword_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'query')
-                
-                # Log the keyword data to database
-                self._log_keyword_rankings(client, keyword_data, start_date)
-                
-            except Exception as e:
-                logger.error(f"Failed to fetch or log Search Console data: {str(e)}")
-                raise
+            client = Client.objects.get(id=client_id)
+            sc_credentials = client.sc_credentials
             
-            result = {
-                'keyword_data': json.dumps(keyword_data),
-                'start_date': start_date,
-                'end_date': end_date,
-                'client_id': client_id
+            if not sc_credentials:
+                raise ValueError("Missing Search Console credentials")
+            
+            search_console_service = self._get_search_console_service(sc_credentials)
+            property_url = sc_credentials.property_url
+            
+            # Check if specific dates were provided (for collect_rankings)
+            if start_date and end_date:
+                date_ranges = [(
+                    datetime.strptime(start_date, '%Y-%m-%d').date(),
+                    datetime.strptime(end_date, '%Y-%m-%d').date()
+                )]
+            else:
+                # For backfill_rankings, get last 12 months
+                date_ranges = get_monthly_date_ranges(12)
+            
+            for start_date, end_date in date_ranges:
+                try:
+                    logger.info(f"Fetching data for period: {start_date} to {end_date}")
+                    
+                    keyword_data = self._get_search_console_data(
+                        search_console_service, 
+                        property_url, 
+                        start_date.strftime('%Y-%m-%d'),
+                        end_date.strftime('%Y-%m-%d'),
+                        'query'
+                    )
+                    
+                    # Calculate monthly averages and store
+                    self._log_monthly_rankings(client, keyword_data, start_date)
+                    
+                except Exception as e:
+                    logger.error(f"Error fetching data for period {start_date} to {end_date}: {str(e)}")
+                    continue
+            
+            return {
+                'success': True,
+                'message': f"Processed ranking data for {len(date_ranges)} period(s)"
             }
             
-            return result
-
-        except AuthError as e:
-            logger.error(f"Authentication error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error in ranking tool: {str(e)}")
+            return {'success': False, 'error': str(e)}
 
     @transaction.atomic
-    def _log_keyword_rankings(self, client, keyword_data, date_str):
-        """
-        Log keyword ranking data to the KeywordRankingHistory model
-        """
+    def _log_monthly_rankings(self, client, keyword_data, month_date):
+        """Log monthly average rankings"""
         try:
-            # Convert date string to date object
-            ranking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            
-            # Get all targeted keywords for this client for efficient lookup
+            # Get all targeted keywords for this client
             targeted_keywords = {
                 kw.keyword.lower(): kw 
                 for kw in TargetedKeyword.objects.filter(client=client)
             }
             
-            # Prepare bulk create list
+            # Delete existing rankings for this month
+            KeywordRankingHistory.objects.filter(
+                client=client,
+                date__year=month_date.year,
+                date__month=month_date.month
+            ).delete()
+            
+            # Process and store rankings
             rankings_to_create = []
             
             for data in keyword_data:
                 keyword_text = data['Keyword']
                 
-                # Create ranking history entry
                 ranking = KeywordRankingHistory(
                     client=client,
                     keyword_text=keyword_text,
-                    date=ranking_date,
+                    date=month_date,  # Use first day of month as reference date
                     impressions=data['Impressions'],
                     clicks=data['Clicks'],
-                    ctr=data['CTR (%)'] / 100,  # Convert percentage to decimal
+                    ctr=data['CTR (%)'] / 100,
                     average_position=data['Avg Position']
                 )
                 
@@ -191,30 +192,18 @@ class GoogleRankingsTool(BaseTool):
                 
                 rankings_to_create.append(ranking)
             
-            # Bulk create the rankings
-            if rankings_to_create:
-                # Delete existing rankings for this date and client to avoid duplicates
-                KeywordRankingHistory.objects.filter(
-                    client=client,
-                    date=ranking_date
-                ).delete()
-                
-                # Create new rankings
-                KeywordRankingHistory.objects.bulk_create(
-                    rankings_to_create,
-                    batch_size=1000
-                )
-                
-                logger.info(
-                    f"Successfully logged {len(rankings_to_create)} keyword rankings "
-                    f"for client {client.name} on {date_str}"
-                )
-        
-        except Exception as e:
-            logger.error(
-                f"Error logging keyword rankings for client {client.name}: {str(e)}", 
-                exc_info=True
+            # Bulk create new rankings
+            KeywordRankingHistory.objects.bulk_create(
+                rankings_to_create,
+                batch_size=1000
             )
+            
+            logger.info(
+                f"Stored {len(rankings_to_create)} rankings for {month_date.strftime('%B %Y')}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error logging monthly rankings: {str(e)}")
             raise
 
     def _get_search_console_data(self, service, property_url, start_date, end_date, dimension):

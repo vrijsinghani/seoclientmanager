@@ -31,7 +31,7 @@ urlpatterns = [
                 path('', KeywordListView.as_view(), name='keyword_list'),
                 path('add/', KeywordCreateView.as_view(), name='keyword_create'),
                 path('import/', views.keyword_import, name='keyword_import'),
-                path('<int:pk>/edit/', KeywordUpdateView.as_view(), name='keyword_edit'),
+                path('<int:pk>/edit/', KeywordUpdateView.as_view(), name='keyword_update'),
                 path('<int:pk>/rankings/', views.ranking_import, name='ranking_import'),
             ])),
             
@@ -64,6 +64,12 @@ urlpatterns = [
             
             # Add this inside the client_id patterns
             path('profile/update/', views.update_client_profile, name='update_client_profile'),
+            path('clients/<int:client_id>/keywords/<int:keyword_id>/debug/', views.debug_keyword_data, name='debug_keyword_data'),
+            path('rankings/', include([
+                path('collect/', views.collect_rankings, name='collect_rankings'),
+                path('report/', views.generate_report, name='generate_report'),
+                path('backfill/', views.backfill_rankings, name='backfill_rankings'),
+            ])),
         ])),
     ])),
     

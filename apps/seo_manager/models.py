@@ -1,6 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db.models import Q
+from django.db.models import Avg
+import logging
+from dateutil.relativedelta import relativedelta
+import json
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class ClientGroup(models.Model):
@@ -33,6 +41,25 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_keyword_rankings_summary(self):
+        """Get summary of current keyword rankings"""
+        latest_rankings = KeywordRankingHistory.objects.filter(
+            client=self,
+            keyword__isnull=False,  # Only targeted keywords
+            date=KeywordRankingHistory.objects.filter(
+                client=self,
+                keyword__isnull=False
+            ).values('date').order_by('-date').first()['date']
+        ).select_related('keyword')
+
+        return {
+            'total_keywords': latest_rankings.count(),
+            'avg_position': latest_rankings.aggregate(
+                Avg('average_position')
+            )['average_position__avg'],
+            'rankings': latest_rankings
+        }
 
 class SEOData(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='seo_data')
@@ -143,6 +170,80 @@ class TargetedKeyword(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def get_monthly_rankings(self, months=12):
+        """Get monthly ranking history"""
+        end_date = timezone.now().date()
+        start_date = end_date - relativedelta(months=months)
+        
+        logger.debug(
+            f"Fetching monthly rankings for keyword '{self.keyword}' (ID: {self.id})"
+            f"\nDate range: {start_date} to {end_date}"
+        )
+        
+        rankings = self.ranking_history.filter(
+            date__gte=start_date,
+            date__lte=end_date
+        ).order_by('date')
+        
+        logger.debug(f"Found {rankings.count()} ranking records")
+        
+        # Group by month and get the monthly record
+        monthly_data = {}
+        for ranking in rankings:
+            month_key = ranking.date.strftime('%Y-%m')
+            if month_key not in monthly_data:
+                data = {
+                    'date': ranking.date,
+                    'position': float(ranking.average_position),
+                    'impressions': int(ranking.impressions),
+                    'clicks': int(ranking.clicks),
+                    'ctr': float(ranking.ctr)
+                }
+                monthly_data[month_key] = data
+                # logger.debug(
+                #     f"Added data for {month_key}:"
+                #     f"\nPosition: {data['position']}"
+                #     f"\nImpressions: {data['impressions']}"
+                #     f"\nClicks: {data['clicks']}"
+                #     f"\nCTR: {data['ctr']}"
+                # )
+        
+        result = [monthly_data[k] for k in sorted(monthly_data.keys())]
+        logger.debug(
+            f"Returning {len(result)} months of data for {self.keyword}"
+        )
+        return result
+
+    @property
+    def current_position(self):
+        """Get the most recent average position"""
+        latest = self.ranking_history.order_by('-date').first()
+        return round(latest.average_position, 1) if latest else None
+
+    def get_position_change(self, months=1):
+        """Calculate position change over specified number of months"""
+        monthly_data = self.get_monthly_rankings(months + 1)
+        
+        if len(monthly_data) < 2:
+            return None
+            
+        current = monthly_data[-1]['position']
+        previous = monthly_data[-2]['position']
+        
+        return round(previous - current, 1)
+
+    @property
+    def position_trend(self):
+        """Returns trend indicator based on 30-day change"""
+        change = self.get_position_change()
+        if change is None:
+            return 'neutral'
+        if change > 0.5:  # Improved by more than 0.5 positions
+            return 'up'
+        if change < -0.5:  # Declined by more than 0.5 positions
+            return 'down'
+        return 'neutral'
+
     class Meta:
         unique_together = ['client', 'keyword']
         ordering = ['priority', 'keyword']
@@ -180,6 +281,25 @@ class KeywordRankingHistory(models.Model):
         unique_together = ['client', 'keyword_text', 'date']
         ordering = ['-date']
         get_latest_by = 'date'
+        indexes = [
+            models.Index(fields=['-date']),  # Optimize date-based queries
+            models.Index(fields=['client', '-date']),  # Optimize client+date queries
+        ]
+
+    @classmethod
+    def get_rankings_for_period(cls, client, start_date, end_date, keyword=None):
+        """Get rankings for a specific period"""
+        query = cls.objects.filter(
+            client=client,
+            date__range=[start_date, end_date]
+        )
+        
+        if keyword:
+            query = query.filter(
+                Q(keyword=keyword) | Q(keyword_text=keyword.keyword)
+            )
+            
+        return query.order_by('date')
 
     def __str__(self):
         return f"{self.keyword_text} - {self.client.name} - {self.date}"
@@ -225,3 +345,34 @@ class SEOProject(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.client.name}"
+
+    # Add method to analyze project impact
+    def analyze_impact(self):
+        implementation_date = self.implementation_date
+        pre_period = implementation_date - relativedelta(months=1)
+        post_period = implementation_date + relativedelta(months=1)
+
+        results = {}
+        for keyword in self.targeted_keywords.all():
+            rankings = keyword.ranking_history.filter(
+                date__range=[pre_period, post_period]
+            ).order_by('date')
+
+            pre_avg = rankings.filter(date__lt=implementation_date).aggregate(
+                Avg('average_position'))['average_position__avg']
+            post_avg = rankings.filter(date__gte=implementation_date).aggregate(
+                Avg('average_position'))['average_position__avg']
+
+            results[keyword.keyword] = {
+                'pre_implementation_avg': pre_avg,
+                'post_implementation_avg': post_avg,
+                'improvement': pre_avg - post_avg if pre_avg and post_avg else None,
+                'impressions_change': self._calculate_impressions_change(rankings),
+                'clicks_change': self._calculate_clicks_change(rankings)
+            }
+
+        return results
+
+
+
+
