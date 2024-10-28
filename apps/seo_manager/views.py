@@ -29,6 +29,8 @@ from django.utils import timezone
 from dateutil.relativedelta import relativedelta
 from django.template.loader import render_to_string
 from apps.agents.tools.google_report_tool.google_rankings_tool import GoogleRankingsTool
+from django.db.models import Min, Max
+from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +107,28 @@ def client_detail(request, client_id):
         'targeted_keywords__ranking_history'
     )
     
+    # Add these lines before the context dictionary
+    # Get ranking data statistics
+    ranking_stats = KeywordRankingHistory.objects.filter(
+        keyword__client_id=client_id
+    ).aggregate(
+        earliest_date=Min('date'),
+        latest_date=Max('date')
+    )
+    
+    latest_collection_date = ranking_stats['latest_date']
+    
+    # Calculate data coverage in months if we have data
+    data_coverage_months = 0
+    if ranking_stats['earliest_date'] and ranking_stats['latest_date']:
+        date_diff = ranking_stats['latest_date'] - ranking_stats['earliest_date']
+        data_coverage_months = round(date_diff.days / 30)  # Approximate months
+    
+    # Update this query to count unique keyword_text values
+    tracked_keywords_count = KeywordRankingHistory.objects.filter(
+        client_id=client_id
+    ).values('keyword_text').distinct().count()
+    
     context = {
         'client': client,
         'client_activities': client_activities,
@@ -117,6 +141,10 @@ def client_detail(request, client_id):
         'keywords': keywords,
         'projects': projects,
         'profile_form': ClientProfileForm(initial={'client_profile': client.client_profile}),
+        # Add these new context variables
+        'latest_collection_date': latest_collection_date,
+        'data_coverage_months': data_coverage_months,
+        'tracked_keywords_count': tracked_keywords_count,
     }
     
     # user_activity_tool.run(
@@ -920,3 +948,100 @@ def backfill_rankings(request, client_id):
             'error': str(e)
         })
 
+@login_required
+def ranking_data_management(request, client_id):
+    client = get_object_or_404(Client, id=client_id)
+    
+    # Get ranking data statistics
+    ranking_stats = KeywordRankingHistory.objects.filter(
+        client_id=client_id
+    ).aggregate(
+        earliest_date=Min('date'),
+        latest_date=Max('date')
+    )
+    
+    latest_collection_date = ranking_stats['latest_date']
+    
+    # Calculate data coverage in months
+    data_coverage_months = 0
+    if ranking_stats['earliest_date'] and ranking_stats['latest_date']:
+        date_diff = ranking_stats['latest_date'] - ranking_stats['earliest_date']
+        data_coverage_months = round(date_diff.days / 30)
+    
+    # Get search query
+    search_query = request.GET.get('search', '')
+    
+    # Get sort parameters
+    sort_by = request.GET.get('sort', '-date')  # Default sort by date descending
+    if sort_by.startswith('-'):
+        order_by = sort_by
+        sort_dir = 'desc'
+    else:
+        order_by = sort_by
+        sort_dir = 'asc'
+    
+    # Get items per page
+    items_per_page = int(request.GET.get('items', 25))
+    
+    # Get rankings with filtering, sorting and pagination
+    rankings_list = KeywordRankingHistory.objects.filter(client_id=client_id)
+    
+    # Apply search filter if provided
+    if search_query:
+        rankings_list = rankings_list.filter(keyword_text__icontains=search_query)
+    
+    # Apply sorting
+    rankings_list = rankings_list.order_by(order_by)
+    
+    paginator = Paginator(rankings_list, items_per_page)
+    page = request.GET.get('page')
+    rankings = paginator.get_page(page)
+    
+    # Count unique keywords
+    tracked_keywords_count = KeywordRankingHistory.objects.filter(
+        client_id=client_id
+    ).values('keyword_text').distinct().count()
+    
+    context = {
+        'client': client,
+        'latest_collection_date': latest_collection_date,
+        'data_coverage_months': data_coverage_months,
+        'tracked_keywords_count': tracked_keywords_count,
+        'rankings': rankings,
+        'sort_by': sort_by,
+        'sort_dir': sort_dir,
+        'search_query': search_query,
+        'items': items_per_page,
+    }
+    
+    return render(request, 'seo_manager/ranking_data_management.html', context)
+
+@login_required
+def export_rankings_csv(request, client_id):
+    # Get search query
+    search_query = request.GET.get('search', '')
+    
+    # Get rankings
+    rankings = KeywordRankingHistory.objects.filter(client_id=client_id)
+    if search_query:
+        rankings = rankings.filter(keyword_text__icontains=search_query)
+    
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="rankings_{client_id}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Keyword', 'Position', 'Change', 'Impressions', 'Clicks', 'CTR', 'Date'])
+    
+    for ranking in rankings:
+        writer.writerow([
+            ranking.keyword_text,
+            ranking.average_position,
+            ranking.position_change,
+            ranking.impressions,
+            ranking.clicks,
+            f"{ranking.ctr:.2f}%",
+            ranking.date.strftime("%Y-%m-%d")
+        ])
+    
+    return response

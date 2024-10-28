@@ -69,6 +69,8 @@ urlpatterns = [
                 path('collect/', views.collect_rankings, name='collect_rankings'),
                 path('report/', views.generate_report, name='generate_report'),
                 path('backfill/', views.backfill_rankings, name='backfill_rankings'),
+                path('manage/', views.ranking_data_management, name='ranking_data_management'),
+                path('export-csv/', views.export_rankings_csv, name='export_rankings_csv'),
             ])),
         ])),
     ])),

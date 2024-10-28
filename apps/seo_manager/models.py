@@ -304,6 +304,19 @@ class KeywordRankingHistory(models.Model):
     def __str__(self):
         return f"{self.keyword_text} - {self.client.name} - {self.date}"
 
+    @property
+    def position_change(self):
+        """Calculate position change from previous entry"""
+        previous = KeywordRankingHistory.objects.filter(
+            client=self.client,
+            keyword_text=self.keyword_text,
+            date__lt=self.date
+        ).order_by('-date').first()
+        
+        if previous:
+            return previous.average_position - self.average_position
+        return 0
+
 class SEOProject(models.Model):
     client = models.ForeignKey(
         Client,
@@ -372,6 +385,7 @@ class SEOProject(models.Model):
             }
 
         return results
+
 
 
 

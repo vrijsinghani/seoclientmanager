@@ -402,6 +402,7 @@
             <h5 class="mb-0">Ranking Data Management</h5>
             <p class="text-sm mb-0">
               Manage Search Console data collection and reporting
+              <a href="{% url 'seo_manager:ranking_data_management' client.id %}" class="text-primary">View Details</a>
             </p>
           </div>
           <div class="ms-auto my-auto mt-lg-0 mt-4">
@@ -424,25 +425,47 @@
           <table class="table align-items-center mb-0">
             <thead>
               <tr>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Last Collection</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Data Coverage</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Keywords Tracked</th>
-                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-3">Last Collection</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-3">Data Coverage</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-3">Keywords Tracked</th>
+                <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-3">Status</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>
-                  <span class="text-sm">{{ latest_collection_date|default:"No data collected yet" }}</span>
+                <td class="ps-3">
+                  <span class="text-sm">
+                    {% if latest_collection_date %}
+                      {{ latest_collection_date|date:"F d, Y" }}
+                    {% else %}
+                      No data collected yet
+                    {% endif %}
+                  </span>
                 </td>
-                <td>
-                  <span class="text-sm">{{ data_coverage_months }} months</span>
+                <td class="ps-3">
+                  <span class="text-sm">
+                    {% if data_coverage_months %}
+                      {{ data_coverage_months }} month{{ data_coverage_months|pluralize }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </span>
                 </td>
-                <td>
-                  <span class="text-sm">{{ tracked_keywords_count }}</span>
+                <td class="ps-3">
+                  <span class="text-sm">
+                    {% if tracked_keywords_count %}
+                      {{ tracked_keywords_count }}
+                    {% else %}
+                      0
+                    {% endif %}
+                  </span>
                 </td>
-                <td>
-                  <span class="badge badge-sm bg-gradient-success">Active</span>
+                <td class="ps-3">
+                  {% if latest_collection_date %}
+                    <span class="badge badge-sm bg-gradient-success">Active</span>
+                  {% else %}
+                    <span class="badge badge-sm bg-gradient-warning">No Data</span>
+                  {% endif %}
                 </td>
               </tr>
             </tbody>
@@ -793,6 +816,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock extra_js %}
+
+
+
+
+
 
 
 
