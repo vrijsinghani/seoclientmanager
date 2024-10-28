@@ -2,6 +2,9 @@ from typing import Any, Type
 from pydantic.v1 import BaseModel, Field
 from crewai_tools.tools.base_tool import BaseTool
 from apps.seo_manager.models import UserActivity
+import logging
+
+logger = logging.getLogger(__name__)
 
 """
 You can use the UserActivityTool by 
@@ -39,6 +42,7 @@ class UserActivityTool(BaseTool):
                 action=action,
                 details=details
             )
+            logger.debug(f"User activity logged: {user.username} - {category} - {action} - {client} - {details}")
             return {"success": True, "message": "User activity logged successfully."}
         except Exception as e:
             return {"success": False, "error": str(e)}

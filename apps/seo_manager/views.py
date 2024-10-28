@@ -40,7 +40,7 @@ def dashboard(request):
 @login_required
 def client_list(request):
     clients = Client.objects.all().order_by('name').select_related('group')
-    user_activity_tool.run(request.user, 'view', 'Viewed client list')
+    #user_activity_tool.run(request.user, 'view', 'Viewed client list')
     return render(request, 'seo_manager/client_list.html', {'clients': clients})
 
 @login_required
@@ -73,10 +73,12 @@ def client_detail(request, client_id):
         )
     ), id=client_id)
     
-    # Get client activities
+    # Get filtered client activities
+    important_categories = ['create', 'update', 'delete', 'export', 'import', 'other']
     client_activities = UserActivity.objects.filter(
-        client=client
-    ).order_by('-timestamp')[:10]  # Last 10 activities
+        client=client,
+        category__in=important_categories
+    ).order_by('-timestamp')[:10]  # Last 10 important activities
     
     # Get business objectives
     business_objectives = client.business_objectives
@@ -117,12 +119,12 @@ def client_detail(request, client_id):
         'profile_form': ClientProfileForm(initial={'client_profile': client.client_profile}),
     }
     
-    user_activity_tool.run(
-        request.user, 
-        'view', 
-        f"Viewed client details: {client.name}", 
-        client=client
-    )
+    # user_activity_tool.run(
+    #     request.user, 
+    #     'view', 
+    #     f"Viewed client details: {client.name}", 
+    #     client=client
+    # )
     
     return render(request, 'seo_manager/client_detail.html', context)
 

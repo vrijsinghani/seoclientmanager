@@ -175,17 +175,17 @@ class TargetedKeyword(models.Model):
         end_date = timezone.now().date()
         start_date = end_date - relativedelta(months=months)
         
-        logger.debug(
-            f"Fetching monthly rankings for keyword '{self.keyword}' (ID: {self.id})"
-            f"\nDate range: {start_date} to {end_date}"
-        )
+        # logger.debug(
+        #     f"Fetching monthly rankings for keyword '{self.keyword}' (ID: {self.id})"
+        #     f"\nDate range: {start_date} to {end_date}"
+        # )
         
         rankings = self.ranking_history.filter(
             date__gte=start_date,
             date__lte=end_date
         ).order_by('date')
         
-        logger.debug(f"Found {rankings.count()} ranking records")
+        # logger.debug(f"Found {rankings.count()} ranking records")
         
         # Group by month and get the monthly record
         monthly_data = {}
@@ -209,9 +209,9 @@ class TargetedKeyword(models.Model):
                 # )
         
         result = [monthly_data[k] for k in sorted(monthly_data.keys())]
-        logger.debug(
-            f"Returning {len(result)} months of data for {self.keyword}"
-        )
+        # logger.debug(
+        #     f"Returning {len(result)} months of data for {self.keyword}"
+        # )
         return result
 
     @property
