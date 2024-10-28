@@ -223,7 +223,11 @@ def execute_crew(self, execution_id):
 def save_result_to_file(execution, result):
     timestamp = datetime.now().strftime("%y-%m-%d-%H-%M")
     crew_name = execution.crew.name.replace(' ', '_')
-    file_name = f"finaloutput_{timestamp}.txt"
+    client = get_object_or_404(Client, id=execution.client_id)
+    # Directly create flattened client inputs
+    
+    client_name = client.name.replace(' ', '_')
+    file_name = f"{client_name}-finaloutput_{timestamp}.txt"
     
     # Create the directory path
     dir_path = os.path.join(settings.MEDIA_ROOT, str(execution.user.id), 'crew_runs', crew_name)

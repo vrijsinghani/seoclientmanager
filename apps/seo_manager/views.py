@@ -31,6 +31,7 @@ from django.template.loader import render_to_string
 from apps.agents.tools.google_report_tool.google_rankings_tool import GoogleRankingsTool
 from django.db.models import Min, Max
 from django.core.paginator import Paginator
+import markdown
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,9 @@ def client_detail(request, client_id):
             )
         )
     ), id=client_id)
+    
+    # No need to convert to markdown anymore since we're storing HTML
+    client_profile_html = client.client_profile
     
     # Get filtered client activities
     important_categories = ['create', 'update', 'delete', 'export', 'import', 'other']
@@ -140,6 +144,7 @@ def client_detail(request, client_id):
         'meta_tags_files': meta_tags_files,
         'keywords': keywords,
         'projects': projects,
+        'client_profile_html': client_profile_html,
         'profile_form': ClientProfileForm(initial={'client_profile': client.client_profile}),
         # Add these new context variables
         'latest_collection_date': latest_collection_date,
@@ -737,20 +742,20 @@ def update_client_profile(request, client_id):
     client = get_object_or_404(Client, id=client_id)
     
     if request.method == 'POST':
-        form = ClientProfileForm(request.POST)
-        if form.is_valid():
-            client.client_profile = form.cleaned_data['client_profile']
-            client.save()
-            
-            user_activity_tool.run(
-                request.user,
-                'update',
-                f"Updated client profile for: {client.name}",
-                client=client
-            )
-            
-            messages.success(request, "Client profile updated successfully.")
-            return redirect('seo_manager:client_detail', client_id=client.id)
+        # Get the HTML content directly from the form
+        client_profile = request.POST.get('client_profile', '')
+        client.client_profile = client_profile
+        client.save()
+        
+        user_activity_tool.run(
+            request.user,
+            'update',
+            f"Updated client profile for: {client.name}",
+            client=client
+        )
+        
+        messages.success(request, "Client profile updated successfully.")
+        return redirect('seo_manager:client_detail', client_id=client.id)
     
     messages.error(request, "Invalid form submission.")
     return redirect('seo_manager:client_detail', client_id=client.id)
@@ -1045,3 +1050,4 @@ def export_rankings_csv(request, client_id):
         ])
     
     return response
+
