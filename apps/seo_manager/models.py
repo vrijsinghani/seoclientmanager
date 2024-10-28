@@ -25,6 +25,11 @@ class Client(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     business_objectives = models.JSONField(default=list, blank=True)
     target_audience = models.TextField(blank=True, null=True)
+    # New field
+    client_profile = models.TextField(
+        help_text="Detailed 300-500 word profile of the client's business, goals, and SEO strategy",
+        blank=True
+    )
 
     def __str__(self):
         return self.name
@@ -113,3 +118,99 @@ class UserActivity(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.category} - {self.action}"
+
+class TargetedKeyword(models.Model):
+    PRIORITY_CHOICES = [
+        (1, 'Highest'),
+        (2, 'High'),
+        (3, 'Medium'),
+        (4, 'Low'),
+        (5, 'Lowest'),
+    ]
+
+    client = models.ForeignKey(
+        Client, 
+        on_delete=models.CASCADE,
+        related_name='targeted_keywords'
+    )
+    keyword = models.CharField(max_length=255)
+    priority = models.IntegerField(
+        choices=PRIORITY_CHOICES,
+        default=3,
+        help_text="Priority level for this keyword"
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['client', 'keyword']
+        ordering = ['priority', 'keyword']
+
+    def __str__(self):
+        return f"{self.keyword} ({self.client.name})"
+
+class KeywordRankingHistory(models.Model):
+    keyword = models.ForeignKey(
+        TargetedKeyword,
+        on_delete=models.CASCADE,
+        related_name='ranking_history'
+    )
+    date = models.DateField()
+    impressions = models.IntegerField(default=0)
+    clicks = models.IntegerField(default=0)
+    ctr = models.FloatField(
+        verbose_name="Click-Through Rate",
+        help_text="Click-through rate as a decimal (e.g., 0.15 for 15%)"
+    )
+    average_position = models.FloatField()
+    
+    class Meta:
+        unique_together = ['keyword', 'date']
+        ordering = ['-date']
+        get_latest_by = 'date'
+
+    def __str__(self):
+        return f"{self.keyword.keyword} - {self.date}"
+
+class SEOProject(models.Model):
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='seo_projects'
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    implementation_date = models.DateField()
+    completion_date = models.DateField(null=True, blank=True)
+    targeted_keywords = models.ManyToManyField(
+        TargetedKeyword,
+        related_name='related_projects'
+    )
+    documentation_file = models.FileField(
+        upload_to='seo_projects/%Y/%m/',
+        null=True,
+        blank=True
+    )
+    initial_rankings = models.JSONField(
+        default=dict,
+        help_text="Snapshot of keyword rankings before project implementation"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('planned', 'Planned'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('on_hold', 'On Hold'),
+        ],
+        default='planned'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-implementation_date']
+
+    def __str__(self):
+        return f"{self.title} - {self.client.name}"

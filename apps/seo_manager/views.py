@@ -6,8 +6,8 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponse, HttpResponseRedirect
 from .models import Client, SEOData, GoogleAnalyticsCredentials, SearchConsoleCredentials, UserActivity
 from .google_auth import get_google_auth_flow, get_analytics_accounts_oauth, get_analytics_accounts_service_account, get_search_console_properties
-from datetime import datetime
-from .forms import ClientForm, BusinessObjectiveForm
+from datetime import datetime, timedelta
+from .forms import ClientForm, BusinessObjectiveForm, TargetedKeywordForm, KeywordBulkUploadForm, SEOProjectForm, ClientProfileForm
 from apps.common.tools.user_activity_tool import user_activity_tool
 from .sitemap_extractor import extract_sitemap_and_meta_tags, extract_sitemap_and_meta_tags_from_url
 from django.urls import reverse
@@ -15,6 +15,14 @@ import os
 from urllib.parse import urlparse
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
+from django.views.generic import ListView, CreateView, UpdateView, DetailView
+from django.urls import reverse_lazy
+from django.contrib.auth.mixins import LoginRequiredMixin
+import csv
+import io
+from .models import TargetedKeyword, SEOProject
+from .forms import RankingImportForm
+from django.db.models import Avg
 
 logger = logging.getLogger(__name__)
 
@@ -46,50 +54,57 @@ def add_client(request):
 @login_required
 def client_detail(request, client_id):
     client = get_object_or_404(Client, id=client_id)
-    seo_data = SEOData.objects.filter(client=client).order_by('-date')[:30]
     
-    credential_keys = ['accounts', 'properties', 'access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret', 'service_account_json']
-    for key in credential_keys:
-        request.session.pop(key, None)
+    # Get client activities
+    client_activities = UserActivity.objects.filter(
+        client=client
+    ).order_by('-timestamp')[:10]  # Last 10 activities
     
-    if request.method == 'POST':
-        form = BusinessObjectiveForm(request.POST)
-        if form.is_valid():
-            new_objective = {
-                'goal': form.cleaned_data['goal'],
-                'metric': form.cleaned_data['metric'],
-                'target_date': form.cleaned_data['target_date'].isoformat(),
-                'status': form.cleaned_data['status'],
-                'date_created': datetime.now().isoformat(),
-                'date_last_modified': datetime.now().isoformat(),
-            }
-            client.business_objectives.append(new_objective)
-            client.save()
-            user_activity_tool.run(request.user, 'create', f"Added business objective for client: {client.name}", client=client, details=new_objective)
-            messages.success(request, "Business objective added successfully.")
-            return redirect('seo_manager:client_detail', client_id=client.id)
-    else:
-        form = BusinessObjectiveForm()
+    # Get business objectives
+    business_objectives = client.business_objectives
     
-    # Fetch client activities
-    client_activities = UserActivity.objects.filter(client=client).order_by('-timestamp') 
+    # Initialize forms
+    keyword_form = TargetedKeywordForm()
+    import_form = KeywordBulkUploadForm()
+    project_form = SEOProjectForm(client=client)
+    business_objective_form = BusinessObjectiveForm()
     
-    # Get the list of meta tags snapshots
-    meta_tags_dir = os.path.join(settings.MEDIA_ROOT, str(request.user.id), 'meta-tags')
-    os.makedirs(meta_tags_dir, exist_ok=True)  # Create the directory if it doesn't exist
-    meta_tags_files = [f for f in os.listdir(meta_tags_dir) if f.startswith(urlparse(client.website_url).netloc)]
-    
-    # Update the file paths to include the 'meta-tags' directory
-    meta_tags_files = ['meta-tags/' + f for f in meta_tags_files]
+    # Get meta tags files if they exist
+    meta_tags_dir = os.path.join(settings.MEDIA_ROOT, 'meta-tags', str(client.id))
+    meta_tags_files = []
+    if os.path.exists(meta_tags_dir):
+        meta_tags_files = sorted(
+            [f for f in os.listdir(meta_tags_dir) if f.endswith('.json')],
+            key=lambda x: os.path.getmtime(os.path.join(meta_tags_dir, x)),
+            reverse=True
+        )
 
+    # Prepare keyword and project data with rankings
+    keywords = client.targeted_keywords.all().prefetch_related('ranking_history')
+    projects = client.seo_projects.all().prefetch_related(
+        'targeted_keywords__ranking_history'
+    )
+    
     context = {
         'client': client,
-        'seo_data': seo_data,
-        'business_objectives': client.business_objectives,
-        'form': form,
         'client_activities': client_activities,
+        'business_objectives': business_objectives,
+        'form': business_objective_form,
+        'keyword_form': keyword_form,
+        'import_form': import_form,
+        'project_form': project_form,
         'meta_tags_files': meta_tags_files,
+        'keywords': keywords,
+        'projects': projects,
+        'profile_form': ClientProfileForm(initial={'client_profile': client.client_profile}),
     }
+    
+    user_activity_tool.run(
+        request.user, 
+        'view', 
+        f"Viewed client details: {client.name}", 
+        client=client
+    )
     
     return render(request, 'seo_manager/client_detail.html', context)
 
@@ -453,3 +468,260 @@ def create_meta_tags_snapshot_url(request):
             'success': False,
             'message': f"An error occurred while creating the snapshot: {str(e)}"
         })
+
+# Add these class-based views for keyword management
+class KeywordListView(LoginRequiredMixin, ListView):
+    template_name = 'seo_manager/keywords/keyword_list.html'
+    context_object_name = 'keywords'
+
+    def get_queryset(self):
+        return TargetedKeyword.objects.filter(client_id=self.kwargs['client_id'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['client'] = get_object_or_404(Client, id=self.kwargs['client_id'])
+        context['import_form'] = KeywordBulkUploadForm()
+        return context
+
+class KeywordCreateView(LoginRequiredMixin, CreateView):
+    model = TargetedKeyword
+    form_class = TargetedKeywordForm
+    template_name = 'seo_manager/keywords/keyword_form.html'
+
+    def form_valid(self, form):
+        form.instance.client_id = self.kwargs['client_id']
+        response = super().form_valid(form)
+        user_activity_tool.run(self.request.user, 'create', f"Added keyword: {form.instance.keyword}", client=form.instance.client)
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('seo_manager:client_detail', kwargs={'client_id': self.kwargs['client_id']})
+
+class KeywordUpdateView(LoginRequiredMixin, UpdateView):
+    model = TargetedKeyword
+    form_class = TargetedKeywordForm
+    template_name = 'seo_manager/keywords/keyword_form.html'
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        user_activity_tool.run(self.request.user, 'update', f"Updated keyword: {form.instance.keyword}", client=form.instance.client)
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('seo_manager:client_detail', kwargs={'client_id': self.object.client.id})
+
+@login_required
+def keyword_import(request, client_id):
+    if request.method == 'POST':
+        form = KeywordBulkUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            client = get_object_or_404(Client, id=client_id)
+            csv_file = request.FILES['csv_file']
+            decoded_file = csv_file.read().decode('utf-8')
+            csv_data = csv.DictReader(io.StringIO(decoded_file))
+            
+            for row in csv_data:
+                TargetedKeyword.objects.create(
+                    client=client,
+                    keyword=row['keyword'],
+                    priority=int(row['priority']),
+                    notes=row.get('notes', '')
+                )
+            
+            user_activity_tool.run(request.user, 'import', f"Imported keywords from CSV", client=client)
+            messages.success(request, "Keywords imported successfully.")
+            return redirect('seo_manager:client_detail', client_id=client_id)
+    
+    messages.error(request, "Invalid form submission.")
+    return redirect('seo_manager:client_detail', client_id=client_id)
+
+# Add these class-based views for project management
+class ProjectListView(LoginRequiredMixin, ListView):
+    template_name = 'seo_manager/projects/project_list.html'
+    context_object_name = 'projects'
+
+    def get_queryset(self):
+        return SEOProject.objects.filter(client_id=self.kwargs['client_id'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['client'] = get_object_or_404(Client, id=self.kwargs['client_id'])
+        return context
+
+class ProjectCreateView(LoginRequiredMixin, CreateView):
+    model = SEOProject
+    form_class = SEOProjectForm
+    template_name = 'seo_manager/projects/project_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['client'] = get_object_or_404(Client, id=self.kwargs['client_id'])
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.client_id = self.kwargs['client_id']
+        # Capture initial rankings for targeted keywords
+        initial_rankings = {}
+        for keyword in form.cleaned_data['targeted_keywords']:
+            latest_ranking = keyword.ranking_history.first()
+            if latest_ranking:
+                initial_rankings[keyword.keyword] = latest_ranking.average_position
+        form.instance.initial_rankings = initial_rankings
+        
+        response = super().form_valid(form)
+        user_activity_tool.run(self.request.user, 'create', f"Created SEO project: {form.instance.title}", client=form.instance.client)
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('seo_manager:client_detail', kwargs={'client_id': self.kwargs['client_id']})
+
+class ProjectDetailView(LoginRequiredMixin, DetailView):
+    model = SEOProject
+    template_name = 'seo_manager/projects/project_detail.html'
+    context_object_name = 'project'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get the implementation date
+        implementation_date = self.object.implementation_date
+        
+        # Calculate periods for comparison
+        pre_period_start = implementation_date - timedelta(days=30)
+        post_period_end = implementation_date + timedelta(days=30)
+        
+        # Prepare data for the ranking history chart and performance metrics
+        ranking_data = {
+            'labels': [],
+            'datasets': []
+        }
+        
+        performance_metrics = []
+        
+        for keyword in self.object.targeted_keywords.all():
+            # Get rankings for before and after implementation
+            rankings = keyword.ranking_history.filter(
+                date__range=(pre_period_start, post_period_end)
+            ).order_by('date')
+            
+            # Calculate average positions for before and after
+            pre_avg = rankings.filter(
+                date__lt=implementation_date
+            ).aggregate(Avg('average_position'))['average_position__avg']
+            
+            post_avg = rankings.filter(
+                date__gte=implementation_date
+            ).aggregate(Avg('average_position'))['average_position__avg']
+            
+            # Calculate improvement
+            improvement = pre_avg - post_avg if pre_avg and post_avg else None
+            
+            # Add to performance metrics
+            performance_metrics.append({
+                'keyword': keyword.keyword,
+                'initial_position': self.object.initial_rankings.get(keyword.keyword),
+                'current_position': keyword.ranking_history.first().average_position if keyword.ranking_history.exists() else None,
+                'pre_avg': round(pre_avg, 1) if pre_avg else None,
+                'post_avg': round(post_avg, 1) if post_avg else None,
+                'improvement': round(improvement, 1) if improvement else None
+            })
+            
+            # Prepare chart dataset
+            dataset = {
+                'label': keyword.keyword,
+                'data': [],
+                'borderColor': f'#{hash(keyword.keyword) % 0xFFFFFF:06x}',
+                'tension': 0.4,
+                'fill': False
+            }
+            
+            for ranking in rankings:
+                if ranking.date.isoformat() not in ranking_data['labels']:
+                    ranking_data['labels'].append(ranking.date.isoformat())
+                dataset['data'].append(ranking.average_position)
+            
+            ranking_data['datasets'].append(dataset)
+        
+        # Add implementation date marker to chart
+        ranking_data['implementation_date'] = implementation_date.isoformat()
+        
+        context.update({
+            'ranking_history_data': json.dumps(ranking_data),
+            'performance_metrics': performance_metrics,
+            'implementation_date': implementation_date,
+            'pre_period_start': pre_period_start,
+            'post_period_end': post_period_end
+        })
+        
+        return context
+
+@login_required
+def ranking_import(request, client_id):
+    if request.method == 'POST':
+        form = RankingImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.process_import(request.user)
+            messages.success(request, "Rankings imported successfully.")
+            return redirect('seo_manager:client_detail', client_id=client_id)
+    else:
+        form = RankingImportForm()
+    
+    return render(request, 'seo_manager/keywords/ranking_import.html', {
+        'form': form,
+        'client': get_object_or_404(Client, id=client_id)
+    })
+
+@login_required
+def update_client_profile(request, client_id):
+    client = get_object_or_404(Client, id=client_id)
+    
+    if request.method == 'POST':
+        form = ClientProfileForm(request.POST)
+        if form.is_valid():
+            client.client_profile = form.cleaned_data['client_profile']
+            client.save()
+            
+            user_activity_tool.run(
+                request.user,
+                'update',
+                f"Updated client profile for: {client.name}",
+                client=client
+            )
+            
+            messages.success(request, "Client profile updated successfully.")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    
+    messages.error(request, "Invalid form submission.")
+    return redirect('seo_manager:client_detail', client_id=client.id)
+
+def edit_project(request, client_id, project_id):
+    """View for editing an existing SEO project."""
+    project = get_object_or_404(SEOProject, id=project_id, client_id=client_id)
+    
+    if request.method == 'POST':
+        form = SEOProjectForm(request.POST, instance=project, client=project.client)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Project updated successfully.')
+            return redirect('seo_manager:client_detail', client_id=client_id)
+    else:
+        form = SEOProjectForm(instance=project, client=project.client)
+    
+    context = {
+        'form': form,
+        'project': project,
+        'client_id': client_id,
+    }
+    
+    return render(request, 'seo_manager/projects/edit_project.html', context)
+
+def delete_project(request, client_id, project_id):
+    """View for deleting an SEO project."""
+    project = get_object_or_404(SEOProject, id=project_id, client_id=client_id)
+    
+    if request.method == 'POST':
+        project.delete()
+        messages.success(request, 'Project deleted successfully.')
+        return redirect('seo_manager:client_detail', client_id=client_id)
+    
+    return redirect('seo_manager:client_detail', client_id=client_id)

@@ -1,0 +1,54 @@
+<table class="table table-flush" id="keywords-table">
+  <thead class="thead-light">
+    <tr>
+      <th>Keyword</th>
+      <th>Priority</th>
+      <th>Current Position</th>
+      <th>30d Change</th>
+      <th>Notes</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for keyword in keywords %}
+    <tr>
+      <td>
+        <div class="d-flex align-items-center">
+          <span class="text-sm">{{ keyword.keyword }}</span>
+        </div>
+      </td>
+      <td>
+        <span class="badge bg-gradient-{% if keyword.priority == 1 %}danger{% elif keyword.priority == 2 %}warning{% else %}info{% endif %}">
+          {{ keyword.get_priority_display }}
+        </span>
+      </td>
+      <td>
+        {% with latest_ranking=keyword.ranking_history.first %}
+          {% if latest_ranking %}
+            {{ latest_ranking.average_position|floatformat:1 }}
+          {% else %}
+            -
+          {% endif %}
+        {% endwith %}
+      </td>
+      <td>
+        {% with change=keyword.get_30_day_change %}
+          {% if change %}
+            <span class="text-{% if change < 0 %}success{% elif change > 0 %}danger{% else %}secondary{% endif %}">
+              {{ change|floatformat:1 }}
+            </span>
+          {% else %}
+            -
+          {% endif %}
+        {% endwith %}
+      </td>
+      <td class="text-sm">{{ keyword.notes|truncatechars:50 }}</td>
+      <td>
+        <a href="#" class="text-secondary font-weight-bold text-xs" data-bs-toggle="modal" data-bs-target="#edit-keyword-{{ keyword.id }}">
+          Edit
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

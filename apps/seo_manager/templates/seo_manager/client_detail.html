@@ -287,6 +287,275 @@
 
 </div>
 
+<!-- Add this after the existing cards in client_detail.html -->
+
+<!-- Targeted Keywords Section -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header pb-0">
+        <div class="d-lg-flex">
+          <div>
+            <h5 class="mb-0">Targeted Keywords</h5>
+            <p class="text-sm mb-0">
+              Manage keywords and track their performance
+            </p>
+          </div>
+          <div class="ms-auto my-auto mt-lg-0 mt-4">
+            <div class="ms-auto my-auto">
+              <button type="button" class="btn bg-gradient-primary btn-sm mb-0" data-bs-toggle="modal" data-bs-target="#add-keyword">
+                <i class="fas fa-plus"></i>&nbsp;&nbsp;Add Keyword
+              </button>
+              <button type="button" class="btn btn-outline-primary btn-sm mb-0" data-bs-toggle="modal" data-bs-target="#import-keywords">
+                Import CSV
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body px-0 pb-0">
+        <div class="table-responsive">
+          {% include 'seo_manager/keywords/keyword_list_table.html' with keywords=client.targeted_keywords.all %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SEO Projects Section -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header pb-0">
+        <div class="d-lg-flex">
+          <div>
+            <h5 class="mb-0">SEO Projects</h5>
+            <p class="text-sm mb-0">
+              Track and manage SEO implementation projects
+            </p>
+          </div>
+          <div class="ms-auto my-auto mt-lg-0 mt-4">
+            <div class="ms-auto my-auto">
+              <button type="button" class="btn bg-gradient-primary btn-sm mb-0" data-bs-toggle="modal" data-bs-target="#add-project">
+                <i class="fas fa-plus"></i>&nbsp;&nbsp;New Project
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body px-0 pb-0">
+        <div class="table-responsive">
+          {% include 'seo_manager/projects/project_list_table.html' with projects=client.seo_projects.all %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Keyword Modal -->
+<div class="modal fade" id="add-keyword" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Keyword</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:keyword_create' client.id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          {{ keyword_form.as_p }}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Add Keyword</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Import Keywords Modal -->
+<div class="modal fade" id="import-keywords" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Import Keywords</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:keyword_import' client.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          {{ import_form.as_p }}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Import</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Project Modal -->
+<div class="modal fade" id="add-project" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">New SEO Project</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:project_create' client.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          {{ project_form.as_p }}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add this after the client details card and before the business objectives -->
+<div class="col-md-12">
+  <div class="card mb-4 mt-4">
+    <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+      <div>
+        <h5>Client Profile</h5>
+        <p class="text-sm text-muted mb-0">Background information on client</p>
+      </div>
+      {% if client.client_profile %}
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#edit-profile">
+          Edit Profile
+        </button>
+      {% else %}
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#add-profile">
+          Add Profile
+        </button>
+      {% endif %}
+    </div>
+    
+    <div class="card-body">
+      {% if client.client_profile %}
+        <p class="text-sm">{{ client.client_profile|linebreaks }}</p>
+      {% else %}
+        <p class="text-sm text-muted">No profile has been added for this client yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Add Profile Modal -->
+<div class="modal fade" id="add-profile" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Client Profile</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:update_client_profile' client.id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          {{ profile_form.client_profile }}
+          <small class="form-text text-muted">{{ profile_form.client_profile.help_text }}</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Save Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="edit-profile" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Client Profile</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:update_client_profile' client.id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          {{ profile_form.client_profile }}
+          <small class="form-text text-muted">{{ profile_form.client_profile.help_text }}</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Update Profile</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Project Details Modals -->
+{% for project in client.seo_projects.all %}
+<div class="modal fade" id="view-project-{{ project.id }}" tabindex="-1" role="dialog" aria-labelledby="project-modal-{{ project.id }}" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="project-modal-{{ project.id }}">{{ project.title }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-md-12">
+            <h6 class="text-sm">Description</h6>
+            <p class="text-sm text-muted">{{ project.description }}</p>
+          </div>
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-md-12">
+            <h6 class="text-sm">Status</h6>
+            <span class="badge bg-gradient-{% if project.status == 'completed' %}success{% elif project.status == 'in_progress' %}info{% elif project.status == 'planned' %}secondary{% else %}warning{% endif %}">
+              {{ project.get_status_display }}
+            </span>
+          </div>
+        </div>
+
+        <div class="row mt-3">
+          <div class="col-md-6">
+            <h6 class="text-sm">Implementation Date</h6>
+            <p class="text-sm">{{ project.implementation_date }}</p>
+          </div>
+          <div class="col-md-6">
+            <h6 class="text-sm">Completion Date</h6>
+            <p class="text-sm">{{ project.completion_date|default:"Not set" }}</p>
+          </div>
+        </div>
+
+        <div class="row mt-3">
+          <div class="col-md-12">
+            <h6 class="text-sm">Targeted Keywords</h6>
+            <div class="d-flex flex-wrap gap-2">
+              {% for keyword in project.targeted_keywords.all %}
+                <span class="badge bg-light text-dark">{{ keyword.keyword }}</span>
+              {% empty %}
+                <p class="text-sm text-muted">No keywords assigned</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="{% url 'seo_manager:edit_project' client.id project.id %}" class="btn bg-gradient-primary btn-sm">Edit Project</a>
+        <form method="post" action="{% url 'seo_manager:delete_project' client.id project.id %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn bg-gradient-danger btn-sm" onclick="return confirm('Are you sure you want to delete this project?')">Delete Project</button>
+        </form>
+        <button type="button" class="btn bg-gradient-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 {% endblock content %}
 
 {% block extra_js %}
@@ -401,3 +670,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock extra_js %}
+
