@@ -1,26 +1,26 @@
 {% load seo_tags %}
 
-<table class="table table-flush" id="keywords-table">
+<table class="table table-flush align-items-center mb-0" id="keywords-table">
   <thead class="thead-light">
     <tr>
-      <th>Keyword</th>
-      <th>Priority</th>
-      <th class="text-center">Current Position</th>
-      <th class="text-center">30d Change</th>
-      <th>Notes</th>
-      <th>Actions</th>
+      <th class="text-secondary text-xxs font-weight-bolder opacity-7">Keyword</th>
+      <th class="text-secondary text-xxs font-weight-bolder opacity-7">Priority</th>
+      <th class="text-center text-secondary text-xxs font-weight-bolder opacity-7">Current Position</th>
+      <th class="text-center text-secondary text-xxs font-weight-bolder opacity-7">30d Change</th>
+      <th class="text-secondary text-xxs font-weight-bolder opacity-7">Notes</th>
+      <th class="text-secondary text-xxs font-weight-bolder opacity-7">Actions</th>
     </tr>
   </thead>
   <tbody>
     {% for keyword in keywords %}
     <tr>
-      <td>
-        <div class="d-flex align-items-center">
-          <span class="text-sm">{{ keyword.keyword }}</span>
+      <td class="align-middle py-2">
+        <div class="d-flex px-2">
+          <span class="text-xs font-weight-bold">{{ keyword.keyword }}</span>
         </div>
       </td>
-      <td>
-        <span class="badge bg-gradient-{% if keyword.priority == 1 %}danger{% elif keyword.priority == 2 %}warning{% else %}info{% endif %}">
+      <td class="align-middle py-2">
+        <span class="badge badge-sm bg-gradient-{% if keyword.priority == 1 %}danger{% elif keyword.priority == 2 %}warning{% else %}info{% endif %}">
           {{ keyword.get_priority_display }}
         </span>
       </td>
