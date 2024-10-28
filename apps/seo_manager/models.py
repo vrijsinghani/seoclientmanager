@@ -151,10 +151,21 @@ class TargetedKeyword(models.Model):
         return f"{self.keyword} ({self.client.name})"
 
 class KeywordRankingHistory(models.Model):
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='keyword_rankings'
+    )
     keyword = models.ForeignKey(
         TargetedKeyword,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='ranking_history'
+    )
+    keyword_text = models.CharField(
+        max_length=255,
+        help_text="Actual keyword text, useful when no TargetedKeyword reference exists"
     )
     date = models.DateField()
     impressions = models.IntegerField(default=0)
@@ -166,12 +177,12 @@ class KeywordRankingHistory(models.Model):
     average_position = models.FloatField()
     
     class Meta:
-        unique_together = ['keyword', 'date']
+        unique_together = ['client', 'keyword_text', 'date']
         ordering = ['-date']
         get_latest_by = 'date'
 
     def __str__(self):
-        return f"{self.keyword.keyword} - {self.date}"
+        return f"{self.keyword_text} - {self.client.name} - {self.date}"
 
 class SEOProject(models.Model):
     client = models.ForeignKey(

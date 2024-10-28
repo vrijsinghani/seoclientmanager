@@ -19,7 +19,14 @@ import google.auth.transport.requests
 
 # Import Django models
 from django.core.exceptions import ObjectDoesNotExist
-from apps.seo_manager.models import Client, GoogleAnalyticsCredentials, SearchConsoleCredentials
+from apps.seo_manager.models import (
+    Client, 
+    GoogleAnalyticsCredentials, 
+    SearchConsoleCredentials,
+    KeywordRankingHistory,
+    TargetedKeyword
+)
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +34,7 @@ class AuthError(Exception):
     """Custom exception for authentication errors"""
     pass
 
-class GoogleReportToolInput(BaseModel):
+class GoogleRankingsToolInput(BaseModel):
     """Input schema for GoogleReportTool."""
     start_date: str = Field(..., description="The start date for the analytics data (YYYY-MM-DD).")
     end_date: str = Field(..., description="The end date for the analytics data (YYYY-MM-DD).")
@@ -41,10 +48,10 @@ class GoogleReportToolInput(BaseModel):
         except ValueError:
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
 
-class GoogleReportTool(BaseTool):
+class GoogleRankingsTool(BaseTool):
     name: str = "Google Analytics and Search Console Report Fetcher"
     description: str = "Fetches Google Analytics and Search Console reports for a specified client and date range."
-    args_schema: Type[BaseModel] = GoogleReportToolInput
+    args_schema: Type[BaseModel] = GoogleRankingsToolInput
 
     def __init__(self, **kwargs):
         super().__init__()
@@ -69,38 +76,6 @@ class GoogleReportTool(BaseTool):
         except Exception as e:
             logger.error(f"Failed to refresh OAuth credentials: {str(e)}")
             raise AuthError(f"Failed to refresh OAuth credentials: {str(e)}")
-
-    def _get_analytics_service(self, credentials):        
-        try:
-            if credentials.use_service_account:
-                logger.info("Using service account for Google Analytics")
-                service_account_info = json.loads(credentials.service_account_json)
-                creds = service_account.Credentials.from_service_account_info(
-                    service_account_info,
-                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
-                )
-            else:
-                logger.info("Using OAuth credentials for Google Analytics")
-                
-                # Create credentials object
-                creds = Credentials(
-                    token=credentials.access_token,
-                    refresh_token=credentials.refresh_token,
-                    token_uri=credentials.token_uri,
-                    client_id=credentials.ga_client_id,
-                    client_secret=credentials.client_secret,
-                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
-                )
-                
-                # Always refresh token before use
-                creds = self._refresh_oauth_credentials(creds, credentials)
-            
-            analytics_client = BetaAnalyticsDataClient(credentials=creds)
-            return analytics_client
-
-        except Exception as e:
-            logger.error(f"Error in _get_analytics_service: {str(e)}", exc_info=True)
-            raise AuthError(f"Failed to initialize Analytics service: {str(e)}")
 
     def _get_search_console_service(self, credentials):
         try:
@@ -130,38 +105,18 @@ class GoogleReportTool(BaseTool):
             # Retrieve the client's credentials
             try:
                 client = Client.objects.get(id=client_id)
-                ga_credentials = client.ga_credentials
                 sc_credentials = client.sc_credentials
                 
-                if not ga_credentials or not sc_credentials:
-                    raise ValueError("Missing Google Analytics or Search Console credentials")
+                if not sc_credentials:
+                    raise ValueError("Missing Search Console credentials")
                 
                 # Log credential details for debugging
-                logger.info(f"GA Credentials - Token URI: {ga_credentials.token_uri}, Has refresh token: {bool(ga_credentials.refresh_token)}")
                 logger.info(f"SC Credentials - Token URI: {sc_credentials.token_uri}, Has refresh token: {bool(sc_credentials.refresh_token)}")
                 
             except ObjectDoesNotExist:
                 raise ValueError(f"Client with id {client_id} not found or has missing credentials")
 
             # Initialize services with proper error handling
-            try:
-                analytics_client = self._get_analytics_service(ga_credentials)
-                property_id = ga_credentials.view_id
-                if not property_id:
-                    raise ValueError("Missing Google Analytics property ID")
-                    
-                # Clean up property ID - ensure it's just the numeric ID
-                property_id = property_id.replace('properties/', '')
-                if not property_id.isdigit():
-                    raise ValueError(f"Invalid Google Analytics property ID format. Expected numeric ID, got: {property_id}")
-                    
-            except AuthError as e:
-                logger.error(f"Failed to initialize Google Analytics service: {str(e)}")
-                raise
-            except Exception as e:
-                logger.error(f"Failed to initialize Google Analytics service: {str(e)}")
-                raise
-
             try:
                 search_console_service = self._get_search_console_service(sc_credentials)
                 property_url = sc_credentials.property_url
@@ -174,106 +129,93 @@ class GoogleReportTool(BaseTool):
                 logger.error(f"Failed to initialize Search Console service: {str(e)}")
                 raise
                       
-            # Fetch general analytics data
-            try:
-                general_request = RunReportRequest(
-                    property=f"properties/{property_id}",
-                    date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
-                    dimensions=[
-                        Dimension(name="sessionSourceMedium"),
-                    ],
-                    metrics=[
-                        Metric(name="totalUsers"),
-                        Metric(name="sessions"),
-                        Metric(name="bounceRate"),
-                        Metric(name="averageSessionDuration"),
-                    ],
-                    order_bys=[
-                        OrderBy(metric=OrderBy.MetricOrderBy(metric_name="totalUsers"), desc=True)
-                    ],
-                    limit=10
-                )        
-                general_response = analytics_client.run_report(general_request)
-            except Exception as e:
-                logger.error(f"Failed to fetch analytics data: {str(e)}")
-                raise
-            
             # Fetch Search Console data
             try:
                 keyword_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'query')
-                landing_page_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'page')
+                
+                # Log the keyword data to database
+                self._log_keyword_rankings(client, keyword_data, start_date)
+                
             except Exception as e:
-                logger.error(f"Failed to fetch Search Console data: {str(e)}")
+                logger.error(f"Failed to fetch or log Search Console data: {str(e)}")
                 raise
             
-            processed_general_data = self._process_analytics_data(general_response)
-            
             result = {
-                'analytics_data': json.dumps(processed_general_data),
                 'keyword_data': json.dumps(keyword_data),
-                'landing_page_data': json.dumps(landing_page_data),
                 'start_date': start_date,
                 'end_date': end_date,
                 'client_id': client_id
             }
             
-            # # Create CSV files
-            # keyword_df = pd.DataFrame(keyword_data)
-            # if not keyword_df.empty:
-            #     keyword_df.to_csv('keyword_data.csv', index=False)
-            
-            # landing_page_df = pd.DataFrame(landing_page_data)
-            # if not landing_page_df.empty:
-            #     landing_page_df.to_csv('landing_page_data.csv', index=False)
-            
             return result
+
         except AuthError as e:
             logger.error(f"Authentication error: {str(e)}")
-            return {
-                'analytics_data': json.dumps([]),
-                'keyword_data': json.dumps([]),
-                'landing_page_data': json.dumps([]),
-                'start_date': start_date,
-                'end_date': end_date,
-                'client_id': client_id,
-                'error': str(e)
-            }
-        except Exception as e:
-            logger.error(f"Failed to fetch Google Analytics or Search Console data. Error: {str(e)}", exc_info=True)
-            print(f"GoogleReportTool error: {str(e)}")  # Print to stdout for immediate visibility
-            return {
-                'analytics_data': json.dumps([]),
-                'keyword_data': json.dumps([]),
-                'landing_page_data': json.dumps([]),
-                'start_date': start_date,
-                'end_date': end_date,
-                'client_id': client_id,
-                'error': str(e)
-            }
-            
-    def _process_analytics_data(self, response):
-        processed_data = []
+
+    @transaction.atomic
+    def _log_keyword_rankings(self, client, keyword_data, date_str):
+        """
+        Log keyword ranking data to the KeywordRankingHistory model
+        """
         try:
-            for row in response.rows:
-                source_medium = row.dimension_values[0].value
-                total_users = int(row.metric_values[0].value)
-                sessions = int(row.metric_values[1].value)
-                bounce_rate = float(row.metric_values[2].value)
-                avg_session_duration = float(row.metric_values[3].value)
-                
-                processed_data.append({
-                    'source_medium': source_medium,
-                    'total_users': total_users,
-                    'sessions': sessions,
-                    'bounce_rate': bounce_rate,
-                    'avg_session_duration': avg_session_duration
-                })
+            # Convert date string to date object
+            ranking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             
-            processed_data.sort(key=lambda x: x['total_users'], reverse=True)
+            # Get all targeted keywords for this client for efficient lookup
+            targeted_keywords = {
+                kw.keyword.lower(): kw 
+                for kw in TargetedKeyword.objects.filter(client=client)
+            }
+            
+            # Prepare bulk create list
+            rankings_to_create = []
+            
+            for data in keyword_data:
+                keyword_text = data['Keyword']
+                
+                # Create ranking history entry
+                ranking = KeywordRankingHistory(
+                    client=client,
+                    keyword_text=keyword_text,
+                    date=ranking_date,
+                    impressions=data['Impressions'],
+                    clicks=data['Clicks'],
+                    ctr=data['CTR (%)'] / 100,  # Convert percentage to decimal
+                    average_position=data['Avg Position']
+                )
+                
+                # Link to TargetedKeyword if exists
+                targeted_keyword = targeted_keywords.get(keyword_text.lower())
+                if targeted_keyword:
+                    ranking.keyword = targeted_keyword
+                
+                rankings_to_create.append(ranking)
+            
+            # Bulk create the rankings
+            if rankings_to_create:
+                # Delete existing rankings for this date and client to avoid duplicates
+                KeywordRankingHistory.objects.filter(
+                    client=client,
+                    date=ranking_date
+                ).delete()
+                
+                # Create new rankings
+                KeywordRankingHistory.objects.bulk_create(
+                    rankings_to_create,
+                    batch_size=1000
+                )
+                
+                logger.info(
+                    f"Successfully logged {len(rankings_to_create)} keyword rankings "
+                    f"for client {client.name} on {date_str}"
+                )
+        
         except Exception as e:
-            logger.error(f"Error processing analytics data: {str(e)}", exc_info=True)
-            print(f"Error processing analytics data: {str(e)}")
-        return processed_data
+            logger.error(
+                f"Error logging keyword rankings for client {client.name}: {str(e)}", 
+                exc_info=True
+            )
+            raise
 
     def _get_search_console_data(self, service, property_url, start_date, end_date, dimension):
         try:
@@ -298,7 +240,7 @@ class GoogleReportTool(BaseTool):
                 })
             
             search_console_data.sort(key=lambda x: x['Impressions'], reverse=True)
-            return search_console_data[:50]
+            return search_console_data[:1000]
         except HttpError as error:
             logger.error(f"An error occurred while fetching Search Console data: {error}")
             print(f"An error occurred while fetching Search Console data: {error}")
