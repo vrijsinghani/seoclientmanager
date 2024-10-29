@@ -3,7 +3,7 @@ from django.views.generic import RedirectView
 from home import views
 from django.contrib.auth import views as auth_views
 
-app_name = 'home'
+#app_name = 'home'
 
 urlpatterns = [
   # Redirect root to seo_manager dashboard

@@ -28,7 +28,7 @@
             </li>
             {% if request.user.is_staff %}
             <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'llm-dashboard' %}active{% endif %}" href="{% url 'home:llm-dashboard' %}">
+              <a class="nav-link {% if request.resolver_match.url_name == 'llm-dashboard' %}active{% endif %}" href="{% url 'llm-dashboard' %}">
                 <span class="sidenav-mini-icon"> <i class="ni ni-chart-bar-32 text-info"></i> </span>
                 <span class="sidenav-normal"> LLM Analytics </span>
               </a>

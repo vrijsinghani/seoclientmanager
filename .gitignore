@@ -1,5 +1,5 @@
 media/
-0downloads/*
+0downloads/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -185,3 +185,4 @@ google_secrets.json
 response.json
 keyword_data.csv
 landing_page_data.csv
+litellmtest.py

@@ -121,7 +121,9 @@ def execution_list(request):
 
 @login_required
 def execution_detail(request, execution_id):
-    execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
+#    execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
+    execution = get_object_or_404(CrewExecution, id=execution_id)
+
     messages = CrewMessage.objects.filter(execution=execution).order_by('timestamp')
     
     # Convert markdown to HTML for each message

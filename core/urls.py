@@ -32,6 +32,7 @@ urlpatterns += i18n_patterns(
 )
 
 urlpatterns += [
-    path('seo/', include('apps.seo_manager.urls')),
+    path('seo/', include('apps.seo_manager.urls', namespace='seo_manager')),
+    path('agents/', include('apps.agents.urls', namespace='agents')),
     path('google/login/callback/', seo_views.google_oauth_callback, name='google_oauth_callback'),
 ]
