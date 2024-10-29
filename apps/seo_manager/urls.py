@@ -78,5 +78,15 @@ urlpatterns = [
     # Other URLs
     path('activity-log/', views.activity_log, name='activity_log'),
     path('create-meta-tags-snapshot-url/', views.create_meta_tags_snapshot_url, name='create_meta_tags_snapshot_url'),
+    # Business Objectives URLs
+    path('clients/<int:client_id>/objectives/add/', 
+         views.add_business_objective, 
+         name='add_business_objective'),
+    path('clients/<int:client_id>/objectives/<int:objective_index>/edit/', 
+         views.edit_business_objective, 
+         name='edit_business_objective'),
+    path('clients/<int:client_id>/objectives/<int:objective_index>/delete/', 
+         views.delete_business_objective, 
+         name='delete_business_objective'),
 ]
 

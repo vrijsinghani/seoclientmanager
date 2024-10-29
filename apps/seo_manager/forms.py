@@ -13,23 +13,31 @@ class ClientForm(forms.ModelForm):
         }
 
 class BusinessObjectiveForm(forms.Form):
-    goal = forms.CharField(max_length=255, widget=forms.TextInput(attrs={
-        'class': 'form-control',
-        'placeholder': 'Goal',
-        'style': 'width: 300px;'  # Adjust this value as needed
-    }))
-    metric = forms.CharField(max_length=255, widget=forms.TextInput(attrs={
-        'class': 'form-control',
-        'placeholder': 'Metric',
-        'style': 'width: 200px;'  # Adjust this value as needed
-    }))
-    target_date = forms.DateField(widget=forms.DateInput(attrs={
-        'class': 'form-control',
-        'type': 'date'
-    }))
-    status = forms.BooleanField(required=False, initial=True, widget=forms.CheckboxInput(attrs={
-        'class': 'form-check-input'
-    }))
+    goal = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter objective goal'
+        })
+    )
+    metric = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter metric'
+        })
+    )
+    target_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    status = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input'
+        })
+    )
 
 class TargetedKeywordForm(forms.ModelForm):
     class Meta:

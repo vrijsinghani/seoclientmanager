@@ -98,7 +98,7 @@
           
           <div class="mt-4">
             <h6>Add New Business Objective</h6>
-            <form method="post" class="row g-3 align-items-center">
+            <form method="post" action="{% url 'seo_manager:add_business_objective' client.id %}" class="row g-3 align-items-center">
               {% csrf_token %}
               <div class="col-auto">
                 {{ form.goal }}

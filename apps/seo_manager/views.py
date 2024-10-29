@@ -1051,3 +1051,39 @@ def export_rankings_csv(request, client_id):
     
     return response
 
+@login_required
+def add_business_objective(request, client_id):
+    if request.method == 'POST':
+        client = get_object_or_404(Client, id=client_id)
+        form = BusinessObjectiveForm(request.POST)
+        
+        if form.is_valid():
+            new_objective = {
+                'goal': form.cleaned_data['goal'],
+                'metric': form.cleaned_data['metric'],
+                'target_date': form.cleaned_data['target_date'].isoformat(),
+                'status': form.cleaned_data['status'],
+                'date_created': datetime.now().isoformat(),
+                'date_last_modified': datetime.now().isoformat(),
+            }
+            
+            if not client.business_objectives:
+                client.business_objectives = []
+            
+            client.business_objectives.append(new_objective)
+            client.save()
+            
+            user_activity_tool.run(
+                request.user, 
+                'create', 
+                f"Added business objective for client: {client.name}", 
+                client=client,
+                details=new_objective
+            )
+            
+            messages.success(request, "Business objective added successfully.")
+        else:
+            messages.error(request, "Error adding business objective. Please check the form.")
+            
+    return redirect('seo_manager:client_detail', client_id=client_id)
+

@@ -39,6 +39,11 @@ class Client(models.Model):
         blank=True
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.business_objectives is None:
+            self.business_objectives = []
+
     def __str__(self):
         return self.name
 
