@@ -360,10 +360,18 @@ def create_crewai_agents(agent_models, execution_id):
                     agent_llm, _ = get_llm(value)
                     agent_params[field] = agent_llm
 
-            # Load tools
+            # Load tools with their settings
             for tool in agent_model.tools.all():
                 loaded_tool = load_tool_in_task(tool)
                 if loaded_tool:
+                    # Get tool settings
+                    tool_settings = agent_model.get_tool_settings(tool)
+                    if tool_settings and tool_settings.force_output_as_result:
+                        # Apply the force output setting
+                        loaded_tool = type(loaded_tool)(
+                            result_as_answer=True,
+                            **{k: v for k, v in loaded_tool.__dict__.items() if k != 'result_as_answer'}
+                        )
                     agent_params['tools'].append(loaded_tool)
                     logger.debug(f"Added tool {tool.name} to agent {agent_model.name}")
                 else:

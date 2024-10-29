@@ -2,7 +2,7 @@ import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import Agent
+from .models import Agent, AgentToolSettings
 from .forms import AgentForm
 import traceback
 from django.conf import settings
@@ -28,16 +28,25 @@ def add_agent(request):
                 agent = form.save(commit=False)
                 agent.avatar = form.cleaned_data['avatar']
                 agent.save()
+                
+                # Save many-to-many fields
                 form.save_m2m()
+                
+                # Handle tool settings
+                for tool in agent.tools.all():
+                    force_output = request.POST.get(f'force_tool_output_{tool.id}') == 'on'
+                    AgentToolSettings.objects.create(
+                        agent=agent,
+                        tool=tool,
+                        force_output_as_result=force_output
+                    )
+                
                 messages.success(request, 'Agent added successfully.')
                 return redirect('agents:manage_agents')
             except Exception as e:
                 messages.error(request, f"Error adding agent: {str(e)}")
     else:
-        form = AgentForm(initial={
-            'llm': settings.GENERAL_MODEL,
-            'function_calling_llm': settings.GENERAL_MODEL
-        })
+        form = AgentForm()
     return render(request, 'agents/agent_form.html', {'form': form})
 
 @login_required
@@ -52,6 +61,17 @@ def edit_agent(request, agent_id):
                 agent.avatar = form.cleaned_data['avatar']
                 agent.save()
                 form.save_m2m()
+                
+                # Update tool settings
+                agent.tool_settings.all().delete()  # Remove existing settings
+                for tool in agent.tools.all():
+                    force_output = request.POST.get(f'force_tool_output_{tool.id}') == 'on'
+                    AgentToolSettings.objects.create(
+                        agent=agent,
+                        tool=tool,
+                        force_output_as_result=force_output
+                    )
+                
                 messages.success(request, 'Agent updated successfully.')
                 return redirect('agents:manage_agents')
             except Exception as e:

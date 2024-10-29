@@ -104,6 +104,23 @@ class Agent(models.Model):
         if self.llm not in available_models:
             raise ValidationError({'llm': f"Selected LLM '{self.llm}' is not available. Please choose from: {', '.join(available_models)}"})
 
+    def get_tool_settings(self, tool):
+        """Get settings for a specific tool."""
+        return self.tool_settings.filter(tool=tool).first()
+
+    def get_forced_output_tools(self):
+        """Get all tools that have force_output_as_result=True."""
+        return self.tools.filter(
+            id__in=self.tool_settings.filter(
+                force_output_as_result=True
+            ).values_list('tool_id', flat=True)
+        )
+
+    def has_force_output_enabled(self, tool):
+        """Check if force output is enabled for a specific tool."""
+        tool_setting = self.tool_settings.filter(tool=tool).first()
+        return tool_setting.force_output_as_result if tool_setting else False
+
 class Task(models.Model):
     description = models.TextField()
     agent = models.ForeignKey(Agent, on_delete=models.SET_NULL, null=True, blank=True)
@@ -319,3 +336,11 @@ class CrewTask(models.Model):
 
     def __str__(self):
         return f"{self.crew.name} - {self.task.description} (Order: {self.order})"
+
+class AgentToolSettings(models.Model):
+    agent = models.ForeignKey('Agent', on_delete=models.CASCADE, related_name='tool_settings')
+    tool = models.ForeignKey('Tool', on_delete=models.CASCADE)
+    force_output_as_result = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('agent', 'tool')

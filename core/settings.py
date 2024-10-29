@@ -17,11 +17,12 @@ from dotenv import load_dotenv
 from str2bool       import str2bool 
 import os, random, string, sys
 
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+ENV_FILE = BASE_DIR / '.env'
+load_dotenv(dotenv_path=ENV_FILE)
+print(f"Loading .env from: {ENV_FILE}") 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -367,6 +368,7 @@ COMPANY_NAME = os.environ.get('COMPANY_NAME')
 BROWSERLESS_API_KEY=os.environ.get('BROWSERLESS_API_KEY')
 BROWSERLESS_BASE_URL=os.environ.get('BROWSERLESS_BASE_URL')
 DOWNLOAD_FOLDER = os.environ.get('DOWNLOAD_FOLDER')
+CREWAI_DISABLE_LITELLM=os.environ.get('CREWAI_DISABLE_LITELLM')
 
 # Logging configuration
 LOGGING = {

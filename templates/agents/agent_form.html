@@ -1,5 +1,6 @@
 {% extends "layouts/base.html" %}
 {% load static %}
+{% load agent_filters %}
 
 {% block title %} {% if agent %}Edit Agent{% else %}Add Agent{% endif %} {% endblock %}
 
@@ -104,7 +105,32 @@
                                 <div class="form-group {% if form.tools.errors %}has-error{% endif %}">
                                     <label for="{{ form.tools.id_for_label }}" class="form-control-label">Tools</label>
                                     <div class="tool-selection">
-                                        {{ form.tools }}
+                                        {% for tool in form.tools.field.queryset %}
+                                        <div class="tool-option mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <div class="form-check">
+                                                    <input type="checkbox" 
+                                                           name="tools" 
+                                                           value="{{ tool.id }}" 
+                                                           id="tool_{{ tool.id }}"
+                                                           class="form-check-input tool-checkbox"
+                                                           {% if tool.id|stringformat:"i" in form.tools.value|stringformat:"s" %}checked{% endif %}>
+                                                    <label class="form-check-label" for="tool_{{ tool.id }}">{{ tool.name }}</label>
+                                                </div>
+                                                <div class="ms-3 form-check">
+                                                    <input type="checkbox" 
+                                                           name="force_tool_output_{{ tool.id }}" 
+                                                           id="force_tool_{{ tool.id }}"
+                                                           class="form-check-input"
+                                                           {% if agent and agent|has_force_output_enabled:tool %}checked{% endif %}>
+                                                    <label class="form-check-label" for="force_tool_{{ tool.id }}">
+                                                        <small>Force Output as Result</small>
+                                                        <i class="fas fa-info-circle" data-bs-toggle="tooltip" title="When checked, the tool's output will be used directly as the task result without agent modifications."></i>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
                                     </div>
                                 </div>
                             </div>
