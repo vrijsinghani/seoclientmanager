@@ -47,7 +47,7 @@ class CrawlWebsiteTool(BaseTool):
 
     def _crawl_website(self, start_url: str) -> str:  # Changed return type to str
         website = Website(start_url)
-        website.with_budget({"*": 100})  # Set a limit for crawling
+        website.with_budget({"*": 50})  # Set a limit for crawling
         website.with_respect_robots_txt(True)
         website.with_subdomains(False)  # Stick to the main domain
         website.with_tld(False)  # Don't crawl top-level domain

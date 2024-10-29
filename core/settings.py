@@ -155,6 +155,24 @@ else:
             'NAME': 'db.sqlite3',
         }
     }
+# LiteLLM Logs Database
+LITELLM_DB_ENGINE   = os.getenv('LITELLM_DB_ENGINE'   , 'postgresql')
+LITELLM_DB_NAME     = os.getenv('LITELLM_DB_NAME'     , None)
+LITELLM_DB_USERNAME = os.getenv('LITELLM_DB_USERNAME' , None)
+LITELLM_DB_PASS     = os.getenv('LITELLM_DB_PASS'     , None)
+LITELLM_DB_HOST     = os.getenv('LITELLM_DB_HOST'     , None)
+LITELLM_DB_PORT     = os.getenv('LITELLM_DB_PORT'     , None)
+
+# Add litellm_logs database if credentials are provided
+if LITELLM_DB_NAME and LITELLM_DB_USERNAME:
+    DATABASES['litellm_logs'] = {
+        'ENGINE'  : 'django.db.backends.' + LITELLM_DB_ENGINE,
+        'NAME'    : LITELLM_DB_NAME,
+        'USER'    : LITELLM_DB_USERNAME,
+        'PASSWORD': LITELLM_DB_PASS,
+        'HOST'    : LITELLM_DB_HOST,
+        'PORT'    : LITELLM_DB_PORT,
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

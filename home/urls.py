@@ -3,13 +3,14 @@ from django.views.generic import RedirectView
 from home import views
 from django.contrib.auth import views as auth_views
 
+app_name = 'home'
 
 urlpatterns = [
-  # Redirect root to seomanager dashboard
-  path('', RedirectView.as_view(pattern_name='seomanager:dashboard', permanent=False), name='index'),
+  # Redirect root to seo_manager dashboard
+  path('', RedirectView.as_view(pattern_name='seo_manager:dashboard', permanent=False), name='index'),
   
-  # Include seomanager URLs
-  path('seomanager/', include('apps.seo_manager.urls', namespace='seomanager')),
+  # Include seo_manager URLs
+  path('seomanager/', include('apps.seo_manager.urls', namespace='seo_manager')),
 
   # Dashboard
   path('automotive', views.automotive, name="automotive"),
@@ -101,4 +102,6 @@ urlpatterns = [
   path('error/404/', views.error_404, name="error_404"),
   path('error/500/', views.error_500, name="error_500"),
   path('logout/', views.logout_view, name="logout"),
+  path('llm-dashboard/', views.llm_dashboard, name='llm-dashboard'),
+
 ]

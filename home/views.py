@@ -2,8 +2,12 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.views import LoginView, PasswordResetView, PasswordChangeView, PasswordResetConfirmView
 from home.forms import RegistrationForm, LoginForm, UserPasswordResetForm, UserSetPasswordForm, UserPasswordChangeForm
 from django.contrib.auth import logout
-
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from datetime import datetime, timedelta
+from django.db.models import Sum, Count
+from django.db.models.functions import TruncDay
+from .models import LiteLLMSpendLog
 
 # Dashboard
 def default(request):
@@ -408,3 +412,47 @@ def i18n_view(request):
   return render(request, 'pages/apps/i18n.html', context)
 
 
+@staff_member_required
+def llm_dashboard(request):
+    # Get date range (default last 30 days)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    
+    # Total spend
+    total_spend = LiteLLMSpendLog.objects.using('litellm_logs').aggregate(
+        total=Sum('spend'))['total'] or 0
+    
+    # Total tokens
+    total_tokens = LiteLLMSpendLog.objects.using('litellm_logs').aggregate(
+        total=Sum('total_tokens'))['total'] or 0
+    
+    # Requests count
+    total_requests = LiteLLMSpendLog.objects.using('litellm_logs').count()
+    
+    # Daily spend over time
+    daily_spend = LiteLLMSpendLog.objects.using('litellm_logs')\
+        .filter(startTime__gte=start_date)\
+        .annotate(day=TruncDay('startTime'))\
+        .values('day')\
+        .annotate(total_spend=Sum('spend'))\
+        .order_by('day')
+    
+    # Model usage breakdown - Using request_id for counting
+    model_usage = LiteLLMSpendLog.objects.using('litellm_logs')\
+        .values_list('model', flat=True)\
+        .annotate(
+            count=Count('request_id'),
+            total_spend=Sum('spend')
+        )\
+        .order_by('-count')[:5]
+    
+    context = {
+        'total_spend': round(total_spend, 2),
+        'total_tokens': total_tokens,
+        'total_requests': total_requests,
+        'daily_spend': list(daily_spend),
+        'model_usage': list(model_usage),
+        'segment': 'llm-dashboard'
+    }
+    
+    return render(request, 'home/llm-dashboard.html', context)

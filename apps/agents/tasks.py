@@ -63,7 +63,7 @@ def custom_input_handler(prompt, execution_id):
     logger.debug(f"Custom input handler called for execution {execution_id} with prompt: {prompt}")
     execution = CrewExecution.objects.get(id=execution_id)
     update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
-    log_crew_message(execution, prompt or "Input required", agent='System', human_input_request=prompt or "Input required")
+    log_crew_message(execution, prompt or "Input required", agent='Human Input Requested', human_input_request=prompt or "Input required")
     
     input_key = f'human_input_request_{execution_id}'
     response_key = f"{input_key}_response"
@@ -205,9 +205,9 @@ def execute_crew(self, execution_id):
                 
                 log_message = f"Crew execution completed successfully. Output: {result}"
                 
-                log_crew_message(execution, log_message)
+                log_crew_message(execution, log_message, agent="System")
                 log_message = f"Token Usage: {token_usage}"
-                log_crew_message(execution, log_message)
+                log_crew_message(execution, log_message, agent="System")
             except Exception as e:
                 handle_execution_error(execution, e)
             finally:
@@ -243,7 +243,7 @@ def save_result_to_file(execution, result):
     # Log the file creation
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT)
     log_message = f"Final output saved to: {relative_path}"
-    log_crew_message(execution, log_message)
+    log_crew_message(execution, log_message, agent="System")
     logger.info(log_message)
 
 def initialize_crew(execution):
@@ -303,7 +303,8 @@ def run_crew(task_id, crew, execution):
     inputs["client_website_url"] = client.website_url
     inputs["client_business_objectives"] = client.business_objectives
     inputs["client_target_audience"] = client.target_audience
-    
+    inputs["client_profile"] = client.client_profile
+
     logger.info(f"Crew inputs: {inputs}")
     logger.info(f"Crew process type: {execution.crew.process}")
     update_execution_status(execution, 'RUNNING')
@@ -381,7 +382,7 @@ def create_crewai_agents(agent_models, execution_id):
 def human_input_handler(prompt, execution_id):
     execution = CrewExecution.objects.get(id=execution_id)
     update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
-    log_crew_message(execution, f"Human input required: {prompt}", agent='System', human_input_request=prompt)
+    log_crew_message(execution, f"Human input required: {prompt}", agent='Human Input Requested', human_input_request=prompt)
     
     input_key = f"human_input_{execution_id}_{prompt[:20]}"
     cache.set(input_key, prompt, timeout=3600)  # 1 hour timeout
@@ -469,7 +470,7 @@ def step_callback(step_output, execution_id):
 
 def task_callback(task_output: TaskOutput, execution_id):
     execution = CrewExecution.objects.get(id=execution_id)
-    log_message = f"Task callback: {task_output.raw}"
+    log_message = f"Task callback:\n{task_output.raw}"
     agent = task_output.agent
     if task_output.raw:
         log_crew_message(execution, log_message, agent=agent)
@@ -557,7 +558,7 @@ def detailed_step_callback(event: Union[AgentAction, AgentFinish], execution_id)
     elif isinstance(event, AgentFinish):
         content += f"\n Final Answer: {event.output}"
 
-    log_crew_message(execution, content, agent='System')  # Log the complete content
+    log_crew_message(execution, content, agent='Step Callback')  # Log the complete content
 
 from crewai.tools.tool_usage_events import ToolUsageError
 from crewai.utilities.events import on
@@ -581,6 +582,6 @@ def tool_error_callback(source, event: ToolUsageError):
     error_message += f"\n Run Attempts: {event.run_attempts}"
     error_message += f"\n Delegations: {event.delegations}"
     
-    log_crew_message(execution, error_message, agent='System')
+    log_crew_message(execution, error_message, agent='Tool Error Callback')
     logger.error(error_message)
 

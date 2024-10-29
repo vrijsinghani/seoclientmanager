@@ -17,7 +17,7 @@ def test_crawl_website():
     crawler = CrawlWebsiteTool()
 
     # Test with a real website
-    test_url = "https://brandon.neuralami.com"
+    test_url = "https://proplankohio.com"
     logger.info(f"Starting crawl of {test_url}")
     print(f"Starting crawl of {test_url}")
     result = crawler._run(test_url)

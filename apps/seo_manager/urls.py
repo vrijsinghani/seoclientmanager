@@ -79,3 +79,4 @@ urlpatterns = [
     path('activity-log/', views.activity_log, name='activity_log'),
     path('create-meta-tags-snapshot-url/', views.create_meta_tags_snapshot_url, name='create_meta_tags_snapshot_url'),
 ]
+
