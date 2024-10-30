@@ -41,6 +41,7 @@ openai
 youtube-transcript-api
 tiktoken
 trafilatura
+readability-lxml
 pydantic
 exa_py
 geopy
@@ -58,3 +59,5 @@ Requests
 beautifulsoup4
 mistune
 sec_edgar_downloader
+tenacity
+lxml

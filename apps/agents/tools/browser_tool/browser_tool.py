@@ -2,87 +2,206 @@ import json
 import os
 from typing import Any, Type, Set
 import logging
+import re
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 import requests
 from pydantic import BaseModel, Field
-#from trafilatura import extract
 import html2text
 from crewai_tools import BaseTool
 from urllib.parse import urljoin, urlparse
 import dotenv
+from bs4 import BeautifulSoup
+import trafilatura
+from readability.readability import Document
 
 dotenv.load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 class BrowserToolSchema(BaseModel):
-    """Input for BrowserTool."""
-    website: str = Field(..., title="Website", description="Full URL of the website to scrape (e.g., https://google.com)")
+  """Input for BrowserTool."""
+  website: str = Field(..., title="Website", description="Full URL of the website to scrape (e.g., https://google.com)")
 
 class BrowserTool(BaseTool):
-    name: str = "Scrape website content"
-    description: str = "A tool that can be used to scrape website content. Pass a string with only the full URL, no need for a final slash `/`."
-    args_schema: Type[BaseModel] = BrowserToolSchema
-    api_key: str = Field(default=os.environ.get('BROWSERLESS_API_KEY'))
-    base_url: str = Field(default="https://browserless.rijsinghani.us/scrape")
+  name: str = "Scrape website content"
+  description: str = "A tool that can be used to scrape website content. Pass a string with only the full URL, no need for a final slash `/`."
+  args_schema: Type[BaseModel] = BrowserToolSchema
+  api_key: str = Field(default=os.environ.get('BROWSERLESS_API_KEY'))
+  base_url: str = Field(default="https://browserless.rijsinghani.us/scrape")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        if not self.api_key:
-            logger.error("BROWSERLESS_API_KEY is not set in the environment variables.")
+  def __init__(self, **data):
+      super().__init__(**data)
+      if not self.api_key:
+          logger.error("BROWSERLESS_API_KEY is not set in the environment variables.")
 
-    def _run(
-        self,
-        website: str,
-        **kwargs: Any,
-    ) -> Any:
-        """Scrape website content."""
-        print(f"Browsing: {website}")
-        content = self.get_content(website)
-        return f'\nContent of {website}: {content}\n'
+  def _run(
+      self,
+      website: str,
+      **kwargs: Any,
+  ) -> Any:
+      """Scrape website content."""
+      logger.info(f"Scraping website: {website}")
+      content = self.get_content(website)
+      return f'\nContent of {website}: {content}\n'
 
-    def get_content(self, url: str) -> str:
-        payload = {
-            "url": url,
-            "elements": [{"selector": "body"}]  # Add this line to include the required 'elements' field
-        }
-        headers = {'cache-control': 'no-cache', 'content-type': 'application/json'}
-        try:
-            response = requests.post(f"{self.base_url}?token={self.api_key}", headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            content = data['data'][0]['results'][0]['html']
-            extracted_content = html2text.html2text(content)
-            return extracted_content
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch content for {url}: {str(e)}")
-            logger.error(f"Response status code: {response.status_code}")
-            logger.error(f"Response content: {response.text}")
-            return ""
+  def clean_content(self, content: str) -> str:
+      """Clean and structure extracted content"""
+      if not content:
+          return ""
+          
+      # Remove excessive whitespace
+      content = re.sub(r'\s+', ' ', content)
+      
+      # Remove common boilerplate phrases
+      boilerplate = [
+          'cookie policy',
+          'accept cookies',
+          'privacy policy',
+          'terms of service',
+          'subscribe to our newsletter',
+          'sign up for our newsletter',
+          'all rights reserved',
+      ]
+      for phrase in boilerplate:
+          content = re.sub(rf'(?i){phrase}.*?[\.\n]', '', content)
+      
+      # Remove email addresses and phone numbers
+    #   content = re.sub(r'\S+@\S+', '[EMAIL]', content)
+    #   content = re.sub(r'\+?\d{1,3}[-.\s]?$?\d{3}$?[-.\s]?\d{3}[-.\s]?\d{4}', '[PHONE]', content)
+      
+      return content.strip()
 
-    def get_links(self, url: str) -> Set[str]:
-        payload = {
-            "url": url,
-            "elements": [
-                {"selector": "a"}
-            ]
-        }
-        headers = {'Cache-Control': 'no-cache', 'Content-Type': 'application/json'}
-        try:
-            response = requests.post(f"{self.base_url}?token={self.api_key}", headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            links = set()
-            base_domain = urlparse(url).netloc
-            for element in data['data'][0]['results']:
-                for attr in element['attributes']:
-                    if attr['name'] == 'href':
-                        full_url = urljoin(url, attr['value'])
-                        if urlparse(full_url).netloc == base_domain:
-                            links.add(full_url)
-            return links
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch links for {url}: {str(e)}")
-            logger.error(f"Response status code: {response.status_code}")
-            logger.error(f"Response content: {response.text}")
-            return set()
+  def detect_content_type(self, url: str, html_content: str) -> str:
+      """Detect type of content for specialized handling"""
+      patterns = {
+          'article': r'article|post|blog',
+          'product': r'product|item|price',
+          'documentation': r'docs|documentation|api|reference',
+      }
+      
+      for content_type, pattern in patterns.items():
+          if re.search(pattern, url, re.I) or re.search(pattern, html_content, re.I):
+              return content_type
+      return 'general'
+
+  def extract_content(self, url: str, html_content: str) -> dict:
+      """Multi-strategy content extraction"""
+      content = {
+          'title': '',
+          'text': '',
+          'metadata': {}
+      }
+      
+      try:
+          # Strategy 1: Trafilatura
+          trafilatura_content = trafilatura.extract(html_content, include_comments=False, 
+                                                  include_tables=True, 
+                                                  include_links=False)
+          
+          # Strategy 2: Readability
+          doc = Document(html_content)
+          readable_article = doc.summary()
+          doc_title = doc.title()
+          
+          # Strategy 3: BeautifulSoup fallback
+          soup = BeautifulSoup(html_content, 'lxml')
+          
+          # Combine results with priority
+          if trafilatura_content:
+              content['text'] = trafilatura_content
+          elif readable_article:
+              soup_readable = BeautifulSoup(readable_article, 'lxml')
+              content['text'] = soup_readable.get_text(separator=' ', strip=True)
+          else:
+              content['text'] = soup.get_text(separator=' ', strip=True)
+              
+          # Extract title
+          content['title'] = doc_title or soup.title.string if soup.title else ''
+          
+          # Extract basic metadata
+          meta_tags = soup.find_all('meta')
+          content['metadata'] = {
+              'description': next((tag.get('content', '') for tag in meta_tags if tag.get('name', '').lower() == 'description'), ''),
+              'keywords': next((tag.get('content', '').split(',') for tag in meta_tags if tag.get('name', '').lower() == 'keywords'), []),
+              'author': next((tag.get('content', '') for tag in meta_tags if tag.get('name', '').lower() == 'author'), '')
+          }
+          
+      except Exception as e:
+          logger.error(f"Error in content extraction: {str(e)}")
+          # Fallback to basic HTML extraction
+          content['text'] = html2text.html2text(html_content)
+              
+      return content
+
+#  @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+  def get_content(self, url: str) -> str:
+      """Scrape website content with retry mechanism."""
+      payload = {
+          "url": url,
+          "elements": [{"selector": "body"}]
+      }
+      headers = {'cache-control': 'no-cache', 'content-type': 'application/json'}
+      
+      try:
+          response = requests.post(f"{self.base_url}?token={self.api_key}", 
+                                headers=headers, 
+                                json=payload,
+                                timeout=30)
+          response.raise_for_status()
+          data = response.json()
+          html_content = data['data'][0]['results'][0]['html']
+          # Detect content type
+          content_type = self.detect_content_type(url, html_content)
+          # Extract and process content
+          extracted_content = self.extract_content(url, html_content)
+          # Format the final output
+          result = f"Title: {extracted_content['title']}\n\n"
+          result += f"Content Type: {content_type}\n\n"
+          result += extracted_content['text']
+
+          # Add metadata if available
+          if extracted_content['metadata'].get('description'):
+              result += f"\n\nDescription: {extracted_content['metadata']['description']}"
+          if extracted_content['metadata'].get('author'):
+              result += f"\nAuthor: {extracted_content['metadata']['author']}"
+          if extracted_content['metadata'].get('keywords'):
+              result += f"\nKeywords: {', '.join(extracted_content['metadata']['keywords'])}"
+          return result
+          
+      except requests.exceptions.RequestException as e:
+          logger.error(f"Failed to fetch content for {url}: {str(e)}")
+          logger.error(f"Response status code: {getattr(response, 'status_code', 'N/A')}")
+          logger.error(f"Response content: {getattr(response, 'text', 'N/A')}")
+          return ""
+
+  def get_links(self, url: str) -> Set[str]:
+      """Extract links from the webpage."""
+      payload = {
+          "url": url,
+          "elements": [
+              {"selector": "a"}
+          ]
+      }
+      headers = {'Cache-Control': 'no-cache', 'Content-Type': 'application/json'}
+      try:
+          response = requests.post(f"{self.base_url}?token={self.api_key}", 
+                                headers=headers, 
+                                json=payload,
+                                timeout=30)
+          response.raise_for_status()
+          data = response.json()
+          links = set()
+          base_domain = urlparse(url).netloc
+          for element in data['data'][0]['results']:
+              for attr in element['attributes']:
+                  if attr['name'] == 'href':
+                      full_url = urljoin(url, attr['value'])
+                      if urlparse(full_url).netloc == base_domain:
+                          links.add(full_url)
+          return links
+      except requests.exceptions.RequestException as e:
+          logger.error(f"Failed to fetch links for {url}: {str(e)}")
+          logger.error(f"Response status code: {getattr(response, 'status_code', 'N/A')}")
+          logger.error(f"Response content: {getattr(response, 'text', 'N/A')}")
+          return set()
