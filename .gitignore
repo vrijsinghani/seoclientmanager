@@ -180,9 +180,10 @@ celerybeat-schedule.bak
 celerybeat-schedule.dat
 celerybeat-schedule.dir
 0downloads
-experiments/crewAI-examples
+/experiments/crewAI-examples/
 google_secrets.json
 response.json
 keyword_data.csv
 landing_page_data.csv
 litellmtest.py
+/external_research/crewAi/
