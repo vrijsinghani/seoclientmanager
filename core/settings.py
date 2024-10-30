@@ -22,7 +22,7 @@ import os, random, string, sys
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = BASE_DIR / '.env'
 load_dotenv(dotenv_path=ENV_FILE)
-print(f"Loading .env from: {ENV_FILE}") 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -33,7 +33,6 @@ if not SECRET_KEY:
 
 # Enable/Disable DEBUG Mode
 DEBUG = str2bool(os.environ.get('DEBUG'))
-print(' DEBUG -> ' + str(DEBUG) ) 
 
 ALLOWED_HOSTS = ['*', 'manager.neuralami.com']
 
@@ -345,7 +344,6 @@ SONNET=os.environ.get('SONNET')
 OPUS=os.environ.get('OPUS')
 HAIKU=os.environ.get('HAIKU')
 GENERAL_MODEL=os.environ.get('GENERAL_MODEL')
-print(f"GENERAL_MODEL from environment: {GENERAL_MODEL}")  # Debugging line
 TEXT_MODEL=os.environ.get('TEXT_MODEL')
 CODING_MODEL=os.environ.get('CODING_MODEL')
 GROQMIXTRAL=os.environ.get('GROQMIXTRAL')
@@ -374,13 +372,20 @@ CREWAI_DISABLE_LITELLM=os.environ.get('CREWAI_DISABLE_LITELLM')
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'standard',
         },
         'file': {
             'class': 'logging.FileHandler',
             'filename': 'debug.log',
+            'formatter': 'standard',
         },
     },
     'root': {
@@ -389,55 +394,50 @@ LOGGING = {
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'INFO',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'allauth': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'apps.crawl_website': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'apps.common': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'apps.seo_manager': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'apps.agents': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'apps.agents.tools.google_analytics_tool': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
         'channels': {
-            'handlers': ['console', 'file'],
+            'handlers': ['file'],
             'level': 'DEBUG',
-            'propagate': False,  # Prevents duplicate messages
+            'propagate': True,
         },
     },
 }
+
 TIME_ZONE = 'America/New_York'
 USE_TZ = True
-# def show_toolbar(request):
-#     return True
-
-# DEBUG_TOOLBAR_CONFIG = {
-#     "SHOW_TOOLBAR_CALLBACK": show_toolbar,
-# }
 
 CHANNEL_LAYERS = {
     'default': {

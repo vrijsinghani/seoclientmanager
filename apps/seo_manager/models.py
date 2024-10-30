@@ -219,21 +219,27 @@ class TargetedKeyword(models.Model):
         # )
         return result
 
+    def get_ranking_history(self):
+        """Get all ranking history entries for this keyword"""
+        return KeywordRankingHistory.objects.filter(
+            Q(keyword=self) | 
+            Q(keyword_text=self.keyword, client=self.client)
+        ).order_by('-date')
+
     @property
     def current_position(self):
         """Get the most recent average position"""
-        latest = self.ranking_history.order_by('-date').first()
+        latest = self.get_ranking_history().first()
         return round(latest.average_position, 1) if latest else None
 
     def get_position_change(self, months=1):
         """Calculate position change over specified number of months"""
-        monthly_data = self.get_monthly_rankings(months + 1)
-        
-        if len(monthly_data) < 2:
+        history = self.get_ranking_history()[:2]  # Get latest two entries
+        if len(history) < 2:
             return None
             
-        current = monthly_data[-1]['position']
-        previous = monthly_data[-2]['position']
+        current = history[0].average_position
+        previous = history[1].average_position
         
         return round(previous - current, 1)
 

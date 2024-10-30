@@ -32,6 +32,7 @@ from apps.agents.tools.google_report_tool.google_rankings_tool import GoogleRank
 from django.db.models import Min, Max
 from django.core.paginator import Paginator
 import markdown
+from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
@@ -62,20 +63,22 @@ def add_client(request):
 
 @login_required
 def client_detail(request, client_id):
+    # First get all the targeted keywords
     client = get_object_or_404(Client.objects.prefetch_related(
-        Prefetch(
-            'targeted_keywords',
-            queryset=TargetedKeyword.objects.prefetch_related(
-                Prefetch(
-                    'ranking_history',
-                    queryset=KeywordRankingHistory.objects.filter(
-                        date__gte=timezone.now().date() - relativedelta(months=12)
-                    ).order_by('date')
-                )
-            )
-        )
+        'targeted_keywords'
     ), id=client_id)
     
+    # Then for each keyword, get its complete history
+    for keyword in client.targeted_keywords.all():
+        # Get history both by keyword relationship AND by keyword_text match
+        history = KeywordRankingHistory.objects.filter(
+            Q(keyword=keyword) | 
+            Q(keyword_text=keyword.keyword, client_id=client_id)
+        ).order_by('-date')
+        
+        # Force evaluation and attach to keyword using a proper attribute name
+        keyword.ranking_data = list(history)
+        
     # No need to convert to markdown anymore since we're storing HTML
     client_profile_html = client.client_profile
     
@@ -151,13 +154,6 @@ def client_detail(request, client_id):
         'data_coverage_months': data_coverage_months,
         'tracked_keywords_count': tracked_keywords_count,
     }
-    
-    # user_activity_tool.run(
-    #     request.user, 
-    #     'view', 
-    #     f"Viewed client details: {client.name}", 
-    #     client=client
-    # )
     
     return render(request, 'seo_manager/client_detail.html', context)
 

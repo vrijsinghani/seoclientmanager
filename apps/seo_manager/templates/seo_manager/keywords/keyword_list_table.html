@@ -125,119 +125,51 @@
 </div>
 {% endfor %}
 
-<!-- Add this at the bottom of the file -->
+<!-- Replace the existing script block at the bottom -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const charts = {};
-    
     {% for keyword in keywords %}
-    const modal{{ keyword.id }} = document.getElementById('view-history-{{ keyword.id }}');
-    const chartData{{ keyword.id }} = [
-        {% with monthly_data=keyword.get_monthly_rankings %}
-            {% for entry in monthly_data %}
+    (function() {
+        const modal = document.getElementById('view-history-{{ keyword.id }}');
+        if (!modal) return;
+
+        const data = [
+            {% for entry in keyword.ranking_data %}
                 {
-                    x: '{{ entry.date|date:"F Y" }}',
-                    y: {{ entry.position }},
-                    impressions: {{ entry.impressions }},
-                    clicks: {{ entry.clicks }},
-                    ctr: {{ entry.ctr }}
+                    date: '{{ entry.date|date:"Y-m-d" }}',
+                    position: {{ entry.average_position }},
                 }{% if not forloop.last %},{% endif %}
             {% endfor %}
-        {% endwith %}
-    ];
+        ];
 
-    if (modal{{ keyword.id }}) {
-        modal{{ keyword.id }}.addEventListener('show.bs.modal', function() {
-            const chartContainer = document.getElementById('chart-container-{{ keyword.id }}');
-            let canvas = document.getElementById('keyword-chart-{{ keyword.id }}');
-            
-            // Destroy existing chart if it exists
-            if (charts['{{ keyword.id }}']) {
-                charts['{{ keyword.id }}'].destroy();
-                delete charts['{{ keyword.id }}'];
-            }
+        console.log('Data for {{ keyword.keyword }}:', data);  // Debug log
 
-            if (chartData{{ keyword.id }}.length > 0) {
-                // Create new canvas if needed
-                if (!canvas || !canvas.getContext) {
-                    // Remove old canvas if it exists
-                    if (canvas) {
-                        canvas.remove();
-                    }
-                    canvas = document.createElement('canvas');
-                    canvas.id = 'keyword-chart-{{ keyword.id }}';
-                    canvas.className = 'chart-canvas';
-                    chartContainer.innerHTML = '';
-                    chartContainer.appendChild(canvas);
-                }
+        modal.addEventListener('show.bs.modal', function() {
+            const ctx = document.getElementById('keyword-chart-{{ keyword.id }}');
+            if (!ctx) return;
 
-                const ctx = canvas.getContext('2d');
-                charts['{{ keyword.id }}'] = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        datasets: [{
-                            label: 'Position',
-                            data: chartData{{ keyword.id }},
-                            borderColor: '#5e72e4',
-                            backgroundColor: 'rgba(94, 114, 228, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        parsing: {
-                            xAxisKey: 'x',
-                            yAxisKey: 'y'
-                        },
-                        scales: {
-                            y: {
-                                reverse: true,
-                                beginAtZero: false,
-                                grid: {
-                                    drawBorder: false,
-                                    display: true,
-                                    drawOnChartArea: true,
-                                    drawTicks: false,
-                                    borderDash: [5, 5]
-                                }
-                            },
-                            x: {
-                                grid: {
-                                    display: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const data = context.raw;
-                                        return [
-                                            `Position: ${data.y.toFixed(1)}`,
-                                            `Impressions: ${data.impressions}`,
-                                            `Clicks: ${data.clicks}`,
-                                            `CTR: ${(data.ctr * 100).toFixed(1)}%`
-                                        ];
-                                    }
-                                }
-                            }
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Position',
+                        data: data.map(d => d.position),
+                        borderColor: '#5e72e4',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            reverse: true
                         }
                     }
-                });
-            } else {
-                chartContainer.innerHTML = '<p class="text-center text-muted my-5">No ranking data available for this period</p>';
-            }
+                }
+            });
         });
-
-        modal{{ keyword.id }}.addEventListener('hidden.bs.modal', function() {
-            if (charts['{{ keyword.id }}']) {
-                charts['{{ keyword.id }}'].destroy();
-                delete charts['{{ keyword.id }}'];
-            }
-        });
-    }
+    })();
     {% endfor %}
 });
 </script>

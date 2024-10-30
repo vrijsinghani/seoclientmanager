@@ -752,27 +752,70 @@
 <!-- Add this after your existing extra_js content -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    {% for keyword in keywords %}
-    (function() {  // Use IIFE to avoid variable conflicts
-        const ctx = document.getElementById('keyword-chart-{{ keyword.id }}');
-        if (!ctx) return; // Skip if element doesn't exist
+    {% for keyword in client.targeted_keywords.all %}
+    (function() {
+        const modal = document.getElementById('view-history-{{ keyword.id }}');
+        if (!modal) return;
 
+        // Debug log to see what data we have
+        console.log('Keyword: {{ keyword.keyword }}');
+        
         const history = [
-            {% for entry in keyword.get_ranking_history %}
+            {% for entry in keyword.ranking_history.all %}
                 {
-                    date: '{{ entry.date|date:"M d" }}',
-                    position: {{ entry.average_position|floatformat:1 }}
+                    date: '{{ entry.date|date:"M d, Y" }}',
+                    position: {{ entry.average_position }},
+                    impressions: {{ entry.impressions }},
+                    clicks: {{ entry.clicks }},
+                    ctr: {{ entry.ctr }}
                 }{% if not forloop.last %},{% endif %}
             {% endfor %}
         ];
+        
+        // Debug log to see the history array
+        console.log('History data:', history);
 
-        if (history.length > 0 && ctx.getContext) {
-            new Chart(ctx, {
-                // ... rest of chart configuration remains the same ...
+        modal.addEventListener('show.bs.modal', function() {
+            const ctx = document.getElementById('keyword-chart-{{ keyword.id }}');
+            if (!ctx) {
+                console.error('Canvas not found for keyword {{ keyword.id }}');
+                return;
+            }
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.map(entry => entry.date),
+                    datasets: [{
+                        label: 'Position',
+                        data: history.map(entry => entry.position),
+                        borderColor: '#5e72e4',
+                        backgroundColor: 'rgba(94, 114, 228, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            reverse: true,
+                            beginAtZero: false
+                        }
+                    }
+                }
             });
-        } else if (ctx) {
-            ctx.parentElement.innerHTML = '<p class="text-center text-muted my-5">No ranking data available for this period</p>';
-        }
+
+            modal._chart = chart;
+        });
+
+        modal.addEventListener('hidden.bs.modal', function() {
+            if (modal._chart) {
+                modal._chart.destroy();
+                modal._chart = null;
+            }
+        });
     })();
     {% endfor %}
 });
