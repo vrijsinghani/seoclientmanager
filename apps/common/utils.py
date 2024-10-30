@@ -64,24 +64,6 @@ def get_llm(model_name:str, temperature=0.0):
     token_counter_callback.llm = llm
     return llm, token_counter_callback
 
-def get_llm_openai(model_name: str, temperature=0.0) -> tuple[openai.OpenAI, BaseCallbackHandler]:
-    """Creates an OpenAI chat client using the LiteLLM proxy."""
-
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    token_counter_callback = TokenCounterCallback(tokenizer)
-
-    callback_manager = CallbackManager([token_counter_callback])  
-
-    llm = openai.OpenAI(
-        model=model_name,
-        base_url=settings.OPENAI_API_BASE,
-        api_key=settings.LITELLM_MASTER_KEY,
-        temperature=temperature,
-        callbacks=[token_counter_callback],
-    )
-    token_counter_callback.llm = llm
-
-    return llm, token_counter_callback
 
 def is_pdf_url(url: str) -> bool:
     """Determine if the given URL points to a PDF document."""

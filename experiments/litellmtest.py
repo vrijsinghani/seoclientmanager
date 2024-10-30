@@ -1,7 +1,7 @@
 import openai
 client = openai.OpenAI(
-    api_key="sk-CFBgKkhnfKEI2P6tYYfpQw",
-    base_url="http://192.168.1.160:4000" # LiteLLM Proxy is OpenAI compatible, Read More: https://docs.litellm.ai/docs/proxy/user_keys
+    api_key="sk-H6WNsJZ26q9k0JByI3HUSA",
+    base_url="https://litellm.neuralami.ai" # LiteLLM Proxy is OpenAI compatible, Read More: https://docs.litellm.ai/docs/proxy/user_keys
 )
 response = client.chat.completions.create(
     model="openai/gpt-4o-mini", # model to send to the proxy
