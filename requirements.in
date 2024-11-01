@@ -1,0 +1,71 @@
+# create requirements.txt using pip-compile
+# pip-compile --verbose --upgrade --resolver=backtracking --output-file=requirements.txt requirements.in
+# Core
+django==4.2.9
+django-allauth
+PyJWT
+python-dotenv
+str2bool==1.1
+django-quill-editor
+
+# Misc
+celery
+redis
+hiredis
+pillow
+markdown
+
+# Tools
+django-celery-results
+django_redis
+djangorestframework
+django-api-generator
+django-debug-toolbar
+drf-spectacular
+celery-progress
+channels-redis
+# Deployment
+whitenoise
+gunicorn
+cryptography
+
+# DB Layer
+psycopg2-binary
+
+# Data Processing and API
+pandas==2.2.0
+
+google-auth
+google_auth_oauthlib
+google-api-python-client
+google-analytics-data
+
+# AI and NLP
+openai==1.53.0
+youtube-transcript-api
+tiktoken
+trafilatura
+readability-lxml
+pydantic
+exa_py
+geopy
+langchain
+langchain_community
+langchain_core
+langchain_openai
+crewai>=0.76.9
+crewai_tools>=0.13.4
+embedchain
+langsmith
+
+# Web Scraping and Requests
+Requests
+beautifulsoup4
+mistune
+sec_edgar_downloader
+tenacity
+lxml
+regex
+unstructured
+lxml_html_clean
+spider_rs # requires rust curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh

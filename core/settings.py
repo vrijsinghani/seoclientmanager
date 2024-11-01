@@ -54,6 +54,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_celery_results',
+    'debug_toolbar',
+    'django_quill',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.github',
+
+    'rest_framework',
+    'drf_spectacular',
+    'django_api_gen',
+    'channels',
 
     'home',
     'apps.api',
@@ -65,22 +78,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.seo_manager',
     'apps.crawl_website.apps.CrawlWebsiteConfig',
-    'apps.agents.apps.AgentsConfig',  # Add this line for the new agents app
-
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.google',
-    'allauth.socialaccount.providers.github',
-
-    'django_celery_results',
-    'debug_toolbar',
-    'django_quill',
-
-    'rest_framework',
-    'drf_spectacular',
-    'django_api_gen',
-    'channels',
+    'apps.agents.apps.AgentsConfig',  
 ]
 
 SITE_ID = 1
@@ -173,7 +171,22 @@ if LITELLM_DB_NAME and LITELLM_DB_USERNAME:
         'HOST'    : LITELLM_DB_HOST,
         'PORT'    : LITELLM_DB_PORT,
     }
+STAGING_DB_ENGINE = os.getenv('STAGING_DB_ENGINE', 'postgresql')
+STAGING_DB_NAME = os.getenv('STAGING_DB_NAME')
+STAGING_DB_USERNAME = os.getenv('STAGING_DB_USERNAME')
+STAGING_DB_PASS = os.getenv('STAGING_DB_PASS')
+STAGING_DB_HOST = os.getenv('STAGING_DB_HOST')
+STAGING_DB_PORT = os.getenv('STAGING_DB_PORT', '5432')
 
+if STAGING_DB_NAME and STAGING_DB_USERNAME:
+  DATABASES['staging'] = {
+      'ENGINE'  : 'django.db.backends.' + STAGING_DB_ENGINE,
+      'NAME'    : STAGING_DB_NAME,
+      'USER'    : STAGING_DB_USERNAME,
+      'PASSWORD': STAGING_DB_PASS,
+      'HOST'    : STAGING_DB_HOST,
+      'PORT'    : STAGING_DB_PORT,
+  }
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 

@@ -22,7 +22,6 @@ urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),
     path('accounts/', include('allauth.urls')),
     path('crawl_website/', include('apps.crawl_website.urls')),
-    path('agents/', include('apps.agents.urls')),  # Add this line for the agents app
 
     path("__debug__/", include("debug_toolbar.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
