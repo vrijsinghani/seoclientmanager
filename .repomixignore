@@ -23,7 +23,7 @@ tasks_scripts/*
 .cursorrules
 .env
 .replit
-.repopackignore
+.repomixignore
 build.sh
 celerybeat-schedule
 CHANGELOG.media
@@ -36,6 +36,6 @@ manage.py
 package-lock.json
 render.yaml
 replit.nix 
-repopack-output.txt
-repopack.config.json
+repomix-output.txt
+repomix.config.json
 requirements copy.txt

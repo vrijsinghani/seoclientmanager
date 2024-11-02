@@ -125,7 +125,7 @@ celerybeat.pid
 
 # Environments
 #.env
-.venv
+.venv/
 env/
 env_linux/
 venv/
@@ -188,3 +188,5 @@ landing_page_data.csv
 litellmtest.py
 /external_research/crewAi/
 /env-files/
+poetry.lock
+pyproject.toml

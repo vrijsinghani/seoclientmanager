@@ -12,9 +12,11 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.callbacks.manager import CallbackManager
 import openai
 from langchain.schema import HumanMessage
-import markdown
+from markdown_it import MarkdownIt
 from bs4 import BeautifulSoup
 
+# Initialize markdown-it instance at module level for reuse
+md = MarkdownIt({"html": True})
 
 class TokenCounterCallback(BaseCallbackHandler):
     def __init__(self, tokenizer):
@@ -33,23 +35,18 @@ class TokenCounterCallback(BaseCallbackHandler):
                 self.output_tokens += len(self.tokenizer.encode(result.text, disallowed_special=()))
 
 def get_models():
-    data=""
-    #data = cache.get('models')
-    if not data:
-        url = f'{settings.API_BASE_URL}/models'
-        headers = {'accept': 'application/json', 'Authorization': f'Bearer {settings.LITELLM_MASTER_KEY}'}
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()['data']
-            # Sort the data by 'id' in ascending order
-            data.sort(key=lambda x: x['id'])
-            cache.set('models', data, 60*60)  # Cache data for 1 hour
-        else:
-            return None
-    return [item['id'] for item in data]
+    data = ""
+    url = f'{settings.API_BASE_URL}/models'
+    headers = {'accept': 'application/json', 'Authorization': f'Bearer {settings.LITELLM_MASTER_KEY}'}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()['data']
+        # Sort the data by 'id' in ascending order
+        data.sort(key=lambda x: x['id'])
+        return [item['id'] for item in data]
+    return []  # Return empty list instead of None
 
 def get_llm(model_name:str, temperature=0.0):
-
     tokenizer=tiktoken.get_encoding("cl100k_base")
     token_counter_callback = TokenCounterCallback(tokenizer)
      
@@ -171,8 +168,8 @@ def format_message(content):
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     content = ansi_escape.sub('', content)
 
-    # Convert Markdown to HTML
-    html_content = markdown.markdown(content, extensions=['fenced_code', 'codehilite'])
+    # Convert Markdown to HTML using markdown-it
+    html_content = md.render(content)
 
     # Parse the HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')

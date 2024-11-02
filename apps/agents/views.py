@@ -18,10 +18,13 @@ from channels.layers import get_channel_layer
 from django.conf import settings
 import os
 from apps.seo_manager.models import Client  # Import the Client model
-import markdown  # Add this import at the top
+from markdown_it import MarkdownIt  # Import markdown-it
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
+
+# Initialize the MarkdownIt instance
+md = MarkdownIt()
 
 @login_required
 def crewai_home(request):
@@ -121,28 +124,20 @@ def execution_list(request):
 
 @login_required
 def execution_detail(request, execution_id):
-#    execution = get_object_or_404(CrewExecution, id=execution_id, user=request.user)
     execution = get_object_or_404(CrewExecution, id=execution_id)
 
     messages = CrewMessage.objects.filter(execution=execution).order_by('timestamp')
     
-    # Convert markdown to HTML for each message
-    md = markdown.Markdown(extensions=[
-        'markdown.extensions.extra',
-        'markdown.extensions.codehilite',
-        'markdown.extensions.fenced_code',
-        'markdown.extensions.tables'
-    ])
-    
+    # Convert markdown to HTML for each message using markdown-it
     for message in messages:
-        # Add debug print
-        message.content_html = md.convert(message.content)
+        message.content_html = md.render(message.content)  # Use markdown-it for conversion
+
     # Convert markdown in outputs if they exist
     if execution.outputs:
         outputs_html = {}
         for key, value in execution.outputs.items():
             if isinstance(value, (str, int, float, bool)):
-                outputs_html[key] = md.convert(str(value))
+                outputs_html[key] = md.render(str(value))  # Use markdown-it for conversion
             elif value is None:
                 outputs_html[key] = ''
             else:

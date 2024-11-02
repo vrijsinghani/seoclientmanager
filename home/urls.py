@@ -7,11 +7,8 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
   # Redirect root to seo_manager dashboard
-  path('', RedirectView.as_view(pattern_name='seo_manager:dashboard', permanent=False), name='index'),
+  path('', RedirectView.as_view(url='/seo/', permanent=False), name='index'),
   
-  # Include seo_manager URLs
-  path('seomanager/', include('apps.seo_manager.urls', namespace='seo_manager')),
-
   # Dashboard
   path('automotive', views.automotive, name="automotive"),
   path('smart-home', views.smart_home, name="smart_home"),

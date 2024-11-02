@@ -31,7 +31,6 @@ from django.template.loader import render_to_string
 from apps.agents.tools.google_report_tool.google_rankings_tool import GoogleRankingsTool
 from django.db.models import Min, Max
 from django.core.paginator import Paginator
-import markdown
 from django.db.models import Q
 
 logger = logging.getLogger(__name__)
@@ -79,7 +78,6 @@ def client_detail(request, client_id):
         # Force evaluation and attach to keyword using a proper attribute name
         keyword.ranking_data = list(history)
         
-    # No need to convert to markdown anymore since we're storing HTML
     client_profile_html = client.client_profile
     
     # Get filtered client activities

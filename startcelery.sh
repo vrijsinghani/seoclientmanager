@@ -7,5 +7,7 @@ echo "Current directory: $(pwd)"
 export PYTHONPATH="$PROJECT_DIR:$PYTHONPATH"
 export DJANGO_SETTINGS_MODULE="core.settings"
 
-# Start Celery
-celery -A apps.tasks worker -l info -B
+# Start Celery with nohup
+mkdir -p logs pids
+nohup poetry run celery -A apps.tasks worker -l info -B > ./logs/celery.log 2>&1 &
+echo $! > ./pids/celery.pid
