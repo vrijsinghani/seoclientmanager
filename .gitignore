@@ -190,3 +190,5 @@ litellmtest.py
 /env-files/
 poetry.lock
 pyproject.toml
+pids/celery.pid
+pids/django.pid

@@ -147,7 +147,6 @@ class CompressionTool(BaseTool):
         detail_level: str = "comprehensive",
         **kwargs: Any
     ) -> str:
-        """Execute the text processing pipeline."""
         try:
             # Validate input
             if not content or not isinstance(content, str):
@@ -157,12 +156,19 @@ class CompressionTool(BaseTool):
                 })
 
             content_tokens = tokenize(content, self.tokenizer)
+            logger.info(f"Original content tokens: {content_tokens}")
+
             if content_tokens <= max_tokens:
+                processed_content = self._process_chunk(content, detail_level)
+                final_tokens = tokenize(processed_content, self.tokenizer)
+                logger.info(f"Processed content tokens (single chunk): {final_tokens}")
                 return json.dumps({
-                    "processed_content": self._process_chunk(content, detail_level),
+                    "processed_content": processed_content,
                     "original_tokens": content_tokens,
-                    "final_tokens": content_tokens,
-                    "reduction_ratio": 1.0
+                    "final_tokens": final_tokens,
+                    "reduction_ratio": final_tokens / content_tokens,
+                    "llm_input_tokens": self.token_counter_callback.input_tokens,
+                    "llm_output_tokens": self.token_counter_callback.output_tokens
                 })
 
             # Calculate chunk size based on max_tokens
@@ -178,29 +184,37 @@ class CompressionTool(BaseTool):
                 logger.info(f"Processing chunk {i+1}/{len(chunks)}")
                 processed_chunk = self._process_chunk(chunk, detail_level)
                 processed_chunks.append(processed_chunk)
+                logger.info(f"Chunk {i+1} tokens: {tokenize(processed_chunk, self.tokenizer)}")
             
             # Deduplicate if needed
             if len(processed_chunks) > 1:
+                logger.info("Deduplicating chunks")
                 processed_chunks = self._deduplicate_content(processed_chunks)
             
             # Join chunks and check final token count
             processed_content = "\n\n".join(processed_chunks)
             final_tokens = tokenize(processed_content, self.tokenizer)
+            logger.info(f"Final tokens after joining chunks: {final_tokens}")
             
             # If still too long, process again with focused detail level
             if final_tokens > max_tokens:
                 logger.info("Performing second processing pass")
                 processed_content = self._process_chunk(processed_content, "focused")
                 final_tokens = tokenize(processed_content, self.tokenizer)
+                logger.info(f"Final tokens after second pass: {final_tokens}")
             
             result = {
                 "processed_content": processed_content,
                 "original_tokens": content_tokens,
                 "final_tokens": final_tokens,
                 "reduction_ratio": final_tokens / content_tokens,
-                "input_tokens": self.token_counter_callback.input_tokens,
-                "output_tokens": self.token_counter_callback.output_tokens
+                "llm_input_tokens": self.token_counter_callback.input_tokens,
+                "llm_output_tokens": self.token_counter_callback.output_tokens
             }
+            
+            # Reset the token counter for the next run
+            self.token_counter_callback.input_tokens = 0
+            self.token_counter_callback.output_tokens = 0
             
             return json.dumps(result)
 
@@ -210,3 +224,4 @@ class CompressionTool(BaseTool):
                 "error": "Processing failed",
                 "message": str(e)
             })
+
