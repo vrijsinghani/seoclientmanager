@@ -25,6 +25,7 @@ channels-redis
 # Deployment
 whitenoise
 gunicorn
+daphne
 
 # DB Layer
 psycopg2-binary

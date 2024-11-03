@@ -16,7 +16,7 @@ from markdown_it import MarkdownIt
 from bs4 import BeautifulSoup
 
 # Initialize markdown-it instance at module level for reuse
-md = MarkdownIt({"html": True})
+md = MarkdownIt('commonmark', {'html': True})
 
 class TokenCounterCallback(BaseCallbackHandler):
     def __init__(self, tokenizer):
@@ -35,16 +35,59 @@ class TokenCounterCallback(BaseCallbackHandler):
                 self.output_tokens += len(self.tokenizer.encode(result.text, disallowed_special=()))
 
 def get_models():
-    data = ""
-    url = f'{settings.API_BASE_URL}/models'
-    headers = {'accept': 'application/json', 'Authorization': f'Bearer {settings.LITELLM_MASTER_KEY}'}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        data = response.json()['data']
-        # Sort the data by 'id' in ascending order
-        data.sort(key=lambda x: x['id'])
-        return [item['id'] for item in data]
-    return []  # Return empty list instead of None
+    """
+    Fetches available models from the API with improved error handling and logging
+    """
+    try:
+        # Check if we have cached models
+        cached_models = cache.get('available_models')
+        if cached_models:
+            return cached_models
+
+        # Construct URL and headers
+        url = f'{settings.API_BASE_URL}/models'
+        headers = {
+            'accept': 'application/json',
+            'Authorization': f'Bearer {settings.LITELLM_MASTER_KEY}'
+        }
+        
+        # Log the request attempt
+        logging.info(f"Fetching models from {url}")
+        
+        # Make the request
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        # Log the response status
+        logging.info(f"Models API response status: {response.status_code}")
+        
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                if 'data' in data and isinstance(data['data'], list):
+                    # Sort the models by ID
+                    models = sorted([item['id'] for item in data['data']])
+                    
+                    # Cache the results for 5 minutes
+                    cache.set('available_models', models, 300)
+                    
+                    logging.info(f"Successfully fetched {len(models)} models")
+                    return models
+                else:
+                    logging.error(f"Unexpected API response structure: {data}")
+                    return []
+            except ValueError as e:
+                logging.error(f"Failed to parse JSON response: {e}")
+                return []
+        else:
+            logging.error(f"API request failed with status {response.status_code}: {response.text}")
+            return []
+            
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request failed: {str(e)}")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected error in get_models: {str(e)}")
+        return []
 
 def get_llm(model_name:str, temperature=0.0):
     tokenizer=tiktoken.get_encoding("cl100k_base")
@@ -168,32 +211,36 @@ def format_message(content):
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     content = ansi_escape.sub('', content)
 
-    # Convert Markdown to HTML using markdown-it
-    html_content = md.render(content)
+    try:
+        # Convert Markdown to HTML using markdown-it
+        html_content = md.render(content)
 
-    # Parse the HTML with BeautifulSoup
-    soup = BeautifulSoup(html_content, 'html.parser')
+        # Parse the HTML with BeautifulSoup
+        soup = BeautifulSoup(html_content, 'html.parser')
 
-    # Add Bootstrap classes to elements
-    for tag in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
-        tag['class'] = tag.get('class', []) + ['mt-3', 'mb-2']
-    
-    for tag in soup.find_all('p'):
-        tag['class'] = tag.get('class', []) + ['mb-2']
-    
-    for tag in soup.find_all('ul', 'ol'):
-        tag['class'] = tag.get('class', []) + ['pl-4']
-    
-    for tag in soup.find_all('code'):
-        tag['class'] = tag.get('class', []) + ['bg-light', 'p-1', 'rounded']
+        # Add Bootstrap classes to elements
+        for tag in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+            tag['class'] = tag.get('class', []) + ['mt-3', 'mb-2']
+        
+        for tag in soup.find_all('p'):
+            tag['class'] = tag.get('class', []) + ['mb-2']
+        
+        for tag in soup.find_all('ul', 'ol'):
+            tag['class'] = tag.get('class', []) + ['pl-4']
+        
+        for tag in soup.find_all('code'):
+            tag['class'] = tag.get('class', []) + ['bg-light', 'p-1', 'rounded']
 
-    # Convert back to string
-    formatted_content = str(soup)
+        # Convert back to string
+        formatted_content = str(soup)
 
-    # Ensure all spans are closed
-    open_spans = formatted_content.count('<span')
-    close_spans = formatted_content.count('</span>')
-    if open_spans > close_spans:
-        formatted_content += '</span>' * (open_spans - close_spans)
+        # Ensure all spans are closed
+        open_spans = formatted_content.count('<span')
+        close_spans = formatted_content.count('</span>')
+        if open_spans > close_spans:
+            formatted_content += '</span>' * (open_spans - close_spans)
 
-    return formatted_content
+        return formatted_content
+    except Exception as e:
+        logging.error(f"Error formatting message: {str(e)}")
+        return content  # Return original content if formatting fails

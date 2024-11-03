@@ -1,290 +1,155 @@
-# [Soft Dashboard PRO Django](https://appseed.us/product/soft-ui-dashboard-pro/django/)
+# SEO Client Manager
 
-**Django** starter styled with **[Soft Dashboard PRO](https://appseed.us/product/soft-ui-dashboard-pro/django/)**, a premium `Bootstrap 5` KIT from `Creative-Tim`.
-The product is designed to deliver the best possible user experience with highly customizable feature-rich pages. 
+An advanced SEO management platform that helps agencies and professionals manage their SEO clients, track performance, and automate SEO tasks through AI-powered tools.
 
-- 👉 [Soft UI Dashboard PRO Django](https://appseed.us/product/soft-ui-dashboard-pro/django/) - `Product Page`
-- 👉 [Soft UI Dashboard PRO Django](https://django-soft-dash-pro.onrender.com/) - `LIVE Demo`
+## Overview
 
-<br />
+SEO Client Manager is a Django-based web application designed to streamline SEO workflows and client management. It combines traditional SEO tools with modern AI capabilities to provide a comprehensive solution for SEO professionals.
 
-## Features
+## Proposed Project Structure
 
-- `Up-to-date dependencies`
-- Database: `SQLite`, PgSQL, MySql
-- **Authentication**
-  - `Session-Based authentication`
-  - `Social Login`: **Github** & **Google**
-- **User Extended profile**
-- **API** via DRF
-- DataTables
-- Charts
-- Celery
-- File Manager
-- i18n (internationalization) 
-- `Docker`
-- **CrewAI Agents Management**
+```
+seoclientmanager/
+├── apps/                      # Application modules
+│   ├── agents/               # AI and automation tools
+│   │   ├── tools/           # Custom automation tools
+│   │   ├── services/        # Agent services
+│   │   └── views/           # Agent management views
+│   ├── seo_manager/         # Core SEO functionality
+│   │   ├── services/        # Business logic layer
+│   │   │   ├── keywords/
+│   │   │   ├── analytics/
+│   │   │   ├── rankings/
+│   │   │   └── reports/
+│   │   └── views/          # View layer
+│   │       ├── keywords/   # Keyword-related views
+│   │       ├── projects/   # Project management views
+│   │       ├── analytics/  # Analytics views
+│   │       └── clients/    # Client management views
+│   ├── common/             # Shared utilities
+│   └── api/               # API endpoints
+├── config/                # Configuration files
+│   ├── settings/         # Django settings
+│   │   ├── base.py
+│   │   ├── development.py
+│   │   └── production.py
+│   ├── nginx/           # Nginx configuration
+│   └── docker/          # Docker configuration
+├── scripts/             # Helper scripts
+│   ├── development/
+│   │   ├── add_dependencies.py
+│   │   └── start_seomanager.sh
+│   └── deployment/
+│       ├── daphneserver.sh
+│       ├── startcelery.sh
+│       └── stopservices.sh
+├── static/              # Static assets
+├── templates/           # HTML templates
+├── tests/              # Test suite
+│   ├── unit/
+│   └── integration/
+├── var/                # Variable data
+│   ├── log/           # Log files
+│   └── run/           # Process IDs and sockets
+└── experiments/        # Development experiments
+    └── research/      # Research and documentation
+```
 
-![Soft Dashboard PRO Django](https://github.com/app-generator/priv-django-soft-ui-dashboard-enh/assets/51070104/108fab39-b351-41c9-b9b0-06e8fdde51f9)
+## Suggested Improvements
 
-<br />
+### 1. Service Layer Introduction
+- Separate business logic from views
+- Create dedicated services for each domain (keywords, analytics, etc.)
+- Improve code reusability and maintainability
 
-## Start in `Docker`
+### 2. Configuration Management
+- Separate settings for different environments
+- Centralize all configuration files
+- Better environment variable management
 
-> **Step 1** - Download the [code](https://appseed.us/product/soft-ui-dashboard-pro/django/) and unzip the sources (requires a `purchase`). 
+### 3. Process Management
+- Organized log and PID storage in var/
+- Consistent process handling
+- Better debugging capabilities
+
+### 4. Development Workflow
+- Structured script organization
+- Separate development and deployment scripts
+- Improved dependency management
+
+### 5. Testing Structure
+- Dedicated test directory
+- Separate unit and integration tests
+- Better test organization
+
+## Technical Stack
+
+- **Framework**: Django
+- **Database**: PostgreSQL
+- **Task Queue**: Celery
+- **Web Server**: Nginx/Gunicorn/Daphne
+- **AI Components**: Custom agents and tools
+- **Frontend**: Bootstrap/JavaScript
+- **Package Management**: Poetry
+
+## Getting Started
+
+1. Clone the repository
+
+2. Install Poetry:
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+3. Install dependencies:
+```bash
+poetry install
+```
+
+4. Configure environment:
+```bash
+cp config/settings/.env.example .env
+# Edit .env with your settings
+```
+
+5. Run migrations:
+```bash
+poetry run python manage.py migrate
+```
+
+## Development
+
+### Helper Scripts
+
+Development scripts are organized in the scripts/ directory:
 
 ```bash
-$ unzip django-soft-ui-dashboard-pro.zip
-$ cd django-soft-ui-dashboard-pro
+# Start development server
+./scripts/development/start_seomanager.sh
+
+# Start Celery worker
+./scripts/deployment/startcelery.sh
+
+# Run Daphne server
+./scripts/deployment/daphneserver.sh
+
+# Stop all services
+./scripts/deployment/stopservices.sh
+
+# Add dependencies
+python scripts/development/add_dependencies.py
 ```
 
-<br />
-
-> **Step 2** - Start the APP in `Docker`
+## Docker Support
 
 ```bash
-# Optional (kill all existing containers)
-$ docker container kill $(docker ps -q) ; docker container rm $(docker ps -a -q) ; docker network prune -f 
-# Start the APP
-$ docker-compose up --build 
+docker-compose up --build
 ```
 
-Visit `http://localhost:5085` in your browser. The app should be up & running.
+## License
 
-<br />
+This project is proprietary software. All rights reserved.
 
-## Create new `.env` from `env.sample`
+## Support
 
-The meaning of each variable can be found below: 
-
-- `DEBUG`: if `True` the app runs in develoment mode
-  - For production value `False` should be used
-- `MYSQL` credentials 
-  - `DB_ENGINE`, default value = `mysql`
-  - `DB_NAME`, default value = `appseed_db`
-  - `DB_HOST`, default value = `localhost`
-  - `DB_PORT`, default value = `3306`
-  - `DB_USERNAME`, default value = `appseed_db_usr`
-  - `DB_PASS`, default value = `pass`
-- `OAuth` via Github
-  - `GITHUB_ID`=<GITHUB_ID_HERE>
-  - `GITHUB_SECRET`=<GITHUB_SECRET_HERE> 
-- `OAuth` via Google
-  - `GOOGLE_CLIENT_ID`=<GOOGLE_ID_HERE>
-  - `GOOGLE_SECRET_KEY`=<GOOGLE_SECRET_HERE> 
-
-<br />
-
-## Manual Build
-
-> Download the [code](https://appseed.us/product/soft-ui-dashboard-pro/django/) and unzip the sources (requires a `purchase`).  
-
-```bash
-$ unzip django-soft-ui-dashboard-pro.zip
-$ cd django-soft-ui-dashboard-pro
-```
-
-<br />
-
-### 👉 Set Up for `Unix`, `MacOS` 
-
-> Install modules via `VENV`  
-
-```bash
-$ virtualenv env
-$ source env/bin/activate
-$ pip3 install -r requirements.txt
-```
-
-<br />
-
-> Set Up Database
-
-```bash
-$ python manage.py makemigrations
-$ python manage.py migrate
-```
-
-<br />
-
-> Create Superuser
-
-```bash
-$ python manage.py createsuperuser
-```
-
-<br />
-
-> Start the app
-
-```bash
-$ python manage.py runserver
-```
-
-At this point, the app runs at `http://127.0.0.1:8000/`. 
-
-<br />
-
-### 👉 Set Up for `Windows` 
-
-> Install modules via `VENV` (windows) 
-
-```
-$ virtualenv env
-$ .\env\Scripts\activate
-$ pip3 install -r requirements.txt
-```
-
-<br />
-
-> Set Up Database
-
-```bash
-$ python manage.py makemigrations
-$ python manage.py migrate
-```
-
-<br />
-
-> Start the app
-
-```bash
-$ python manage.py runserver
-```
-
-At this point, the app runs at `http://127.0.0.1:8000/`. 
-
-<br />
-
-### 👉 Create Users
-
-By default, the app redirects guest users to authenticate. In order to access the private pages, follow this set up: 
-
-- Start the app
-- Access the `registration` page and create a new user:
-  - `http://127.0.0.1:8000/register/`
-- Access the `sign in` page and authenticate
-  - `http://127.0.0.1:8000/login/`
-
-<br />
-
-## CrewAI Agents Management
-
-The application now includes a feature set for managing CrewAI Agents, Tasks, and Tools. These features are accessible via a gear icon placed in the upper left of the Agents card in the CrewAI Agents section.
-
-To access these features:
-
-1. Log in as an admin user.
-2. Navigate to the CrewAI Agents section in the sidebar.
-3. Click on the gear icon in the upper left of the Agents card.
-
-From here, you can:
-
-- Manage Agents: Add, edit, or delete AI agents.
-- Manage Tasks: Create, modify, or remove tasks for agents to perform.
-- Manage Tools: Add, update, or delete tools that agents can use.
-
-These management features are restricted to admin users only.
-
-<br />
-
-## Start Celery (async task)
-
-- Make sure you have a Redis Server running: `redis://localhost:6379`
-  - `$ redis-cli` and type `ping` 
-- In the base directory inside `tasks_scripts` folder you need to write your scripts file.
-- Run the celery command from the CLI.
-
-```bash
-$ export DJANGO_SETTINGS_MODULE="core.settings"  
-$ celery -A apps.tasks worker -l info -B
-```
-
-- You will see a new route `Apps -> Tasks` in the sidebar.
-- You can start and cancel any task from the UI.
-
-<br />
-
-## Enable Social Login 
-
-> 👉 **Github Setup** - [Create an OAuth App](https://docs.github.com/en/developers/apps/building-oauth-apps/creating-an-oauth-app)
-
-- SignIN to `Github`
-- Access `Settings` -> `Developer Settings` -> `OAuth Apps`
-- Edit your OAuth App
-  - `App Name`
-  - `App Description`
-  - (mandatory) `HomePage`: `https://localhost:8000`
-  - (mandatory) `Authorization callback URL`: `https://localhost:8000/`
-  - Generate a new `secret key`
-
-<br />
-
-## Recompile SCSS  
-
-> Tested with `NodeJS v14.0.0`
-
-The SCSS/CSS files used to style the Ui are saved in the `static/assets` directory. 
-In order to update the Ui colors (primary, secondary) this procedure needs to be followed. 
-
-```bash
-$ yarn # install modules
-$ # # edit variables 
-$ vi static/assets/scss/soft-ui-dashboard/custom/_variables.scss 
-$ gulp # SCSS to CSS translation
-```
-
-The `_variables.scss` content defines the `primary` and `secondary` colors: 
-
-```scss
-$primary:       #cb0c9f !default; // EDIT for customization
-$secondary:     #8392AB !default; // EDIT for customization
-$info:          #17c1e8 !default; // EDIT for customization
-$success:       #82d616 !default; // EDIT for customization
-$warning:       #fbcf33 !default; // EDIT for customization
-$danger:        #ea0606 !default; // EDIT for customization
-```
-
-<br />
-
-## Codebase
-
-The project is coded using a simple and intuitive structure presented below:
-
-```bash
-< PROJECT ROOT >
-   |
-   |-- core/              # Implements app configuration
-   |    |-- settings.py   # Defines Global Settings
-   |    |-- wsgi.py       # Start the app in production
-   |    |-- urls.py       # Define URLs served by all apps/nodes
-   |
-   |-- home/              # Serves all pages from the UI Kit  
-   |
-   |-- apps/
-   |    |
-   |    |-- common/       # Assets used by all APPS (models, helpers)
-   |    |-- users/        # Handles Auth Flow
-   |    |-- api/          # DRF API
-   |    |-- charts/       # Charts APP
-   |    |-- tables/       # DataTables APP
-   |    |-- tasks/        # Celery App
-   |    |-- agents/       # CrewAI Agents Management
-   |
-   |-- templates/         # Pages & Templates   
-   |-- assets/            # Static Assets [ JS, CSS, images ]   
-   |
-   |-- requirements.txt   # Development modules - SQLite storage
-   |
-   |-- .env               # Environment
-   |-- env.sample         # Environment Sample
-   |
-   |-- manage.py          # Django Manager File
-   |
-   |-- ************************************************************************
-```
-
-<br />
-
----
-[Soft Dashboard PRO Django](https://appseed.us/product/soft-ui-dashboard-pro/django/) - Starter crafted by **[AppSeed](https://appseed.us/)**.
+For technical support or feature requests, please contact the development team or open an issue in the project repository.

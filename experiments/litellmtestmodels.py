@@ -18,4 +18,4 @@ if not data:
         data.sort(key=lambda x: x['id'])
     else:
         pass
-#print([item['id'] for item in data])
+print([item['id'] for item in data])

@@ -334,10 +334,3 @@ def submit_human_input(request, execution_id):
     execution.save()
     
     return JsonResponse({'message': 'Human input received and processed'})
-
-
-
-
-
-
-

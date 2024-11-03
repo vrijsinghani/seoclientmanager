@@ -1,7 +1,7 @@
 import logging
-from typing import Optional, Type, Any, List, Set
-from pydantic.v1 import BaseModel, Field
-from crewai_tools import BaseTool
+from typing import Optional, Dict, Any, Type
+from pydantic import BaseModel, Field
+from crewai_tools.tools.base_tool import BaseTool
 from urllib.parse import urljoin, urlparse
 from spider_rs import Website, Page
 from trafilatura import extract
@@ -9,26 +9,24 @@ from trafilatura import extract
 
 logger = logging.getLogger(__name__)
 
-class FixedCrawlWebsiteToolSchema(BaseModel):
-    """Input for CrawlWebsiteTool."""
-    pass
+class CrawlWebsiteToolSchema(BaseModel):
+    website_url: str = Field(description="Mandatory website url to crawl and read content")
 
-class CrawlWebsiteToolSchema(FixedCrawlWebsiteToolSchema):
-    """Input for CrawlWebsiteTool."""
-    website_url: str = Field(..., description="Mandatory website url to crawl and read content")
+    model_config = {
+        "extra": "forbid"
+    }      
 
 class CrawlWebsiteTool(BaseTool):
     name: str = "Crawl and read website content"
     description: str = "A tool that can be used to crawl a website and read its content, including content from internal links on the same page."
-    args_schema: Type[BaseModel] = CrawlWebsiteToolSchema
+    args_schema: Type[CrawlWebsiteToolSchema] = CrawlWebsiteToolSchema
     website_url: Optional[str] = None
-
+    
     def __init__(self, website_url: Optional[str] = None, **kwargs):
         super().__init__(**kwargs)
         if website_url is not None:
             self.website_url = website_url
             self.description = f"A tool that can be used to crawl {website_url} and read its content, including content from internal links on the same page."
-            self.args_schema = FixedCrawlWebsiteToolSchema
 
     def _run(self, website_url: str) -> str:
         url = website_url or self.website_url
@@ -38,8 +36,7 @@ class CrawlWebsiteTool(BaseTool):
         logger.info(f"Starting crawl for URL: {url}")
         
         try:
-            result = self._crawl_website(url)  # Changed website_url to url
-            # Remove the log statement that was causing the error
+            result = self._crawl_website(url)
             return result
         except Exception as e:
             logger.error(f"Error during crawl: {e}")
