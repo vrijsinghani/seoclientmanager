@@ -10,9 +10,23 @@ from django.db.models import Min, Max, Q
 from ..models import Client, KeywordRankingHistory, UserActivity
 from ..forms import ClientForm, BusinessObjectiveForm, TargetedKeywordForm, KeywordBulkUploadForm, SEOProjectForm, ClientProfileForm
 from apps.common.tools.user_activity_tool import user_activity_tool
+from apps.agents.tools.client_profile_tool.client_profile_tool import ClientProfileTool
 from datetime import datetime
+from markdown_it import MarkdownIt  # Import markdown-it
+
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    'dashboard',
+    'client_list',
+    'add_client',
+    'client_detail',
+    'edit_client',
+    'delete_client',
+    'update_client_profile',
+    'generate_magic_profile',
+]
 
 @login_required
 def dashboard(request):
@@ -40,41 +54,33 @@ def add_client(request):
 
 @login_required
 def client_detail(request, client_id):
-    # First get all the targeted keywords
     client = get_object_or_404(Client.objects.prefetch_related(
         'targeted_keywords'
     ), id=client_id)
     
-    # Then for each keyword, get its complete history
     for keyword in client.targeted_keywords.all():
-        # Get history both by keyword relationship AND by keyword_text match
         history = KeywordRankingHistory.objects.filter(
             Q(keyword=keyword) | 
             Q(keyword_text=keyword.keyword, client_id=client_id)
         ).order_by('-date')
         
-        # Force evaluation and attach to keyword using a proper attribute name
         keyword.ranking_data = list(history)
         
     client_profile_html = client.client_profile
-    
-    # Get filtered client activities
+        
     important_categories = ['create', 'update', 'delete', 'export', 'import', 'other']
     client_activities = UserActivity.objects.filter(
         client=client,
         category__in=important_categories
-    ).order_by('-timestamp')[:10]  # Last 10 important activities
+    ).order_by('-timestamp')[:10]
     
-    # Get business objectives
     business_objectives = client.business_objectives
     
-    # Initialize forms
     keyword_form = TargetedKeywordForm()
     import_form = KeywordBulkUploadForm()
     project_form = SEOProjectForm(client=client)
     business_objective_form = BusinessObjectiveForm()
     
-    # Get meta tags files if they exist
     meta_tags_dir = os.path.join(settings.MEDIA_ROOT, 'meta-tags', str(client.id))
     meta_tags_files = []
     if os.path.exists(meta_tags_dir):
@@ -84,13 +90,11 @@ def client_detail(request, client_id):
             reverse=True
         )
 
-    # Prepare keyword and project data with rankings
     keywords = client.targeted_keywords.all().prefetch_related('ranking_history')
     projects = client.seo_projects.all().prefetch_related(
         'targeted_keywords__ranking_history'
     )
     
-    # Get ranking data statistics
     ranking_stats = KeywordRankingHistory.objects.filter(
         keyword__client_id=client_id
     ).aggregate(
@@ -100,13 +104,11 @@ def client_detail(request, client_id):
     
     latest_collection_date = ranking_stats['latest_date']
     
-    # Calculate data coverage in months if we have data
     data_coverage_months = 0
     if ranking_stats['earliest_date'] and ranking_stats['latest_date']:
         date_diff = ranking_stats['latest_date'] - ranking_stats['earliest_date']
-        data_coverage_months = round(date_diff.days / 30)  # Approximate months
+        data_coverage_months = round(date_diff.days / 30)
     
-    # Update this query to count unique keyword_text values
     tracked_keywords_count = KeywordRankingHistory.objects.filter(
         client_id=client_id
     ).values('keyword_text').distinct().count()
@@ -160,7 +162,6 @@ def update_client_profile(request, client_id):
     client = get_object_or_404(Client, id=client_id)
     
     if request.method == 'POST':
-        # Get the HTML content directly from the form
         client_profile = request.POST.get('client_profile', '')
         client.client_profile = client_profile
         client.save()
@@ -177,3 +178,36 @@ def update_client_profile(request, client_id):
     
     messages.error(request, "Invalid form submission.")
     return redirect('seo_manager:client_detail', client_id=client.id)
+
+@login_required
+def generate_magic_profile(request, client_id):
+    if request.method == 'POST':
+        try:
+            client = get_object_or_404(Client, id=client_id)
+            
+            profile_tool = ClientProfileTool()
+            result = profile_tool._run(client_id=client_id)
+            result_data = json.loads(result)
+            
+            if result_data.get('success'):
+                user_activity_tool.run(
+                    request.user,
+                    'update',
+                    f"Generated magic profile for: {client.name}",
+                    client=client
+                )
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': result_data.get('message', 'Failed to generate profile')
+                })
+                
+        except Exception as e:
+            logger.error(f"Error generating magic profile: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+            
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

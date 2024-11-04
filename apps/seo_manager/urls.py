@@ -4,6 +4,7 @@ from .views import (
     KeywordListView, KeywordCreateView, KeywordUpdateView,
     ProjectListView, ProjectCreateView, ProjectDetailView
 )
+from .views import client_views
 
 app_name = 'seo_manager'
 
@@ -62,9 +63,13 @@ urlpatterns = [
             # Meta Tags URLs
             path('create-meta-tags-snapshot/', views.create_meta_tags_snapshot, name='create_meta_tags_snapshot'),
             
-            # Add this inside the client_id patterns
-            path('profile/update/', views.update_client_profile, name='update_client_profile'),
-            path('clients/<int:client_id>/keywords/<int:keyword_id>/debug/', views.debug_keyword_data, name='debug_keyword_data'),
+            # Profile URLs
+            path('profile/', include([
+                path('update/', views.update_client_profile, name='update_client_profile'),
+                path('generate-magic/', client_views.generate_magic_profile, name='generate_magic_profile'),
+            ])),
+            
+            path('keywords/<int:keyword_id>/debug/', views.debug_keyword_data, name='debug_keyword_data'),
             path('rankings/', include([
                 path('collect/', views.collect_rankings, name='collect_rankings'),
                 path('report/', views.generate_report, name='generate_report'),
@@ -89,4 +94,3 @@ urlpatterns = [
          views.delete_business_objective, 
          name='delete_business_objective'),
 ]
-

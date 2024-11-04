@@ -363,6 +363,25 @@
     </div>
 </div>
 
+<!-- Add the report modal -->
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reportModalLabel">Rankings Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="reportContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">Print Report</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -449,7 +468,46 @@
         });
     });
 
-    // Add other button handlers...
+    // Generate Report Button
+    document.getElementById('generateReportBtn').addEventListener('click', function() {
+        Swal.fire({
+            title: 'Generating Report',
+            text: 'Please wait...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading()
+            }
+        });
+
+        fetch('{% url "seo_manager:generate_report" client.id %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('reportContent').innerHTML = data.report_html;
+                var reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+                Swal.close();
+                reportModal.show();
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.error
+                });
+            }
+        })
+        .catch(error => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'An unexpected error occurred while generating the report.'
+            });
+        });
+    });
 </script>
 {% endblock extra_js %}
 
@@ -490,6 +548,23 @@
     }
     .fa-sort-up, .fa-sort-down {
         color: #344767;
+    }
+    #reportContent {
+        padding: 20px;
+    }
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #reportModal, #reportModal * {
+            visibility: visible;
+        }
+        #reportModal {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}

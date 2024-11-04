@@ -38,6 +38,15 @@ class Client(models.Model):
         help_text="Detailed 300-500 word profile of the client's business, goals, and SEO strategy",
         blank=True
     )
+    distilled_website = models.TextField(
+        help_text="Distilled version of the client's website content for SEO purposes",
+        blank=True
+    )
+    distilled_website_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time the distilled website content was modified or created"
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,7 +55,17 @@ class Client(models.Model):
 
     def __str__(self):
         return self.name
-
+    
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_client = Client.objects.get(pk=self.pk)
+            if old_client.distilled_website != self.distilled_website:
+                self.distilled_website_date = timezone.now()
+        else:
+            if self.distilled_website:
+                self.distilled_website_date = timezone.now()
+        super().save(*args, **kwargs)
+        
     def get_keyword_rankings_summary(self):
         """Get summary of current keyword rankings"""
         latest_rankings = KeywordRankingHistory.objects.filter(
