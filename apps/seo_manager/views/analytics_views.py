@@ -3,7 +3,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from ..models import Client, GoogleAnalyticsCredentials
-from ..google_auth import get_google_auth_flow, get_analytics_accounts_oauth, get_analytics_accounts_service_account
+from ..google_auth import (
+    get_google_auth_flow, 
+    get_analytics_accounts_oauth, 
+    get_analytics_accounts_service_account,
+    get_search_console_properties
+)
 from apps.common.tools.user_activity_tool import user_activity_tool
 
 @login_required

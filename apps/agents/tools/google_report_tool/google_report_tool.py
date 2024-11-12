@@ -46,85 +46,6 @@ class GoogleReportTool(BaseTool):
     description: str = "Fetches Google Analytics and Search Console reports for a specified client and date range."
     args_schema: Type[BaseModel] = GoogleReportToolInput
 
-    def __init__(self, **kwargs):
-        super().__init__()
-
-    def _refresh_oauth_credentials(self, credentials_obj, stored_credentials):
-        """Helper method to refresh OAuth credentials"""
-        try:
-            # Create a session for token validation
-            session = google.auth.transport.requests.AuthorizedSession(credentials_obj)
-            
-            # Force token refresh
-            request = google.auth.transport.requests.Request()
-            credentials_obj.refresh(request)
-            
-            # Update stored credentials
-            stored_credentials.access_token = credentials_obj.token
-            stored_credentials.save()
-            
-            logger.info("Successfully refreshed and validated OAuth credentials")
-            return credentials_obj
-            
-        except Exception as e:
-            logger.error(f"Failed to refresh OAuth credentials: {str(e)}")
-            raise AuthError(f"Failed to refresh OAuth credentials: {str(e)}")
-
-    def _get_analytics_service(self, credentials):        
-        try:
-            if credentials.use_service_account:
-                logger.info("Using service account for Google Analytics")
-                service_account_info = json.loads(credentials.service_account_json)
-                creds = service_account.Credentials.from_service_account_info(
-                    service_account_info,
-                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
-                )
-            else:
-                logger.info("Using OAuth credentials for Google Analytics")
-                
-                # Create credentials object
-                creds = Credentials(
-                    token=credentials.access_token,
-                    refresh_token=credentials.refresh_token,
-                    token_uri=credentials.token_uri,
-                    client_id=credentials.ga_client_id,
-                    client_secret=credentials.client_secret,
-                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
-                )
-                
-                # Always refresh token before use
-                creds = self._refresh_oauth_credentials(creds, credentials)
-            
-            analytics_client = BetaAnalyticsDataClient(credentials=creds)
-            return analytics_client
-
-        except Exception as e:
-            logger.error(f"Error in _get_analytics_service: {str(e)}", exc_info=True)
-            raise AuthError(f"Failed to initialize Analytics service: {str(e)}")
-
-    def _get_search_console_service(self, credentials):
-        try:
-            logger.info("Using OAuth credentials for Search Console")
-            
-            # Create credentials object
-            creds = Credentials(
-                token=credentials.access_token,
-                refresh_token=credentials.refresh_token,
-                token_uri=credentials.token_uri,
-                client_id=credentials.sc_client_id,
-                client_secret=credentials.client_secret,
-                scopes=['https://www.googleapis.com/auth/webmasters.readonly']
-            )
-            
-            # Always refresh token before use
-            creds = self._refresh_oauth_credentials(creds, credentials)
-            
-            return build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
-
-        except Exception as e:
-            logger.error(f"Error in _get_search_console_service: {str(e)}", exc_info=True)
-            raise AuthError(f"Failed to initialize Search Console service: {str(e)}")
-
     def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
         try:
             # Retrieve the client's credentials
@@ -136,21 +57,20 @@ class GoogleReportTool(BaseTool):
                 if not ga_credentials or not sc_credentials:
                     raise ValueError("Missing Google Analytics or Search Console credentials")
                 
-                # Log credential details for debugging
                 logger.info(f"GA Credentials - Token URI: {ga_credentials.token_uri}, Has refresh token: {bool(ga_credentials.refresh_token)}")
                 logger.info(f"SC Credentials - Token URI: {sc_credentials.token_uri}, Has refresh token: {bool(sc_credentials.refresh_token)}")
                 
             except ObjectDoesNotExist:
                 raise ValueError(f"Client with id {client_id} not found or has missing credentials")
 
-            # Initialize services with proper error handling
+            # Initialize services using model methods
             try:
-                analytics_client = self._get_analytics_service(ga_credentials)
+                analytics_client = ga_credentials.get_service()
                 property_id = ga_credentials.view_id
                 if not property_id:
                     raise ValueError("Missing Google Analytics property ID")
                     
-                # Clean up property ID - ensure it's just the numeric ID
+                # Clean up property ID
                 property_id = property_id.replace('properties/', '')
                 if not property_id.isdigit():
                     raise ValueError(f"Invalid Google Analytics property ID format. Expected numeric ID, got: {property_id}")
@@ -158,23 +78,18 @@ class GoogleReportTool(BaseTool):
             except AuthError as e:
                 logger.error(f"Failed to initialize Google Analytics service: {str(e)}")
                 raise
-            except Exception as e:
-                logger.error(f"Failed to initialize Google Analytics service: {str(e)}")
-                raise
 
             try:
-                search_console_service = self._get_search_console_service(sc_credentials)
+                search_console_service = sc_credentials.get_service()
                 property_url = sc_credentials.property_url
                 if not property_url:
                     raise ValueError("Missing Search Console property URL")
             except AuthError as e:
                 logger.error(f"Failed to initialize Search Console service: {str(e)}")
                 raise
-            except Exception as e:
-                logger.error(f"Failed to initialize Search Console service: {str(e)}")
-                raise
                       
             # Fetch general analytics data
+            analytics_data = []
             try:
                 general_request = RunReportRequest(
                     property=f"properties/{property_id}",
@@ -194,22 +109,49 @@ class GoogleReportTool(BaseTool):
                     limit=10
                 )        
                 general_response = analytics_client.run_report(general_request)
+                analytics_data = self._process_analytics_data(general_response)
+                
+                if not analytics_data:
+                    logger.warning("No analytics data returned from Google Analytics")
+                
             except Exception as e:
                 logger.error(f"Failed to fetch analytics data: {str(e)}")
+                if 'invalid_grant' in str(e) or 'expired' in str(e):
+                    raise AuthError(f"Google Analytics credentials have expired: {str(e)}")
                 raise
             
             # Fetch Search Console data
+            keyword_data = []
+            landing_page_data = []
             try:
                 keyword_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'query')
                 landing_page_data = self._get_search_console_data(search_console_service, property_url, start_date, end_date, 'page')
+                
+                if not keyword_data and not landing_page_data:
+                    logger.warning("No data returned from Search Console")
+                    
             except Exception as e:
                 logger.error(f"Failed to fetch Search Console data: {str(e)}")
+                if 'invalid_grant' in str(e) or 'expired' in str(e):
+                    raise AuthError(f"Search Console credentials have expired: {str(e)}")
                 raise
             
-            processed_general_data = self._process_analytics_data(general_response)
+            # Check if we got any data at all
+            if not analytics_data and not keyword_data and not landing_page_data:
+                return {
+                    'success': False,
+                    'error': "No data was collected from either Google Analytics or Search Console",
+                    'analytics_data': json.dumps([]),
+                    'keyword_data': json.dumps([]),
+                    'landing_page_data': json.dumps([]),
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'client_id': client_id
+                }
             
-            result = {
-                'analytics_data': json.dumps(processed_general_data),
+            return {
+                'success': True,
+                'analytics_data': json.dumps(analytics_data),
                 'keyword_data': json.dumps(keyword_data),
                 'landing_page_data': json.dumps(landing_page_data),
                 'start_date': start_date,
@@ -217,40 +159,26 @@ class GoogleReportTool(BaseTool):
                 'client_id': client_id
             }
             
-            # # Create CSV files
-            # keyword_df = pd.DataFrame(keyword_data)
-            # if not keyword_df.empty:
-            #     keyword_df.to_csv('keyword_data.csv', index=False)
-            
-            # landing_page_df = pd.DataFrame(landing_page_data)
-            # if not landing_page_df.empty:
-            #     landing_page_df.to_csv('landing_page_data.csv', index=False)
-            
-            return result
         except AuthError as e:
             logger.error(f"Authentication error: {str(e)}")
-            return {
-                'analytics_data': json.dumps([]),
-                'keyword_data': json.dumps([]),
-                'landing_page_data': json.dumps([]),
-                'start_date': start_date,
-                'end_date': end_date,
-                'client_id': client_id,
-                'error': str(e)
-            }
+            return self._error_response(start_date, end_date, client_id, str(e))
         except Exception as e:
             logger.error(f"Failed to fetch Google Analytics or Search Console data. Error: {str(e)}", exc_info=True)
-            print(f"GoogleReportTool error: {str(e)}")  # Print to stdout for immediate visibility
-            return {
-                'analytics_data': json.dumps([]),
-                'keyword_data': json.dumps([]),
-                'landing_page_data': json.dumps([]),
-                'start_date': start_date,
-                'end_date': end_date,
-                'client_id': client_id,
-                'error': str(e)
-            }
-            
+            return self._error_response(start_date, end_date, client_id, str(e))
+
+    def _error_response(self, start_date, end_date, client_id, error):
+        """Helper method to return error response"""
+        return {
+            'success': False,
+            'error': error,
+            'analytics_data': json.dumps([]),
+            'keyword_data': json.dumps([]),
+            'landing_page_data': json.dumps([]),
+            'start_date': start_date,
+            'end_date': end_date,
+            'client_id': client_id
+        }
+
     def _process_analytics_data(self, response):
         processed_data = []
         try:
@@ -277,8 +205,22 @@ class GoogleReportTool(BaseTool):
 
     def _get_search_console_data(self, service, property_url, start_date, end_date, dimension):
         try:
+            # Parse the property URL if needed
+            if isinstance(property_url, str) and '{' in property_url:
+                try:
+                    data = json.loads(property_url.replace("'", '"'))  # Replace single quotes with double quotes
+                    site_url = data['url']
+                except (json.JSONDecodeError, KeyError):
+                    site_url = property_url
+            elif isinstance(property_url, dict):
+                site_url = property_url['url']
+            else:
+                site_url = property_url
+
+            logger.info(f"Using Search Console property URL: {site_url}")
+
             response = service.searchanalytics().query(
-                siteUrl=property_url,
+                siteUrl=site_url,  # Use the parsed URL
                 body={
                     'startDate': start_date,
                     'endDate': end_date,
@@ -302,4 +244,7 @@ class GoogleReportTool(BaseTool):
         except HttpError as error:
             logger.error(f"An error occurred while fetching Search Console data: {error}")
             print(f"An error occurred while fetching Search Console data: {error}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error fetching Search Console data: {str(e)}")
             return []

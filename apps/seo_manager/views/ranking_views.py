@@ -12,6 +12,9 @@ from django.db.models import Min, Max
 from ..models import Client, KeywordRankingHistory
 from ..forms import RankingImportForm
 from apps.agents.tools.google_report_tool.google_rankings_tool import GoogleRankingsTool
+import logging
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def ranking_import(request, client_id):
@@ -36,7 +39,7 @@ def collect_rankings(request, client_id):
         tool = GoogleRankingsTool()
         # Get just the last 30 days of data
         end_date = timezone.now().date()
-        start_date = end_date - timedelta(days=30)
+        start_date = end_date - timedelta(days=7)
         
         result = tool._run(
             start_date=start_date.strftime('%Y-%m-%d'),
@@ -44,18 +47,30 @@ def collect_rankings(request, client_id):
             client_id=client_id
         )
         
-        if result['success']:
-            messages.success(request, "Latest rankings collected successfully")
-            return JsonResponse({
-                'success': True,
-                'message': "Latest rankings data has been collected and stored"
-            })
+        if result.get('success'):
+            # Only show success if we actually stored some data
+            if result.get('stored_rankings_count', 0) > 0:
+                messages.success(request, "Latest rankings collected successfully")
+                return JsonResponse({
+                    'success': True,
+                    'message': "Latest rankings data has been collected and stored"
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': "No ranking data was collected. Please check your Search Console credentials."
+                })
         else:
+            error_msg = result.get('error', 'Failed to collect rankings')
+            if 'invalid_grant' in error_msg or 'expired' in error_msg:
+                error_msg = "Your Search Console access has expired. Please reconnect your Search Console account."
+            
             return JsonResponse({
                 'success': False,
-                'error': result.get('error', 'Unknown error occurred')
+                'error': error_msg
             })
     except Exception as e:
+        logger.error(f"Error in collect_rankings view: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': str(e)

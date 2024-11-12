@@ -63,6 +63,24 @@ def get_search_console_service(credentials):
     return build('searchconsole', 'v1', credentials=credentials)
 
 def get_search_console_properties(credentials):
-    service = get_search_console_service(credentials)
+    """
+    Get list of Search Console properties using OAuth credentials
+    
+    Args:
+        credentials: OAuth credentials object
+        
+    Returns:
+        list: List of Search Console properties
+    """
+    service = build('searchconsole', 'v1', credentials=credentials)
     sites = service.sites().list().execute()
-    return [site['siteUrl'] for site in sites.get('siteEntry', [])]
+    
+    properties = []
+    if 'siteEntry' in sites:
+        for site in sites['siteEntry']:
+            properties.append({
+                'url': site['siteUrl'],
+                'permission_level': site.get('permissionLevel', '')
+            })
+    
+    return properties

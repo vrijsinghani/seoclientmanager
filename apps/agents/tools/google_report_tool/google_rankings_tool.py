@@ -56,54 +56,8 @@ class GoogleRankingsTool(BaseTool):
     description: str = "Fetches Google Analytics and Search Console reports for a specified client and date range."
     args_schema: Type[BaseModel] = GoogleRankingsToolInput
 
-    def __init__(self, **kwargs):
-        super().__init__()
-
-    def _refresh_oauth_credentials(self, credentials_obj, stored_credentials):
-        """Helper method to refresh OAuth credentials"""
-        try:
-            # Create a session for token validation
-            session = google.auth.transport.requests.AuthorizedSession(credentials_obj)
-            
-            # Force token refresh
-            request = google.auth.transport.requests.Request()
-            credentials_obj.refresh(request)
-            
-            # Update stored credentials
-            stored_credentials.access_token = credentials_obj.token
-            stored_credentials.save()
-            
-            logger.info("Successfully refreshed and validated OAuth credentials")
-            return credentials_obj
-            
-        except Exception as e:
-            logger.error(f"Failed to refresh OAuth credentials: {str(e)}")
-            raise AuthError(f"Failed to refresh OAuth credentials: {str(e)}")
-
-    def _get_search_console_service(self, credentials):
-        try:
-            logger.info("Using OAuth credentials for Search Console")
-            
-            # Create credentials object
-            creds = Credentials(
-                token=credentials.access_token,
-                refresh_token=credentials.refresh_token,
-                token_uri=credentials.token_uri,
-                client_id=credentials.sc_client_id,
-                client_secret=credentials.client_secret,
-                scopes=['https://www.googleapis.com/auth/webmasters.readonly']
-            )
-            
-            # Always refresh token before use
-            creds = self._refresh_oauth_credentials(creds, credentials)
-            
-            return build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
-
-        except Exception as e:
-            logger.error(f"Error in _get_search_console_service: {str(e)}", exc_info=True)
-            raise AuthError(f"Failed to initialize Search Console service: {str(e)}")
-
     def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
+        total_stored_rankings = 0
         try:
             client = Client.objects.get(id=client_id)
             sc_credentials = client.sc_credentials
@@ -111,7 +65,8 @@ class GoogleRankingsTool(BaseTool):
             if not sc_credentials:
                 raise ValueError("Missing Search Console credentials")
             
-            search_console_service = self._get_search_console_service(sc_credentials)
+            # Get authenticated service using model method
+            search_console_service = sc_credentials.get_service()
             property_url = sc_credentials.property_url
             
             # Check if specific dates were provided (for collect_rankings)
@@ -136,21 +91,46 @@ class GoogleRankingsTool(BaseTool):
                         'query'
                     )
                     
-                    # Calculate monthly averages and store
-                    self._log_monthly_rankings(client, keyword_data, start_date)
+                    if keyword_data:  # Only process if we got data
+                        # Calculate monthly averages and store
+                        stored_count = self._log_monthly_rankings(client, keyword_data, start_date)
+                        total_stored_rankings += stored_count
+                    else:
+                        logger.warning(f"No keyword data returned for period {start_date} to {end_date}")
                     
                 except Exception as e:
                     logger.error(f"Error fetching data for period {start_date} to {end_date}: {str(e)}")
+                    if 'invalid_grant' in str(e) or 'expired' in str(e):
+                        raise  # Re-raise auth errors to be handled above
                     continue
             
-            return {
-                'success': True,
-                'message': f"Processed ranking data for {len(date_ranges)} period(s)"
-            }
+            if total_stored_rankings > 0:
+                return {
+                    'success': True,
+                    'message': f"Processed ranking data for {len(date_ranges)} period(s)",
+                    'stored_rankings_count': total_stored_rankings
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': "No ranking data was collected",
+                    'stored_rankings_count': 0
+                }
             
+        except AuthError as e:
+            logger.error(f"Authentication error: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'stored_rankings_count': total_stored_rankings
+            }
         except Exception as e:
             logger.error(f"Error in ranking tool: {str(e)}")
-            return {'success': False, 'error': str(e)}
+            return {
+                'success': False,
+                'error': str(e),
+                'stored_rankings_count': total_stored_rankings
+            }
 
     @transaction.atomic
     def _log_monthly_rankings(self, client, keyword_data, month_date):
@@ -202,14 +182,30 @@ class GoogleRankingsTool(BaseTool):
                 f"Stored {len(rankings_to_create)} rankings for {month_date.strftime('%B %Y')}"
             )
             
+            return len(rankings_to_create)  # Return count of stored rankings
+            
         except Exception as e:
             logger.error(f"Error logging monthly rankings: {str(e)}")
             raise
 
     def _get_search_console_data(self, service, property_url, start_date, end_date, dimension):
         try:
+            # Parse the property URL if needed
+            if isinstance(property_url, str) and '{' in property_url:
+                try:
+                    data = json.loads(property_url.replace("'", '"'))  # Replace single quotes with double quotes
+                    site_url = data['url']
+                except (json.JSONDecodeError, KeyError):
+                    site_url = property_url
+            elif isinstance(property_url, dict):
+                site_url = property_url['url']
+            else:
+                site_url = property_url
+
+            logger.info(f"Using Search Console property URL: {site_url}")
+
             response = service.searchanalytics().query(
-                siteUrl=property_url,
+                siteUrl=site_url,
                 body={
                     'startDate': start_date,
                     'endDate': end_date,

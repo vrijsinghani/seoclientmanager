@@ -7,9 +7,18 @@ import logging
 from dateutil.relativedelta import relativedelta
 import json
 from datetime import datetime
+from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
+from google.analytics.data_v1beta import BetaAnalyticsDataClient
+from googleapiclient.discovery import build
+import google.auth.transport.requests
 
 logger = logging.getLogger(__name__)
 
+# Define AuthError at the module level
+class AuthError(Exception):
+    """Custom exception for authentication errors"""
+    pass
 
 class ClientGroup(models.Model):
     name = models.CharField(max_length=100)
@@ -122,9 +131,68 @@ class GoogleAnalyticsCredentials(models.Model):
     def __str__(self):
         return f"GA Credentials for {self.client.name}"
 
+    def get_credentials(self):
+        """Returns refreshed Google Analytics credentials"""
+        try:
+            if self.use_service_account:
+                logger.info("Using service account for Google Analytics")
+                service_account_info = json.loads(self.service_account_json)
+                return service_account.Credentials.from_service_account_info(
+                    service_account_info,
+                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
+                )
+            
+            if not self.refresh_token:
+                raise AuthError("No refresh token available. Reauthorization required.")
+
+            logger.info("Using OAuth credentials for Google Analytics")
+            credentials = Credentials(
+                token=self.access_token,
+                refresh_token=self.refresh_token,
+                token_uri=self.token_uri,
+                client_id=self.ga_client_id,
+                client_secret=self.client_secret,
+                scopes=['https://www.googleapis.com/auth/analytics.readonly']
+            )
+
+            # Only refresh if token is expired or missing
+            if not self.access_token or not credentials.valid:
+                request = google.auth.transport.requests.Request()
+                try:
+                    credentials.refresh(request)
+                    
+                    # Update stored credentials
+                    self.access_token = credentials.token
+                    self.save(update_fields=['access_token'])
+                    
+                    logger.info(f"Successfully refreshed Google Analytics OAuth credentials for {self.client.name}")
+                except Exception as e:
+                    if 'invalid_grant' in str(e):
+                        # Clear invalid credentials to force reauthorization
+                        self.access_token = None
+                        self.refresh_token = None
+                        self.save(update_fields=['access_token', 'refresh_token'])
+                        raise AuthError("Stored credentials are no longer valid. Please reauthorize Google Analytics access.")
+                    raise
+
+            return credentials
+
+        except Exception as e:
+            logger.error(f"Failed to refresh Google Analytics credentials for {self.client.name}: {str(e)}")
+            raise AuthError(f"Failed to get valid Google Analytics credentials: {str(e)}")
+
+    def get_service(self):
+        """Returns an authenticated Google Analytics service"""
+        try:
+            credentials = self.get_credentials()
+            return BetaAnalyticsDataClient(credentials=credentials)
+        except Exception as e:
+            logger.error(f"Failed to create Analytics service: {str(e)}")
+            raise AuthError(f"Failed to initialize Analytics service: {str(e)}")
+
 class SearchConsoleCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='sc_credentials')
-    property_url = models.URLField()
+    property_url = models.TextField()
     access_token = models.TextField(blank=True, null=True)
     refresh_token = models.TextField(blank=True, null=True)
     token_uri = models.URLField(blank=True, null=True)
@@ -133,6 +201,56 @@ class SearchConsoleCredentials(models.Model):
 
     def __str__(self):
         return f"Search Console Credentials for {self.client.name}"
+
+    def get_credentials(self):
+        """Returns refreshed Google OAuth2 credentials"""
+        try:
+            if not self.refresh_token:
+                raise AuthError("No refresh token available. Reauthorization required.")
+
+            credentials = Credentials(
+                token=self.access_token,
+                refresh_token=self.refresh_token,
+                token_uri=self.token_uri,
+                client_id=self.sc_client_id,
+                client_secret=self.client_secret,
+                scopes=['https://www.googleapis.com/auth/webmasters.readonly']
+            )
+
+            # Only refresh if token is expired or missing
+            if not self.access_token or not credentials.valid:
+                request = google.auth.transport.requests.Request()
+                try:
+                    credentials.refresh(request)
+                    
+                    # Update stored credentials
+                    self.access_token = credentials.token
+                    self.save(update_fields=['access_token'])
+                    
+                    logger.info(f"Successfully refreshed Search Console OAuth credentials for {self.client.name}")
+                except Exception as e:
+                    if 'invalid_grant' in str(e):
+                        # Clear invalid credentials to force reauthorization
+                        self.access_token = None
+                        self.refresh_token = None
+                        self.save(update_fields=['access_token', 'refresh_token'])
+                        raise AuthError("Stored credentials are no longer valid. Please reauthorize Search Console access.")
+                    raise
+
+            return credentials
+
+        except Exception as e:
+            logger.error(f"Failed to refresh Search Console credentials for {self.client.name}: {str(e)}")
+            raise AuthError(f"Failed to get valid Search Console credentials: {str(e)}")
+
+    def get_service(self):
+        """Returns an authenticated Search Console service"""
+        try:
+            credentials = self.get_credentials()
+            return build('searchconsole', 'v1', credentials=credentials, cache_discovery=False)
+        except Exception as e:
+            logger.error(f"Failed to create Search Console service: {str(e)}")
+            raise AuthError(f"Failed to initialize Search Console service: {str(e)}")
 
 class SummarizerUsage(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
