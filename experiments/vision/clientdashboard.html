@@ -1,0 +1,391 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: white; /* Ensure the iframe has a white background */
+        }
+
+        
+.metric-card {
+border-radius: 8px;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.metric-card .card-body {
+padding: 1.5rem;
+}
+.trend-indicator {
+font-size: 0.8rem;
+padding: 2px 6px;
+border-radius: 4px;
+}
+.trend-up {
+background-color: #d4edda;
+color: #155724;
+}
+.trend-down {
+background-color: #f8d7da;
+color: #721c24;
+}
+
+
+    </style>
+</head>
+<body>
+    <!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flooring Store SEO Dashboard</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.metric-card {
+border-radius: 8px;
+box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.metric-card .card-body {
+padding: 1.5rem;
+}
+.trend-indicator {
+font-size: 0.8rem;
+padding: 2px 6px;
+border-radius: 4px;
+}
+.trend-up {
+background-color: #d4edda;
+color: #155724;
+}
+.trend-down {
+background-color: #f8d7da;
+color: #721c24;
+}
+</style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<a class="navbar-brand" href="index.html">Luxury Flooring SEO</a>
+<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+<span class="navbar-toggler-icon"></span>
+</button>
+<div class="collapse navbar-collapse" id="navbarNav">
+<ul class="navbar-nav">
+<li class="nav-item active">
+<a class="nav-link" href="index.html">Dashboard</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="business-objectives.html">Business Objectives</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="company-profile.html">Company Profile</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="keyword-intelligence.html">Keyword Intelligence</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="performance-optimization.html">Performance</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="ai-analysis.html">AI Analysis</a>
+</li>
+</ul>
+<ul class="navbar-nav ml-auto">
+<li class="nav-item">
+<a class="nav-link" href="#">Settings</a>
+</li>
+<li class="nav-item">
+<a class="nav-link" href="#">Help</a>
+</li>
+</ul>
+</div>
+</nav>
+
+<!-- Main Content -->
+<div class="container-fluid mt-4">
+<!-- Welcome Section -->
+<div class="row mb-4">
+<div class="col-12">
+<h1>Welcome to Luxury Flooring SEO Dashboard</h1>
+<p class="text-muted">Last updated: <span id="lastUpdate">March 14, 2024 09:00 AM</span></p>
+</div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-4">
+<div class="col-md-3">
+<div class="card metric-card bg-white">
+<div class="card-body">
+<h6 class="card-title text-muted mb-1">Organic Traffic</h6>
+<h2 class="mb-2">15,427</h2>
+<span class="trend-indicator trend-up">↑ 12.3% vs last month</span>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card metric-card bg-white">
+<div class="card-body">
+<h6 class="card-title text-muted mb-1">Conversion Rate</h6>
+<h2 class="mb-2">3.8%</h2>
+<span class="trend-indicator trend-up">↑ 0.5% vs last month</span>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card metric-card bg-white">
+<div class="card-body">
+<h6 class="card-title text-muted mb-1">Avg. Position</h6>
+<h2 class="mb-2">4.2</h2>
+<span class="trend-indicator trend-down">↓ 0.3 vs last month</span>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card metric-card bg-white">
+<div class="card-body">
+<h6 class="card-title text-muted mb-1">Revenue from SEO</h6>
+<h2 class="mb-2">$42,850</h2>
+<span class="trend-indicator trend-up">↑ 15.7% vs last month</span>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Performance Charts -->
+<div class="row mb-4">
+<div class="col-md-8">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Organic Traffic Trends</h5>
+</div>
+<div class="card-body">
+<canvas id="trafficChart"></canvas>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Top Performing Categories</h5>
+</div>
+<div class="card-body">
+<canvas id="categoriesChart"></canvas>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Recent Performance -->
+<div class="row">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Top Performing Keywords</h5>
+</div>
+<div class="card-body">
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Keyword</th>
+                <th>Position</th>
+                <th>Clicks</th>
+                <th>CTR</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>hardwood flooring installation</td>
+                <td>2</td>
+                <td>524</td>
+                <td>4.8%</td>
+            </tr>
+            <tr>
+                <td>luxury vinyl planks</td>
+                <td>3</td>
+                <td>412</td>
+                <td>3.9%</td>
+            </tr>
+            <tr>
+                <td>wood floor refinishing</td>
+                <td>4</td>
+                <td>385</td>
+                <td>3.5%</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Recent Opportunities</h5>
+</div>
+<div class="card-body">
+<div class="list-group">
+    <a href="#" class="list-group-item list-group-item-action">
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">Optimize "ceramic tile installation"</h6>
+            <small class="text-success">High Impact</small>
+        </div>
+        <p class="mb-1">Current position: 8 → Potential position: 3</p>
+    </a>
+    <a href="#" class="list-group-item list-group-item-action">
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">Create content for "eco-friendly flooring"</h6>
+            <small class="text-warning">Medium Impact</small>
+        </div>
+        <p class="mb-1">Growing trend with 2,500 monthly searches</p>
+    </a>
+    <a href="#" class="list-group-item list-group-item-action">
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">Improve meta descriptions for vinyl pages</h6>
+            <small class="text-warning">Medium Impact</small>
+        </div>
+        <p class="mb-1">Potential CTR improvement: +1.2%</p>
+    </a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+// Initialize Charts
+document.addEventListener('DOMContentLoaded', function() {
+// Traffic Chart
+const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+new Chart(trafficCtx, {
+type: 'line',
+data: {
+labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+datasets: [{
+label: 'Organic Traffic',
+data: [12000, 13200, 14100, 14800, 15200, 15427],
+borderColor: 'rgb(75, 192, 192)',
+tension: 0.1,
+fill: false
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Visitors'
+    }
+}
+}
+}
+});
+
+// Categories Chart
+const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+new Chart(categoriesCtx, {
+type: 'doughnut',
+data: {
+labels: ['Hardwood', 'Vinyl', 'Tile', 'Carpet', 'Other'],
+datasets: [{
+data: [35, 25, 20, 15, 5],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(255, 99, 132, 0.8)',
+    'rgba(153, 102, 255, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'bottom'
+}
+}
+}
+});
+});
+</script>
+</body>
+</html>
+
+
+
+    <script>
+        
+// Initialize Charts
+document.addEventListener('DOMContentLoaded', function() {
+// Traffic Chart
+const trafficCtx = document.getElementById('trafficChart').getContext('2d');
+new Chart(trafficCtx, {
+type: 'line',
+data: {
+labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+datasets: [{
+label: 'Organic Traffic',
+data: [12000, 13200, 14100, 14800, 15200, 15427],
+borderColor: 'rgb(75, 192, 192)',
+tension: 0.1,
+fill: false
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Visitors'
+    }
+}
+}
+}
+});
+
+// Categories Chart
+const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+new Chart(categoriesCtx, {
+type: 'doughnut',
+data: {
+labels: ['Hardwood', 'Vinyl', 'Tile', 'Carpet', 'Other'],
+datasets: [{
+data: [35, 25, 20, 15, 5],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(255, 99, 132, 0.8)',
+    'rgba(153, 102, 255, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'bottom'
+}
+}
+}
+});
+});
+
+
+    </script>
+</body>
+</html>

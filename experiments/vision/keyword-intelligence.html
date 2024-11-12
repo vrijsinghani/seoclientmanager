@@ -1,0 +1,1026 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: white; /* Ensure the iframe has a white background */
+        }
+
+        
+.keyword-card {
+transition: transform 0.2s;
+}
+.keyword-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.intent-badge {
+font-size: 0.8rem;
+padding: 0.4rem 0.8rem;
+}
+.intent-informational { background-color: #e3f2fd; color: #0d47a1; }
+.intent-commercial { background-color: #e8f5e9; color: #1b5e20; }
+.intent-transactional { background-color: #fce4ec; color: #880e4f; }
+.difficulty-easy { color: #4caf50; }
+.difficulty-medium { color: #ff9800; }
+.difficulty-hard { color: #f44336; }
+.search-volume {
+font-size: 0.9rem;
+color: #666;
+}
+.trend-up { color: #4caf50; }
+.trend-down { color: #f44336; }
+.trend-stable { color: #ff9800; }
+
+
+    </style>
+</head>
+<body>
+    <!-- keyword-intelligence.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Keyword Intelligence - Luxury Flooring SEO</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.keyword-card {
+transition: transform 0.2s;
+}
+.keyword-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.intent-badge {
+font-size: 0.8rem;
+padding: 0.4rem 0.8rem;
+}
+.intent-informational { background-color: #e3f2fd; color: #0d47a1; }
+.intent-commercial { background-color: #e8f5e9; color: #1b5e20; }
+.intent-transactional { background-color: #fce4ec; color: #880e4f; }
+.difficulty-easy { color: #4caf50; }
+.difficulty-medium { color: #ff9800; }
+.difficulty-hard { color: #f44336; }
+.search-volume {
+font-size: 0.9rem;
+color: #666;
+}
+.trend-up { color: #4caf50; }
+.trend-down { color: #f44336; }
+.trend-stable { color: #ff9800; }
+</style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<!-- ... (copy navigation from index.html) ... -->
+</nav>
+
+<div class="container-fluid mt-4">
+<!-- Header Section -->
+<div class="row mb-4">
+<div class="col-md-8">
+<h1>Keyword Intelligence</h1>
+<p class="text-muted">Discover and analyze keywords for your flooring business</p>
+</div>
+<div class="col-md-4 text-right">
+<button class="btn btn-outline-primary mr-2">
+<i class="fas fa-download"></i> Export Report
+</button>
+<button class="btn btn-primary">
+<i class="fas fa-sync"></i> Update Analysis
+</button>
+</div>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="card mb-4">
+<div class="card-body">
+<div class="row">
+<div class="col-md-6">
+<div class="input-group">
+    <input type="text" class="form-control" placeholder="Enter a keyword or topic...">
+    <div class="input-group-append">
+        <button class="btn btn-primary" type="button">Analyze</button>
+    </div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="btn-group float-right">
+    <button class="btn btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+        Product Category
+    </button>
+    <div class="dropdown-menu">
+        <a class="dropdown-item" href="#">Hardwood Flooring</a>
+        <a class="dropdown-item" href="#">Luxury Vinyl</a>
+        <a class="dropdown-item" href="#">Laminate</a>
+        <a class="dropdown-item" href="#">Tile & Stone</a>
+        <a class="dropdown-item" href="#">Installation Services</a>
+    </div>
+    <button class="btn btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+        Search Intent
+    </button>
+    <div class="dropdown-menu">
+        <a class="dropdown-item" href="#">Informational</a>
+        <a class="dropdown-item" href="#">Commercial</a>
+        <a class="dropdown-item" href="#">Transactional</a>
+    </div>
+    <button class="btn btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+        Difficulty
+    </button>
+    <div class="dropdown-menu">
+        <a class="dropdown-item" href="#">Easy (0-30)</a>
+        <a class="dropdown-item" href="#">Medium (31-70)</a>
+        <a class="dropdown-item" href="#">Hard (71-100)</a>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Overview Cards -->
+<div class="row mb-4">
+<div class="col-md-3">
+<div class="card bg-light">
+<div class="card-body">
+<h6 class="card-title text-muted">Total Keywords</h6>
+<h2>1,247</h2>
+<p class="mb-0 text-success"><i class="fas fa-arrow-up"></i> 12% from last month</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card bg-light">
+<div class="card-body">
+<h6 class="card-title text-muted">Ranking Keywords</h6>
+<h2>485</h2>
+<p class="mb-0 text-success"><i class="fas fa-arrow-up"></i> 8% from last month</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card bg-light">
+<div class="card-body">
+<h6 class="card-title text-muted">Avg. Search Volume</h6>
+<h2>2,850</h2>
+<p class="mb-0 text-warning"><i class="fas fa-minus"></i> 2% from last month</p>
+</div>
+</div>
+</div>
+<div class="col-md-3">
+<div class="card bg-light">
+<div class="card-body">
+<h6 class="card-title text-muted">Content Gaps</h6>
+<h2>23</h2>
+<p class="mb-0 text-danger"><i class="fas fa-arrow-down"></i> 15% from last month</p>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Long-tail Keyword Discovery -->
+<div class="card mb-4">
+<div class="card-header">
+<h5 class="card-title mb-0">Long-tail Keyword Opportunities</h5>
+</div>
+<div class="card-body">
+<div class="table-responsive">
+<table class="table">
+<thead>
+    <tr>
+        <th>Keyword</th>
+        <th>Search Volume</th>
+        <th>Difficulty</th>
+        <th>Intent</th>
+        <th>Current Ranking</th>
+        <th>Actions</th>
+    </tr>
+</thead>
+<tbody>
+    <tr>
+        <td>best hardwood flooring for high traffic areas</td>
+        <td>
+            <span class="search-volume">1,200</span>
+            <span class="trend-up ml-2"><i class="fas fa-arrow-up"></i> 15%</span>
+        </td>
+        <td>
+            <span class="difficulty-easy">
+                <i class="fas fa-circle"></i> Easy (25)
+            </span>
+        </td>
+        <td>
+            <span class="badge intent-badge intent-informational">Informational</span>
+        </td>
+        <td>Not Ranking</td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary">Target</button>
+        </td>
+    </tr>
+    <tr>
+        <td>luxury vinyl plank flooring installation cost</td>
+        <td>
+            <span class="search-volume">890</span>
+            <span class="trend-stable ml-2"><i class="fas fa-minus"></i> 2%</span>
+        </td>
+        <td>
+            <span class="difficulty-medium">
+                <i class="fas fa-circle"></i> Medium (45)
+            </span>
+        </td>
+        <td>
+            <span class="badge intent-badge intent-commercial">Commercial</span>
+        </td>
+        <td>#12</td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary">Target</button>
+        </td>
+    </tr>
+    <!-- Add more rows as needed -->
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Semantic Keyword Grouping -->
+<div class="row mb-4">
+<div class="col-md-8">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Semantic Keyword Clusters</h5>
+</div>
+<div class="card-body">
+<canvas id="semanticClusterChart"></canvas>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Top Clusters</h5>
+</div>
+<div class="card-body">
+<div class="list-group">
+    <a href="#" class="list-group-item list-group-item-action">
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">Hardwood Installation</h6>
+            <small>45 keywords</small>
+        </div>
+        <p class="mb-1">Avg. Volume: 2,500</p>
+    </a>
+    <a href="#" class="list-group-item list-group-item-action">
+        <div class="d-flex w-100 justify-content-between">
+            <h6 class="mb-1">Vinyl Maintenance</h6>
+            <small>32 keywords</small>
+        </div>
+        <p class="mb-1">Avg. Volume: 1,800</p>
+    </a>
+    <!-- Add more clusters -->
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Intent Mapping Section -->
+<div class="row mb-4">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Search Intent Distribution</h5>
+</div>
+<div class="card-body">
+<canvas id="intentDistributionChart"></canvas>
+<div class="mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="badge intent-badge intent-informational">Informational</span>
+        <div class="progress flex-grow-1 mx-2" style="height: 8px;">
+            <div class="progress-bar bg-info" style="width: 45%"></div>
+        </div>
+        <span>45%</span>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="badge intent-badge intent-commercial">Commercial</span>
+        <div class="progress flex-grow-1 mx-2" style="height: 8px;">
+            <div class="progress-bar bg-success" style="width: 35%"></div>
+        </div>
+        <span>35%</span>
+    </div>
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="badge intent-badge intent-transactional">Transactional</span>
+        <div class="progress flex-grow-1 mx-2" style="height: 8px;">
+            <div class="progress-bar bg-danger" style="width: 20%"></div>
+        </div>
+        <span>20%</span>
+    </div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Intent-Based Keywords</h5>
+</div>
+<div class="card-body">
+<ul class="nav nav-tabs" id="intentTabs" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" data-toggle="tab" href="#informational">Informational</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-toggle="tab" href="#commercial">Commercial</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-toggle="tab" href="#transactional">Transactional</a>
+    </li>
+</ul>
+<div class="tab-content mt-3">
+    <div class="tab-pane fade show active" id="informational">
+        <div class="list-group">
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">how to choose hardwood flooring</h6>
+                    <small>1,200 searches/mo</small>
+                </div>
+                <p class="mb-1">Current Position: 5</p>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">vinyl vs hardwood flooring comparison</h6>
+                    <small>950 searches/mo</small>
+                </div>
+                <p class="mb-1">Current Position: 8</p>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="commercial">
+        <div class="list-group">
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">best flooring for kitchen</h6>
+                    <small>2,400 searches/mo</small>
+                </div>
+                <p class="mb-1">Current Position: 4</p>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">luxury vinyl plank brands</h6>
+                    <small>1,800 searches/mo</small>
+                </div>
+                <p class="mb-1">Current Position: 6</p>
+            </div>
+        </div>
+    </div>
+    <div class="tab-pane fade" id="transactional">
+        <div class="list-group">
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">hardwood flooring installation cost</h6>
+                    <small>3,200 searches/mo</small>
+                </div>
+                <p class="mb-1">Current Position: 3</p>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">buy luxury vinyl planks online</h6>
+                    <small>1,500 searches/mo</small>
+                </div>
+                <p class="mb-1">Current Position: 7</p>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Content Gap Analysis -->
+<div class="row mb-4">
+<div class="col-md-12">
+<div class="card">
+<div class="card-header d-flex justify-content-between align-items-center">
+<h5 class="card-title mb-0">Content Gap Analysis</h5>
+<button class="btn btn-sm btn-primary">Generate Content Ideas</button>
+</div>
+<div class="card-body">
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Missing Topic</th>
+                <th>Search Volume</th>
+                <th>Competitor Coverage</th>
+                <th>Difficulty</th>
+                <th>Priority</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>eco-friendly flooring options</td>
+                <td>
+                    <span class="search-volume">2,400</span>
+                    <span class="trend-up ml-2"><i class="fas fa-arrow-up"></i> 25%</span>
+                </td>
+                <td>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-warning" style="width: 60%"></div>
+                    </div>
+                    <small>3/5 competitors</small>
+                </td>
+                <td>
+                    <span class="difficulty-medium">
+                        <i class="fas fa-circle"></i> Medium (52)
+                    </span>
+                </td>
+                <td>
+                    <span class="badge badge-success">High</span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary">Create Content</button>
+                </td>
+            </tr>
+            <tr>
+                <td>pet-friendly flooring solutions</td>
+                <td>
+                    <span class="search-volume">1,800</span>
+                    <span class="trend-up ml-2"><i class="fas fa-arrow-up"></i> 18%</span>
+                </td>
+                <td>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-danger" style="width: 40%"></div>
+                    </div>
+                    <small>2/5 competitors</small>
+                </td>
+                <td>
+                    <span class="difficulty-easy">
+                        <i class="fas fa-circle"></i> Easy (28)
+                    </span>
+                </td>
+                <td>
+                    <span class="badge badge-success">High</span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary">Create Content</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Keyword Difficulty Analysis -->
+<div class="row">
+<div class="col-md-8">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Keyword Difficulty Distribution</h5>
+</div>
+<div class="card-body">
+<canvas id="difficultyDistributionChart"></canvas>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Difficulty Breakdown</h5>
+</div>
+<div class="card-body">
+<div class="mb-4">
+    <h6>Easy (0-30)</h6>
+    <div class="progress mb-2" style="height: 8px;">
+        <div class="progress-bar bg-success" style="width: 35%"></div>
+    </div>
+    <small>435 keywords</small>
+</div>
+<div class="mb-4">
+    <h6>Medium (31-70)</h6>
+    <div class="progress mb-2" style="height: 8px;">
+        <div class="progress-bar bg-warning" style="width: 45%"></div>
+    </div>
+    <small>562 keywords</small>
+</div>
+<div class="mb-4">
+    <h6>Hard (71-100)</h6>
+    <div class="progress mb-2" style="height: 8px;">
+        <div class="progress-bar bg-danger" style="width: 20%"></div>
+    </div>
+    <small>250 keywords</small>
+</div>
+<hr>
+<h6>Key Factors:</h6>
+<ul class="list-unstyled">
+    <li><i class="fas fa-check-circle text-success mr-2"></i>Domain Authority</li>
+    <li><i class="fas fa-check-circle text-success mr-2"></i>Content Quality</li>
+    <li><i class="fas fa-check-circle text-success mr-2"></i>Backlink Profile</li>
+    <li><i class="fas fa-check-circle text-success mr-2"></i>Competition Level</li>
+    <li><i class="fas fa-check-circle text-success mr-2"></i>SERP Features</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Add this script section at the bottom of the body -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+// Initialize all tooltips
+$('[data-toggle="tooltip"]').tooltip();
+
+// Semantic Cluster Chart
+const semanticCtx = document.getElementById('semanticClusterChart').getContext('2d');
+new Chart(semanticCtx, {
+type: 'bubble',
+data: {
+datasets: [{
+label: 'Hardwood Installation',
+data: [{
+    x: 80,
+    y: 65,
+    r: 20
+}],
+backgroundColor: 'rgba(75, 192, 192, 0.6)'
+}, {
+label: 'Vinyl Maintenance',
+data: [{
+    x: 65,
+    y: 75,
+    r: 15
+}],
+backgroundColor: 'rgba(255, 99, 132, 0.6)'
+}, {
+label: 'Tile Selection',
+data: [{
+    x: 70,
+    y: 55,
+    r: 18
+}],
+backgroundColor: 'rgba(54, 162, 235, 0.6)'
+}]
+},
+options: {
+responsive: true,
+plugins: {
+title: {
+    display: true,
+    text: 'Semantic Keyword Clusters'
+},
+tooltip: {
+    callbacks: {
+        label: function(context) {
+            return `${context.dataset.label}: ${context.raw.r} keywords`;
+        }
+    }
+}
+},
+scales: {
+x: {
+    title: {
+        display: true,
+        text: 'Relevance Score'
+    },
+    min: 0,
+    max: 100
+},
+y: {
+    title: {
+        display: true,
+        text: 'Search Volume'
+    },
+    min: 0,
+    max: 100
+}
+}
+}
+});
+
+// Intent Distribution Chart
+const intentCtx = document.getElementById('intentDistributionChart').getContext('2d');
+new Chart(intentCtx, {
+type: 'doughnut',
+data: {
+labels: ['Informational', 'Commercial', 'Transactional'],
+datasets: [{
+data: [45, 35, 20],
+backgroundColor: [
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(255, 99, 132, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'bottom'
+}
+}
+}
+});
+
+// Difficulty Distribution Chart
+const difficultyCtx = document.getElementById('difficultyDistributionChart').getContext('2d');
+new Chart(difficultyCtx, {
+type: 'bar',
+data: {
+labels: ['0-10', '11-20', '21-30', '31-40', '41-50', '51-60', '61-70', '71-80', '81-90', '91-100'],
+datasets: [{
+label: 'Number of Keywords',
+data: [120, 150, 165, 145, 170, 140, 107, 95, 80, 75],
+backgroundColor: function(context) {
+    const value = context.raw;
+    if (context.dataIndex <= 2) return 'rgba(75, 192, 192, 0.8)'; // Easy
+    if (context.dataIndex <= 6) return 'rgba(255, 206, 86, 0.8)'; // Medium
+    return 'rgba(255, 99, 132, 0.8)'; // Hard
+}
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Number of Keywords'
+    }
+},
+x: {
+    title: {
+        display: true,
+        text: 'Difficulty Score Range'
+    }
+}
+},
+plugins: {
+legend: {
+    display: false
+}
+}
+}
+});
+
+// Add event listeners for filters
+document.querySelectorAll('.dropdown-item').forEach(item => {
+item.addEventListener('click', function(e) {
+e.preventDefault();
+// Implement filter logic here
+console.log('Filter selected:', this.textContent);
+});
+});
+
+// Add event listeners for action buttons
+document.querySelectorAll('.btn-outline-primary').forEach(button => {
+button.addEventListener('click', function(e) {
+// Implement action logic here
+console.log('Action button clicked:', this.textContent);
+});
+});
+
+// Function to update trends
+function updateTrends() {
+// Implement trend update logic here
+console.log('Updating trends...');
+}
+
+// Function to refresh keyword data
+function refreshKeywordData() {
+// Implement refresh logic here
+console.log('Refreshing keyword data...');
+}
+
+// Initialize custom tooltips for charts
+const customTooltips = {
+callbacks: {
+label: function(context) {
+let label = context.dataset.label || '';
+if (label) {
+    label += ': ';
+}
+if (context.parsed.y !== null) {
+    label += new Intl.NumberFormat().format(context.parsed.y);
+}
+return label;
+}
+}
+};
+
+// Add event listener for the search input
+document.querySelector('input[type="text"]').addEventListener('keyup', function(e) {
+if (e.key === 'Enter') {
+// Implement search logic here
+console.log('Searching for:', this.value);
+}
+});
+
+// Initialize periodic data refresh
+setInterval(function() {
+updateTrends();
+}, 300000); // Update every 5 minutes
+
+// Add export functionality
+document.querySelector('button[data-export]').addEventListener('click', function() {
+// Implement export logic here
+console.log('Exporting data...');
+});
+
+// Add content generation functionality
+document.querySelector('button[data-generate]').addEventListener('click', function() {
+// Implement content generation logic here
+console.log('Generating content ideas...');
+});
+});
+
+// Utility functions for keyword analysis
+const keywordUtils = {
+calculateDifficulty: function(metrics) {
+// Implement difficulty calculation logic
+return Math.floor(Math.random() * 100);
+},
+
+analyzeTrend: function(historical) {
+// Implement trend analysis logic
+return 'up';
+},
+
+categorizeIntent: function(keyword) {
+// Implement intent categorization logic
+return 'informational';
+},
+
+generateSuggestions: function(keyword) {
+// Implement suggestion generation logic
+return ['suggestion1', 'suggestion2'];
+}
+};
+
+// Error handling
+window.addEventListener('error', function(e) {
+console.error('An error occurred:', e.error);
+// Implement error notification logic here
+});
+</script>
+</body>
+</html>
+
+
+
+    <script>
+        
+document.addEventListener('DOMContentLoaded', function() {
+// Initialize all tooltips
+$('[data-toggle="tooltip"]').tooltip();
+
+// Semantic Cluster Chart
+const semanticCtx = document.getElementById('semanticClusterChart').getContext('2d');
+new Chart(semanticCtx, {
+type: 'bubble',
+data: {
+datasets: [{
+label: 'Hardwood Installation',
+data: [{
+    x: 80,
+    y: 65,
+    r: 20
+}],
+backgroundColor: 'rgba(75, 192, 192, 0.6)'
+}, {
+label: 'Vinyl Maintenance',
+data: [{
+    x: 65,
+    y: 75,
+    r: 15
+}],
+backgroundColor: 'rgba(255, 99, 132, 0.6)'
+}, {
+label: 'Tile Selection',
+data: [{
+    x: 70,
+    y: 55,
+    r: 18
+}],
+backgroundColor: 'rgba(54, 162, 235, 0.6)'
+}]
+},
+options: {
+responsive: true,
+plugins: {
+title: {
+    display: true,
+    text: 'Semantic Keyword Clusters'
+},
+tooltip: {
+    callbacks: {
+        label: function(context) {
+            return `${context.dataset.label}: ${context.raw.r} keywords`;
+        }
+    }
+}
+},
+scales: {
+x: {
+    title: {
+        display: true,
+        text: 'Relevance Score'
+    },
+    min: 0,
+    max: 100
+},
+y: {
+    title: {
+        display: true,
+        text: 'Search Volume'
+    },
+    min: 0,
+    max: 100
+}
+}
+}
+});
+
+// Intent Distribution Chart
+const intentCtx = document.getElementById('intentDistributionChart').getContext('2d');
+new Chart(intentCtx, {
+type: 'doughnut',
+data: {
+labels: ['Informational', 'Commercial', 'Transactional'],
+datasets: [{
+data: [45, 35, 20],
+backgroundColor: [
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(255, 99, 132, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'bottom'
+}
+}
+}
+});
+
+// Difficulty Distribution Chart
+const difficultyCtx = document.getElementById('difficultyDistributionChart').getContext('2d');
+new Chart(difficultyCtx, {
+type: 'bar',
+data: {
+labels: ['0-10', '11-20', '21-30', '31-40', '41-50', '51-60', '61-70', '71-80', '81-90', '91-100'],
+datasets: [{
+label: 'Number of Keywords',
+data: [120, 150, 165, 145, 170, 140, 107, 95, 80, 75],
+backgroundColor: function(context) {
+    const value = context.raw;
+    if (context.dataIndex <= 2) return 'rgba(75, 192, 192, 0.8)'; // Easy
+    if (context.dataIndex <= 6) return 'rgba(255, 206, 86, 0.8)'; // Medium
+    return 'rgba(255, 99, 132, 0.8)'; // Hard
+}
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Number of Keywords'
+    }
+},
+x: {
+    title: {
+        display: true,
+        text: 'Difficulty Score Range'
+    }
+}
+},
+plugins: {
+legend: {
+    display: false
+}
+}
+}
+});
+
+// Add event listeners for filters
+document.querySelectorAll('.dropdown-item').forEach(item => {
+item.addEventListener('click', function(e) {
+e.preventDefault();
+// Implement filter logic here
+console.log('Filter selected:', this.textContent);
+});
+});
+
+// Add event listeners for action buttons
+document.querySelectorAll('.btn-outline-primary').forEach(button => {
+button.addEventListener('click', function(e) {
+// Implement action logic here
+console.log('Action button clicked:', this.textContent);
+});
+});
+
+// Function to update trends
+function updateTrends() {
+// Implement trend update logic here
+console.log('Updating trends...');
+}
+
+// Function to refresh keyword data
+function refreshKeywordData() {
+// Implement refresh logic here
+console.log('Refreshing keyword data...');
+}
+
+// Initialize custom tooltips for charts
+const customTooltips = {
+callbacks: {
+label: function(context) {
+let label = context.dataset.label || '';
+if (label) {
+    label += ': ';
+}
+if (context.parsed.y !== null) {
+    label += new Intl.NumberFormat().format(context.parsed.y);
+}
+return label;
+}
+}
+};
+
+// Add event listener for the search input
+document.querySelector('input[type="text"]').addEventListener('keyup', function(e) {
+if (e.key === 'Enter') {
+// Implement search logic here
+console.log('Searching for:', this.value);
+}
+});
+
+// Initialize periodic data refresh
+setInterval(function() {
+updateTrends();
+}, 300000); // Update every 5 minutes
+
+// Add export functionality
+document.querySelector('button[data-export]').addEventListener('click', function() {
+// Implement export logic here
+console.log('Exporting data...');
+});
+
+// Add content generation functionality
+document.querySelector('button[data-generate]').addEventListener('click', function() {
+// Implement content generation logic here
+console.log('Generating content ideas...');
+});
+});
+
+// Utility functions for keyword analysis
+const keywordUtils = {
+calculateDifficulty: function(metrics) {
+// Implement difficulty calculation logic
+return Math.floor(Math.random() * 100);
+},
+
+analyzeTrend: function(historical) {
+// Implement trend analysis logic
+return 'up';
+},
+
+categorizeIntent: function(keyword) {
+// Implement intent categorization logic
+return 'informational';
+},
+
+generateSuggestions: function(keyword) {
+// Implement suggestion generation logic
+return ['suggestion1', 'suggestion2'];
+}
+};
+
+// Error handling
+window.addEventListener('error', function(e) {
+console.error('An error occurred:', e.error);
+// Implement error notification logic here
+});
+
+
+    </script>
+</body>
+</html>

@@ -188,7 +188,5 @@ landing_page_data.csv
 litellmtest.py
 /external_research/crewAi/
 /env-files/
-poetry.lock
-pyproject.toml
 pids/celery.pid
 pids/django.pid

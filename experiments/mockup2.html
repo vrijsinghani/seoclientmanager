@@ -1,0 +1,2011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Driven Keyword Research Tool</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <a class="navbar-brand" href="#">AI Keyword Research Tool</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showPage('dashboard')">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showPage('businessObjectives')">Business Objectives</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showPage('companyProfile')">Company Profile</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showPage('keywordIntelligence')">Keyword Intelligence</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" onclick="showPage('performanceOptimization')">Performance Optimization</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">Reports</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">Settings</a>
+                </li>
+<li class="nav-item">
+    <a class="nav-link" href="#" onclick="showPage('aiAnalysis')">AI Analysis</a>
+</li>
+            </ul>
+        </div>
+    </nav>
+
+    <div id="dashboard" class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        Real-time Metrics
+                    </div>
+                    <div class="card-body">
+                        <h5>Impressions: <span id="impressions">1,234,567</span></h5>
+                        <h5>Clicks: <span id="clicks">98,765</span></h5>
+                        <h5>CTR: <span id="ctr">8.0%</span></h5>
+                        <h5>Avg. Position: <span id="avg-position">3.2</span></h5>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-header">
+                        Performance Trends
+                    </div>
+                    <div class="card-body">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Priority Recommendations
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item">Optimize for "AI-driven marketing" keyword</li>
+                            <li class="list-group-item">Improve CTR for "machine learning solutions"</li>
+                            <li class="list-group-item">Create content for "data analytics trends"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Keyword Intelligence
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item">Top trending query: "AI in business"</li>
+                            <li class="list-group-item">Seasonal pattern detected: "holiday marketing strategies"</li>
+                            <li class="list-group-item">Content gap: "AI ethics in marketing"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="businessObjectives" class="container-fluid mt-4" style="display: none;">
+        <h2>Business Objectives</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Primary Goals</div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item">Increase market share by 15%</li>
+                            <li class="list-group-item">Launch 3 new product lines</li>
+                            <li class="list-group-item">Expand to 2 new geographic markets</li>
+                        </ul>
+                        <button class="btn btn-primary mt-3">Add New Goal</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Revenue Targets</div>
+                    <div class="card-body">
+                        <form>
+                            <div class="form-group">
+                                <label for="revenueTarget">Annual Revenue Target</label>
+                                <input type="text" class="form-control" id="revenueTarget" value="$10,000,000">
+                            </div>
+                            <div class="form-group">
+                                <label for="growthRate">Expected Growth Rate</label>
+                                <input type="text" class="form-control" id="growthRate" value="12%">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Targets</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">Content Strategy Goals</div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Goal</th>
+                                    <th>Target</th>
+                                    <th>Progress</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Increase organic traffic</td>
+                                    <td>50% YoY</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar" style="width: 35%;" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">35%</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Improve conversion rate</td>
+                                    <td>3% to 5%</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar" style="width: 60%;" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">60%</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button class="btn btn-primary">Add New Content Goal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="companyProfile" class="container-fluid mt-4" style="display: none;">
+        <h2>Company Profile</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Basic Information</div>
+                    <div class="card-body">
+                        <form>
+                            <div class="form-group">
+                                <label for="companyName">Company Name</label>
+                                <input type="text" class="form-control" id="companyName" value="AI Solutions Inc.">
+                            </div>
+                            <div class="form-group">
+                                <label for="industryVertical">Industry Vertical</label>
+                                <input type="text" class="form-control" id="industryVertical" value="Technology">
+                            </div>
+                            <div class="form-group">
+                                <label for="geographicFocus">Geographic Focus</label>
+                                <input type="text" class="form-control" id="geographicFocus" value="North America, Europe">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Profile</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Target Audience</div>
+                    <div class="card-body">
+                        <form>
+                            <div class="form-group">
+                                <label for="targetAudience">Primary Target Audience</label>
+                                <textarea class="form-control" id="targetAudience" rows="3">B2B companies, IT decision-makers, Data scientists</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="audienceDemographics">Audience Demographics</label>
+                                <textarea class="form-control" id="audienceDemographics" rows="3">Age: 30-55, Education: Bachelor's or higher, Income: $80k+</textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Audience Info</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">Competitor Information</div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Competitor Name</th>
+                                    <th>Main Products/Services</th>
+                                    <th>Market Share</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>TechGiant Corp</td>
+                                    <td>AI Software, Cloud Services</td>
+                                    <td>35%</td>
+                                    <td><button class="btn btn-sm btn-info">Edit</button></td>
+                                </tr>
+                                <tr>
+                                    <td>DataPro Systems</td>
+                                    <td>Data Analytics, Machine Learning</td>
+                                    <td>22%</td>
+                                    <td><button class="btn btn-sm btn-info">Edit</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button class="btn btn-primary">Add New Competitor</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+<div id="aiAnalysis" class="container-fluid mt-4" style="display: none;">
+    <h2>AI Analysis Capabilities</h2>
+    
+    <!-- Trending Queries Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Trending Queries</span>
+                    <button class="btn btn-sm btn-primary">Refresh Analysis</button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Query</th>
+                                    <th>Growth Rate</th>
+                                    <th>Search Volume</th>
+                                    <th>Trend Direction</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>"AI automation tools"</td>
+                                    <td>+156%</td>
+                                    <td>15,000</td>
+                                    <td><span class="badge badge-success">↑ Rising</span></td>
+                                </tr>
+                                <tr>
+                                    <td>"machine learning solutions"</td>
+                                    <td>+89%</td>
+                                    <td>22,000</td>
+                                    <td><span class="badge badge-success">↑ Rising</span></td>
+                                </tr>
+                                <tr>
+                                    <td>"data analytics platforms"</td>
+                                    <td>+45%</td>
+                                    <td>18,500</td>
+                                    <td><span class="badge badge-warning">→ Stable</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seasonal Patterns Section -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    Seasonal Patterns Detection
+                </div>
+                <div class="card-body">
+                    <canvas id="seasonalChart"></canvas>
+                    <div class="mt-3">
+                        <h6>Detected Patterns:</h6>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                "AI implementation guide"
+                                <span class="badge badge-info">Q4 Peak</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                "machine learning training"
+                                <span class="badge badge-info">Q1 Peak</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Intent Classification -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    Query Intent Classification
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <canvas id="intentDistributionChart"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="intent-breakdown mt-3">
+                                <h6>Intent Breakdown:</h6>
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Informational
+                                        <span class="badge badge-primary badge-pill">45%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Transactional
+                                        <span class="badge badge-primary badge-pill">30%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Commercial
+                                        <span class="badge badge-primary badge-pill">15%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Navigational
+                                        <span class="badge badge-primary badge-pill">10%</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Clustering -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Performance Clustering</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary mr-2">Export Data</button>
+                        <button class="btn btn-sm btn-primary">Update Clusters</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Cluster</th>
+                                    <th>Keywords</th>
+                                    <th>Avg. Position</th>
+                                    <th>CTR</th>
+                                    <th>Conversion Rate</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>High Performance</td>
+                                    <td>125 keywords</td>
+                                    <td>1-3</td>
+                                    <td>15.2%</td>
+                                    <td>4.8%</td>
+                                    <td><button class="btn btn-sm btn-info">View Details</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Medium Performance</td>
+                                    <td>280 keywords</td>
+                                    <td>4-10</td>
+                                    <td>8.5%</td>
+                                    <td>2.3%</td>
+                                    <td><button class="btn btn-sm btn-info">View Details</button></td>
+                                </tr>
+                                <tr>
+                                    <td>Underperforming</td>
+                                    <td>95 keywords</td>
+                                    <td>11+</td>
+                                    <td>1.2%</td>
+                                    <td>0.5%</td>
+                                    <td><button class="btn btn-sm btn-info">View Details</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- High-Potential Keywords -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    Underperforming High-Potential Keywords
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Keyword</th>
+                                    <th>Current Position</th>
+                                    <th>Search Volume</th>
+                                    <th>Potential Impact</th>
+                                    <th>Difficulty</th>
+                                    <th>Action Plan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>"enterprise AI solutions"</td>
+                                    <td>12</td>
+                                    <td>8,500</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">High</div>
+                                        </div>
+                                    </td>
+                                    <td>Medium</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success" data-toggle="tooltip" title="View Optimization Plan">
+                                            View Plan
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>"AI consulting services"</td>
+                                    <td>15</td>
+                                    <td>6,200</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 75%" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">High</div>
+                                        </div>
+                                    </td>
+                                    <td>Medium</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success" data-toggle="tooltip" title="View Optimization Plan">
+                                            View Plan
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    <script>
+        function showPage(pageId) {
+            // Hide all pages
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('businessObjectives').style.display = 'none';
+            document.getElementById('companyProfile').style.display = 'none';
+            document.getElementById('aiAnalysis').style.display = 'none';
+            document.getElementById('keywordIntelligence').style.display = 'none';
+            document.getElementById('performanceOptimization').style.display = 'none';
+        
+            // Show the selected page
+            document.getElementById(pageId).style.display = 'block';
+        
+            // Initialize charts based on the page
+            if (pageId === 'aiAnalysis') {
+                initializeAIAnalysisCharts();
+            } else if (pageId === 'keywordIntelligence') {
+                initializeKeywordIntelligenceCharts();
+            } else if (pageId === 'performanceOptimization') {
+                initializePerformanceOptimizationCharts();
+            }
+        }
+ 
+
+        // Performance Chart
+        var ctx = document.getElementById('performanceChart').getContext('2d');
+        var chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Impressions',
+                    data: [1000000, 1200000, 1100000, 1300000, 1400000, 1500000],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }, {
+                    label: 'Clicks',
+                    data: [50000, 60000, 55000, 65000, 70000, 75000],
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
+<script>
+    // Update the showPage function to include the new aiAnalysis page
+    function showPage(pageId) {
+        // Hide all pages
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('businessObjectives').style.display = 'none';
+        document.getElementById('companyProfile').style.display = 'none';
+        document.getElementById('aiAnalysis').style.display = 'none';
+
+        // Show the selected page
+        document.getElementById(pageId).style.display = 'block';
+
+        // Initialize charts if showing AI Analysis page
+        if (pageId === 'aiAnalysis') {
+            initializeAIAnalysisCharts();
+        }
+    }
+
+    function initializeAIAnalysisCharts() {
+        // Seasonal Pattern Chart
+        var seasonalCtx = document.getElementById('seasonalChart').getContext('2d');
+        var seasonalChart = new Chart(seasonalCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Search Volume Trends',
+                    data: [65, 59, 80, 81, 56, 55, 40, 45, 60, 85, 90, 95],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Intent Distribution Chart
+        var intentCtx = document.getElementById('intentDistributionChart').getContext('2d');
+        var intentChart = new Chart(intentCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Informational', 'Transactional', 'Commercial', 'Navigational'],
+                datasets: [{
+                    data: [45, 30, 15, 10],
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)',
+                        'rgba(255, 99, 132, 0.8)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+
+    // Profile Alignment Chart
+    var profileCtx = document.getElementById('profileAlignmentChart').getContext('2d');
+    var profileChart = new Chart(profileCtx, {
+        type: 'radar',
+        data: {
+            labels: ['Industry Relevance', 'Target Audience', 'Geographic Focus', 'Brand Voice', 'Product Alignment'],
+            datasets: [{
+                label: 'Current Alignment',
+                data: [92, 88, 75, 85, 90],
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgb(75, 192, 192)',
+                pointBackgroundColor: 'rgb(75, 192, 192)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(75, 192, 192)'
+            }]
+        },
+        options: {
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    // Competitive Gap Chart
+    var gapCtx = document.getElementById('competitiveGapChart').getContext('2d');
+    var gapChartData = {
+        labels: ['AI Implementation', 'Machine Learning', 'Data Analytics', 'Cloud Solutions', 'Consulting'],
+        datasets: [{
+            label: 'Your Company',
+            data: [65, 75, 82, 68, 72],
+            backgroundColor: 'rgba(75, 192, 192, 0.8)'
+        }, {
+            label: 'Competitors Average',
+            data: [72, 68, 75, 82, 65],
+            backgroundColor: 'rgba(255, 99, 132, 0.8)'
+        }]
+    };
+    var gapChart = new Chart(gapCtx, {
+        type: 'bar',
+        data: gapChartData,
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+    // Profile Alignment Chart
+    var profileCtx = document.getElementById('profileAlignmentChart').getContext('2d');
+    var profileChartData = {
+        labels: ['Industry Relevance', 'Target Audience', 'Geographic Focus', 'Brand Voice', 'Product Alignment'],
+        datasets: [{
+            label: 'Current Alignment',
+            data: [92, 88, 75, 85, 90],
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            borderColor: 'rgb(75, 192, 192)',
+            pointBackgroundColor: 'rgb(75, 192, 192)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgb(75, 192, 192)'
+        }]
+    };
+    var profileChart = new Chart(profileCtx, {
+        type: 'radar',
+        data: profileChartData,
+        options: {
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    // Initialize tooltips
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    });
+</script>
+<!-- Business Context Analysis Section -->
+<div class="row mt-4 mb-4">
+    <div class="col-md-12">
+        <h3>Business Context Analysis</h3>
+    </div>
+</div>
+
+<!-- Keyword-Business Objective Mapping -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Keyword-Business Objective Mapping</span>
+                <button class="btn btn-sm btn-primary">Update Mapping</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Business Objective</th>
+                                <th>Related Keywords</th>
+                                <th>Alignment Score</th>
+                                <th>Priority</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Increase market share</td>
+                                <td>
+                                    <span class="badge badge-info">enterprise AI solutions</span>
+                                    <span class="badge badge-info">AI consulting</span>
+                                    <span class="badge badge-info">machine learning platforms</span>
+                                </td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85%</div>
+                                    </div>
+                                </td>
+                                <td><span class="badge badge-success">High</span></td>
+                            </tr>
+                            <tr>
+                                <td>Launch new product lines</td>
+                                <td>
+                                    <span class="badge badge-info">AI automation tools</span>
+                                    <span class="badge badge-info">predictive analytics</span>
+                                </td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-warning" role="progressbar" style="width: 65%" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">65%</div>
+                                    </div>
+                                </td>
+                                <td><span class="badge badge-warning">Medium</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Company Profile Alignment -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                Company Profile Alignment
+            </div>
+            <div class="card-body">
+                <canvas id="profileAlignmentChart"></canvas>
+                <div class="mt-3">
+                    <h6>Key Alignment Metrics:</h6>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Industry Relevance
+                            <span class="badge badge-success badge-pill">92%</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Target Audience Match
+                            <span class="badge badge-success badge-pill">88%</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Geographic Focus
+                            <span class="badge badge-warning badge-pill">75%</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Industry Opportunity Scoring -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Industry-Specific Keyword Opportunity Scoring</span>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary">Filter by Industry</button>
+                    <button class="btn btn-sm btn-primary">Export Report</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Industry Relevance</th>
+                                <th>Competition Level</th>
+                                <th>Growth Potential</th>
+                                <th>Opportunity Score</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>AI process automation</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 90%" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100">90%</div>
+                                    </div>
+                                </td>
+                                <td>Medium</td>
+                                <td>High</td>
+                                <td><span class="badge badge-success">8.5</span></td>
+                                <td><button class="btn btn-sm btn-info">Analyze</button></td>
+                            </tr>
+                            <tr>
+                                <td>machine learning consulting</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85%</div>
+                                    </div>
+                                </td>
+                                <td>High</td>
+                                <td>Medium</td>
+                                <td><span class="badge badge-warning">7.2</span></td>
+                                <td><button class="btn btn-sm btn-info">Analyze</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Competitive Gap Analysis -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                Competitive Gap Analysis
+            </div>
+            <div class="card-body">
+                <canvas id="competitiveGapChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                Gap Opportunities
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">AI Implementation Services</h6>
+                            <small class="text-success">High Potential</small>
+                        </div>
+                        <p class="mb-1">Low competition, high search volume</p>
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Custom AI Solutions</h6>
+                            <small class="text-warning">Medium Potential</small>
+                        </div>
+                        <p class="mb-1">Medium competition, growing trend</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Brand Alignment Verification -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                Brand Alignment Verification
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Brand Voice Analysis</h5>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Keyword Group</th>
+                                    <th>Brand Alignment</th>
+                                    <th>Recommendations</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Technical Terms</td>
+                                    <td><span class="badge badge-success">Strong</span></td>
+                                    <td>Maintain current approach</td>
+                                </tr>
+                                <tr>
+                                    <td>Industry Jargon</td>
+                                    <td><span class="badge badge-warning">Moderate</span></td>
+                                    <td>Simplify language for broader appeal</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Brand Value Alignment</h5>
+                        <canvas id="brandAlignmentChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Recommendation Engine Section -->
+<div class="row mt-4 mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>AI Recommendation Engine</span>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary">Refresh Recommendations</button>
+                    <button class="btn btn-sm btn-primary">Export Insights</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Custom Filters -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <h5>Custom Filters</h5>
+                        <div class="d-flex flex-wrap gap-2">
+                            <div class="form-group mr-3">
+                                <label>Minimum Search Volume</label>
+                                <select class="form-control form-control-sm">
+                                    <option>Any</option>
+                                    <option>1,000+</option>
+                                    <option>5,000+</option>
+                                    <option>10,000+</option>
+                                </select>
+                            </div>
+                            <div class="form-group mr-3">
+                                <label>Competition Level</label>
+                                <select class="form-control form-control-sm">
+                                    <option>All</option>
+                                    <option>Low</option>
+                                    <option>Medium</option>
+                                    <option>High</option>
+                                </select>
+                            </div>
+                            <div class="form-group mr-3">
+                                <label>Business Objective</label>
+                                <select class="form-control form-control-sm">
+                                    <option>All Objectives</option>
+                                    <option>Market Share Growth</option>
+                                    <option>Product Launch</option>
+                                    <option>Brand Awareness</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Priority Level</label>
+                                <select class="form-control form-control-sm">
+                                    <option>All</option>
+                                    <option>High</option>
+                                    <option>Medium</option>
+                                    <option>Low</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI-Powered Keyword Clusters -->
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <h5>AI-Powered Keyword Clusters</h5>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Cluster Theme</th>
+                                        <th>Keywords</th>
+                                        <th>Total Search Volume</th>
+                                        <th>Average Competition</th>
+                                        <th>Business Relevance</th>
+                                        <th>Priority Score</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Enterprise AI Solutions</td>
+                                        <td>
+                                            <span class="badge badge-light">enterprise AI platform</span>
+                                            <span class="badge badge-light">AI business solutions</span>
+                                            <span class="badge badge-light">enterprise machine learning</span>
+                                            <button class="btn btn-sm btn-link">+5 more</button>
+                                        </td>
+                                        <td>25,000</td>
+                                        <td>Medium</td>
+                                        <td>
+                                            <div class="progress">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: 90%" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100">90%</div>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge badge-success">8.7</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary">Analyze</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>AI Implementation</td>
+                                        <td>
+                                            <span class="badge badge-light">AI integration services</span>
+                                            <span class="badge badge-light">implement AI solutions</span>
+                                            <span class="badge badge-light">AI deployment</span>
+                                            <button class="btn btn-sm btn-link">+3 more</button>
+                                        </td>
+                                        <td>18,500</td>
+                                        <td>Low</td>
+                                        <td>
+                                            <div class="progress">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85%</div>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge badge-success">8.2</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary">Analyze</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority Scoring Matrix -->
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                Priority Scoring Matrix
+                            </div>
+                            <div class="card-body">
+                                <canvas id="priorityMatrix"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                Scoring Components
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Business Relevance
+                                        <span class="badge badge-primary badge-pill">30%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Search Volume
+                                        <span class="badge badge-primary badge-pill">25%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Competition Level
+                                        <span class="badge badge-primary badge-pill">20%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Current Performance
+                                        <span class="badge badge-primary badge-pill">15%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Business Alignment
+                                        <span class="badge badge-primary badge-pill">10%</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opportunity Sizing and Impact Prediction -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                Opportunity Sizing and Impact Prediction
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Traffic Potential</h6>
+                                        <canvas id="trafficPotentialChart"></canvas>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Revenue Impact</h6>
+                                        <canvas id="revenueImpactChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="row mt-4">
+                                    <div class="col-md-12">
+                                        <h6>Implementation Timeline</h6>
+                                        <div class="table-responsive">
+                                            <table class="table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Phase</th>
+                                                        <th>Duration</th>
+                                                        <th>Expected Impact</th>
+                                                        <th>Resources Required</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>Content Creation</td>
+                                                        <td>4 weeks</td>
+                                                        <td>+15% organic traffic</td>
+                                                        <td>2 writers, 1 editor</td>
+                                                        <td><span class="badge badge-warning">Pending</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Technical Optimization</td>
+                                                        <td>2 weeks</td>
+                                                        <td>+25% CTR</td>
+                                                        <td>1 SEO specialist</td>
+                                                        <td><span class="badge badge-info">In Progress</span></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this to your existing JavaScript -->
+<script>
+    function initializeRecommendationCharts() {
+        // Priority Matrix Chart
+        var priorityCtx = document.getElementById('priorityMatrix').getContext('2d');
+        var priorityChart = new Chart(priorityCtx, {
+            type: 'bubble',
+            data: {
+                datasets: [{
+                    label: 'Keywords',
+                    data: [
+                        { x: 80, y: 90, r: 15 },
+                        { x: 70, y: 85, r: 10 },
+                        { x: 90, y: 75, r: 20 },
+                        { x: 60, y: 95, r: 12 }
+                    ],
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Business Relevance'
+                        },
+                        min: 0,
+                        max: 100
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Search Potential'
+                        },
+                        min: 0,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Traffic Potential Chart
+        var trafficCtx = document.getElementById('trafficPotentialChart').getContext('2d');
+        var trafficChart = new Chart(trafficCtx, {
+            type: 'line',
+            data: {
+                labels: ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6'],
+                datasets: [{
+                    label: 'Projected Traffic',
+                    data: [1000, 1500, 2500, 4000, 6000, 8000],
+                    borderColor: 'rgb(75, 192, 192)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+
+        // Revenue Impact Chart
+        var revenueCtx = document.getElementById('revenueImpactChart').getContext('2d');
+        var revenueChart = new Chart(revenueCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                datasets: [{
+                    label: 'Projected Revenue Impact',
+                    data: [50000, 75000, 100000, 150000],
+                    backgroundColor: 'rgba(75, 192, 192, 0.8)'
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    }
+
+    // Update the existing showPage function to include the new charts
+    function showPage(pageId) {
+        // ... existing code ...
+
+        if (pageId === 'aiAnalysis') {
+            initializeAIAnalysisCharts();
+            initializeRecommendationCharts();
+        }
+    }
+</script>
+
+<!-- Add this new section -->
+<div id="keywordIntelligence" class="container-fluid mt-4" style="display: none;">
+    <h2>Keyword Intelligence</h2>
+
+    <!-- Search and Filter Bar -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Enter seed keyword...">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary" type="button">Analyze</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="btn-group float-right">
+                                <button class="btn btn-outline-secondary">Filter</button>
+                                <button class="btn btn-outline-secondary">Export</button>
+                                <button class="btn btn-outline-secondary">Settings</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Long-tail Keyword Discovery -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Long-tail Keyword Discovery</span>
+                    <button class="btn btn-sm btn-primary">Refresh Analysis</button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Long-tail Keyword</th>
+                                    <th>Search Volume</th>
+                                    <th>Keyword Difficulty</th>
+                                    <th>CPC</th>
+                                    <th>Competition</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>best enterprise ai solutions for small business</td>
+                                    <td>1,200</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-success" role="progressbar" style="width: 35%" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">35</div>
+                                        </div>
+                                    </td>
+                                    <td>$12.50</td>
+                                    <td>Low</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info">Details</button>
+                                    </td>
+                                </tr>
+                                <!-- Add more rows as needed -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Semantic Keyword Grouping -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <span>Semantic Keyword Grouping</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <canvas id="semanticClusterChart"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>Top Semantic Clusters</h5>
+                            <div class="list-group">
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Implementation & Integration</h6>
+                                        <small>45 keywords</small>
+                                    </div>
+                                    <p class="mb-1">Avg. Volume: 2,500</p>
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Training & Support</h6>
+                                        <small>32 keywords</small>
+                                    </div>
+                                    <p class="mb-1">Avg. Volume: 1,800</p>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Intent Mapping -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    Intent Distribution
+                </div>
+                <div class="card-body">
+                    <canvas id="intentDistributionPieChart"></canvas>
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Informational</span>
+                            <span class="badge badge-primary">45%</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Transactional</span>
+                            <span class="badge badge-success">30%</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Commercial</span>
+                            <span class="badge badge-warning">15%</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Navigational</span>
+                            <span class="badge badge-info">10%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    Intent-Based Keywords
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="intentTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-toggle="tab" href="#informational">Informational</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#transactional">Transactional</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#commercial">Commercial</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="tab" href="#navigational">Navigational</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content mt-3">
+                        <div class="tab-pane fade show active" id="informational">
+                            <ul class="list-group">
+                                <li class="list-group-item">how does AI automation work</li>
+                                <li class="list-group-item">machine learning basics guide</li>
+                                <li class="list-group-item">benefits of enterprise AI</li>
+                            </ul>
+                        </div>
+                        <!-- Add other tab panes -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Gap Analysis -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    Content Gap Analysis
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Missing Topic</th>
+                                    <th>Search Volume</th>
+                                    <th>Competitor Coverage</th>
+                                    <th>Difficulty</th>
+                                    <th>Opportunity Score</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>AI implementation best practices</td>
+                                    <td>3,600</td>
+                                    <td>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-warning" role="progressbar" style="width: 60%" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">60%</div>
+                                        </div>
+                                    </td>
+                                    <td>Medium</td>
+                                    <td><span class="badge badge-success">8.5</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary">Create Content</button>
+                                    </td>
+                                </tr>
+                                <!-- Add more rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyword Difficulty Scoring -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    Keyword Difficulty Analysis
+                </div>
+                <div class="card-body">
+                    <canvas id="difficultyScatterChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    Difficulty Breakdown
+                </div>
+                <div class="card-body">
+                    <div class="difficulty-legend">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Easy (0-30)</span>
+                            <span class="badge badge-success">125 keywords</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>Medium (31-60)</span>
+                            <span class="badge badge-warning">243 keywords</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Hard (61-100)</span>
+                            <span class="badge badge-danger">87 keywords</span>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6>Factors Considered:</h6>
+                    <ul class="list-unstyled">
+                        <li>• Domain Authority</li>
+                        <li>• Content Quality</li>
+                        <li>• Backlink Profile</li>
+                        <li>• Competition Level</li>
+                        <li>• SERP Features</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Add this new section -->
+<div id="performanceOptimization" class="container-fluid mt-4" style="display: none;">
+    <h2>Performance Optimization</h2>
+
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Average CTR</h6>
+                    <h2 class="mb-2">3.2%</h2>
+                    <p class="card-text text-success">
+                        <i class="fas fa-arrow-up"></i> +0.5% from last month
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Avg. Position</h6>
+                    <h2 class="mb-2">4.8</h2>
+                    <p class="card-text text-success">
+                        <i class="fas fa-arrow-up"></i> +1.2 positions
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Click Potential</h6>
+                    <h2 class="mb-2">+45%</h2>
+                    <p class="card-text">Additional click opportunity</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">Impression Share</h6>
+                    <h2 class="mb-2">68%</h2>
+                    <p class="card-text">32% growth potential</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTR Improvement Suggestions -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>CTR Improvement Suggestions</span>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-secondary">Filter</button>
+                        <button class="btn btn-sm btn-primary">Export</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Keyword</th>
+                                <th>Current CTR</th>
+                                <th>Avg. Position</th>
+                                <th>Expected CTR</th>
+                                <th>Potential Increase</th>
+                                <th>Recommendation</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>enterprise AI solutions</td>
+                                <td>2.5%</td>
+                                <td>3.2</td>
+                                <td>4.8%</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 92%" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100">+92%</div>
+                                    </div>
+                                </td>
+                                <td>Optimize meta description with benefit-driven copy</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary">Implement</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>AI implementation guide</td>
+                                <td>1.8%</td>
+                                <td>4.5</td>
+                                <td>3.2%</td>
+                                <td>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 78%" aria-valuenow="78" aria-valuemin="0" aria-valuemax="100">+78%</div>
+                                    </div>
+                                </td>
+                                <td>Add step numbers to title tag</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary">Implement</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">CTR Trend Analysis</div>
+                <div class="card-body">
+                    <canvas id="ctrTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Position Optimization -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">Position Optimization Recommendations</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <canvas id="positionDistributionChart"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>Priority Actions</h5>
+                            <div class="list-group">
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Position 4-10 Keywords</h6>
+                                        <small>125 keywords</small>
+                                    </div>
+                                    <p class="mb-1">Optimize internal linking structure</p>
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Position 11-20 Keywords</h6>
+                                        <small>83 keywords</small>
+                                    </div>
+                                    <p class="mb-1">Enhance content depth and quality</p>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Click Potential Analysis -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Click Potential Analysis</div>
+                <div class="card-body">
+                    <canvas id="clickPotentialChart"></canvas>
+                    <div class="mt-3">
+                        <h6>Potential Additional Monthly Clicks</h6>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <td>Current Monthly Clicks</td>
+                                    <td class="text-right">15,000</td>
+                                </tr>
+                                <tr>
+                                    <td>Potential Monthly Clicks</td>
+                                    <td class="text-right">21,750</td>
+                                </tr>
+                                <tr>
+                                    <td>Additional Click Opportunity</td>
+                                    <td class="text-right text-success">+6,750</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Impression Share Opportunities</div>
+                <div class="card-body">
+                    <canvas id="impressionShareChart"></canvas>
+                    <div class="mt-3">
+                        <h6>Top Impression Share Opportunities</h6>
+                        <ul class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                enterprise AI solutions
+                                <span class="badge badge-primary badge-pill">+45%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                AI implementation services
+                                <span class="badge badge-primary badge-pill">+38%</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROI Prediction Modeling -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>ROI Prediction Modeling</span>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-secondary">Adjust Parameters</button>
+                        <button class="btn btn-sm btn-primary">Export Forecast</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <canvas id="roiPredictionChart"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>ROI Projections</h5>
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td>Expected Investment</td>
+                                        <td class="text-right">$25,000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Projected Revenue</td>
+                                        <td class="text-right">$75,000</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ROI (3 months)</td>
+                                        <td class="text-right text-success">200%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Break-even Point</td>
+                                        <td class="text-right">45 days</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <hr>
+                            <h6>Optimization Costs</h6>
+                            <ul class="list-unstyled">
+                                <li>Content Creation: $12,000</li>
+                                <li>Technical SEO: $8,000</li>
+                                <li>Link Building: $5,000</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Add this to your JavaScript -->
+<script>
+function initializeKeywordIntelligenceCharts() {
+    // Semantic Cluster Chart
+    var semanticCtx = document.getElementById('semanticClusterChart').getContext('2d');
+    var semanticChart = new Chart(semanticCtx, {
+        type: 'bubble',
+        data: {
+            datasets: [{
+                label: 'Semantic Clusters',
+                data: [
+                    { x: 40, y: 60, r: 15 },
+                    { x: 25, y: 45, r: 10 },
+                    { x: 60, y: 30, r: 20 },
+                    { x: 75, y: 65, r: 25 }
+                ],
+                backgroundColor: 'rgba(75, 192, 192, 0.6)'
+            }]
+        },
+        options: {
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Semantic Relevance'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Search Volume'
+                    }
+                }
+            }
+        }
+    });
+
+    // Intent Distribution Pie Chart
+    var intentCtx = document.getElementById('intentDistributionPieChart').getContext('2d');
+    var intentChart = new Chart(intentCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Informational', 'Transactional', 'Commercial', 'Navigational'],
+            datasets: [{
+                data: [45, 30, 15, 10],
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(255, 99, 132, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+
+    // Difficulty Scatter Chart
+    var difficultyCtx = document.getElementById('difficultyScatterChart').getContext('2d');
+    var difficultyChart = new Chart(difficultyCtx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Keywords',
+                data: [
+                    { x: 20, y: 5000 },
+                    { x: 45, y: 3000 },
+                    { x: 75, y: 8000 },
+                    { x: 30, y: 2000 }
+                ],
+                backgroundColor: 'rgba(75, 192, 192, 0.6)'
+            }]
+        },
+        options: {
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Keyword Difficulty'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Search Volume'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update the showPage function
+function showPage(pageId) {
+    // Hide all pages
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('businessObjectives').style.display = 'none';
+    document.getElementById('companyProfile').style.display = 'none';
+    document.getElementById('aiAnalysis').style.display = 'none';
+    document.getElementById('keywordIntelligence').style.display = 'none';
+
+    // Show the selected page
+    document.getElementById(pageId).style.display = 'block';
+
+    // Initialize charts based on the page
+    if (pageId === 'aiAnalysis') {
+        initializeAIAnalysisCharts();
+    } else if (pageId === 'keywordIntelligence') {
+        initializeKeywordIntelligenceCharts();
+    }
+}
+
+    function initializePerformanceOptimizationCharts() {
+        // CTR Trend Chart
+        var ctrCtx = document.getElementById('ctrTrendChart').getContext('2d');
+        var ctrChart = new Chart(ctrCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Average CTR',
+                    data: [2.1, 2.3, 2.8, 3.0, 3.2, 3.5],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    
+        // Position Distribution Chart
+        var positionCtx = document.getElementById('positionDistributionChart').getContext('2d');
+        var positionChart = new Chart(positionCtx, {
+            type: 'bar',
+            data: {
+                labels: ['1-3', '4-10', '11-20', '21-30', '31+'],
+                datasets: [{
+                    label: 'Number of Keywords',
+                    data: [45, 125, 83, 67, 32],
+                    backgroundColor: 'rgba(75, 192, 192, 0.8)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    
+        // Click Potential Chart
+        var clickCtx = document.getElementById('clickPotentialChart').getContext('2d');
+        var clickChart = new Chart(clickCtx, {
+            type: 'line',
+            data: {
+                labels: ['Current', 'Month 1', 'Month 2', 'Month 3'],
+                datasets: [{
+                    label: 'Projected Clicks',
+                    data: [15000, 17000, 19500, 21750],
+                    borderColor: 'rgb(75, 192, 192)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    
+        // Impression Share Chart
+        var impressionCtx = document.getElementById('impressionShareChart').getContext('2d');
+        var impressionChart = new Chart(impressionCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Current Share', 'Potential Growth'],
+                datasets: [{
+                    data: [68, 32],
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(255, 99, 132, 0.8)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    
+        // ROI Prediction Chart
+        var roiCtx = document.getElementById('roiPredictionChart').getContext('2d');
+        var roiChart = new Chart(roiCtx, {
+            type: 'line',
+            data: {
+                labels: ['Month 1', 'Month 2', 'Month 3', 'Month 4', 'Month 5', 'Month 6'],
+                datasets: [{
+                    label: 'Investment',
+                    data: [25000, 25000, 25000, 25000, 25000, 25000],
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1
+                }, {
+                    label: 'Revenue',
+                    data: [15000, 35000, 55000, 75000, 95000, 115000],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '
+``` + value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

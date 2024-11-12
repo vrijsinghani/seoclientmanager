@@ -1,0 +1,394 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: white; /* Ensure the iframe has a white background */
+        }
+
+        
+.objective-card {
+border-left: 4px solid #28a745;
+}
+.objective-card.at-risk {
+border-left-color: #ffc107;
+}
+.objective-card.behind {
+border-left-color: #dc3545;
+}
+.goal-progress {
+height: 8px;
+}
+
+
+    </style>
+</head>
+<body>
+    <!-- business-objectives.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Business Objectives - Luxury Flooring SEO</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.objective-card {
+border-left: 4px solid #28a745;
+}
+.objective-card.at-risk {
+border-left-color: #ffc107;
+}
+.objective-card.behind {
+border-left-color: #dc3545;
+}
+.goal-progress {
+height: 8px;
+}
+</style>
+</head>
+<body>
+<!-- Navigation (same as index.html) -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<!-- ... (copy navigation from index.html) ... -->
+</nav>
+
+<div class="container-fluid mt-4">
+<!-- Header Section -->
+<div class="row mb-4">
+<div class="col-md-6">
+<h1>Business Objectives</h1>
+<p class="text-muted">Track and manage your SEO goals and objectives</p>
+</div>
+<div class="col-md-6 text-right">
+<button class="btn btn-primary" data-toggle="modal" data-target="#newObjectiveModal">
+<i class="fas fa-plus"></i> Add New Objective
+</button>
+</div>
+</div>
+
+<!-- Overview Cards -->
+<div class="row mb-4">
+<div class="col-md-4">
+<div class="card bg-success text-white">
+<div class="card-body">
+<h5 class="card-title">On Track</h5>
+<h2>6</h2>
+<p>Objectives meeting targets</p>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card bg-warning text-white">
+<div class="card-body">
+<h5 class="card-title">At Risk</h5>
+<h2>2</h2>
+<p>Objectives needing attention</p>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card bg-danger text-white">
+<div class="card-body">
+<h5 class="card-title">Behind</h5>
+<h2>1</h2>
+<p>Objectives missing targets</p>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Revenue Objectives -->
+<div class="row mb-4">
+<div class="col-md-8">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Revenue Objectives</h5>
+</div>
+<div class="card-body">
+<canvas id="revenueChart"></canvas>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Revenue Breakdown</h5>
+</div>
+<div class="card-body">
+<canvas id="revenueBreakdownChart"></canvas>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Objectives List -->
+<div class="row">
+<div class="col-md-12">
+<h3>Active Objectives</h3>
+
+<!-- Hardwood Flooring Objective -->
+<div class="card mb-3 objective-card">
+<div class="card-body">
+<div class="row align-items-center">
+    <div class="col-md-4">
+        <h5 class="card-title">Increase Hardwood Flooring Sales</h5>
+        <p class="text-muted mb-0">Target: $250,000 in Q2 2024</p>
+    </div>
+    <div class="col-md-4">
+        <div class="progress goal-progress mb-2">
+            <div class="progress-bar bg-success" role="progressbar" style="width: 75%" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <small>75% achieved - $187,500 / $250,000</small>
+    </div>
+    <div class="col-md-2">
+        <span class="badge badge-success">On Track</span>
+    </div>
+    <div class="col-md-2 text-right">
+        <button class="btn btn-sm btn-outline-primary">Details</button>
+    </div>
+</div>
+</div>
+</div>
+
+<!-- Vinyl Flooring Objective -->
+<div class="card mb-3 objective-card at-risk">
+<div class="card-body">
+<div class="row align-items-center">
+    <div class="col-md-4">
+        <h5 class="card-title">Expand Vinyl Flooring Market Share</h5>
+        <p class="text-muted mb-0">Target: 25% market share by Q3 2024</p>
+    </div>
+    <div class="col-md-4">
+        <div class="progress goal-progress mb-2">
+            <div class="progress-bar bg-warning" role="progressbar" style="width: 60%" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <small>15% achieved - Need acceleration</small>
+    </div>
+    <div class="col-md-2">
+        <span class="badge badge-warning">At Risk</span>
+    </div>
+    <div class="col-md-2 text-right">
+        <button class="btn btn-sm btn-outline-primary">Details</button>
+    </div>
+</div>
+</div>
+</div>
+
+<!-- Installation Services Objective -->
+<div class="card mb-3 objective-card">
+<div class="card-body">
+<div class="row align-items-center">
+    <div class="col-md-4">
+        <h5 class="card-title">Grow Installation Services</h5>
+        <p class="text-muted mb-0">Target: 150 installations per month</p>
+    </div>
+    <div class="col-md-4">
+        <div class="progress goal-progress mb-2">
+            <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <small>128 installations this month</small>
+    </div>
+    <div class="col-md-2">
+        <span class="badge badge-success">On Track</span>
+    </div>
+    <div class="col-md-2 text-right">
+        <button class="btn btn-sm btn-outline-primary">Details</button>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- New Objective Modal -->
+<div class="modal fade" id="newObjectiveModal" tabindex="-1">
+<div class="modal-dialog">
+<div class="modal-content">
+<div class="modal-header">
+<h5 class="modal-title">Add New Objective</h5>
+<button type="button" class="close" data-dismiss="modal">
+<span>&times;</span>
+</button>
+</div>
+<div class="modal-body">
+<form>
+<div class="form-group">
+    <label>Objective Name</label>
+    <input type="text" class="form-control" placeholder="Enter objective name">
+</div>
+<div class="form-group">
+    <label>Category</label>
+    <select class="form-control">
+        <option>Revenue</option>
+        <option>Market Share</option>
+        <option>Customer Acquisition</option>
+        <option>Service Quality</option>
+    </select>
+</div>
+<div class="form-group">
+    <label>Target Value</label>
+    <input type="text" class="form-control" placeholder="Enter target value">
+</div>
+<div class="form-group">
+    <label>Target Date</label>
+    <input type="date" class="form-control">
+</div>
+<div class="form-group">
+    <label>Description</label>
+    <textarea class="form-control" rows="3"></textarea>
+</div>
+</form>
+</div>
+<div class="modal-footer">
+<button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+<button type="button" class="btn btn-primary">Save Objective</button>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+// Revenue Chart
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+type: 'line',
+data: {
+labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+datasets: [{
+label: 'Actual Revenue',
+data: [180000, 195000, 215000, 225000, 235000, 245000],
+borderColor: 'rgb(75, 192, 192)',
+tension: 0.1
+}, {
+label: 'Target Revenue',
+data: [175000, 185000, 200000, 220000, 240000, 250000],
+borderColor: 'rgb(255, 99, 132)',
+borderDash: [5, 5],
+tension: 0.1
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Revenue ($)'
+    }
+}
+}
+}
+});
+
+// Revenue Breakdown Chart
+const breakdownCtx = document.getElementById('revenueBreakdownChart').getContext('2d');
+new Chart(breakdownCtx, {
+type: 'doughnut',
+data: {
+labels: ['Hardwood', 'Vinyl', 'Tile', 'Installation', 'Other'],
+datasets: [{
+data: [40, 25, 15, 15, 5],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(255, 99, 132, 0.8)',
+    'rgba(153, 102, 255, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'bottom'
+}
+}
+}
+});
+});
+</script>
+</body>
+</html>
+
+
+
+    <script>
+        
+document.addEventListener('DOMContentLoaded', function() {
+// Revenue Chart
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+type: 'line',
+data: {
+labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+datasets: [{
+label: 'Actual Revenue',
+data: [180000, 195000, 215000, 225000, 235000, 245000],
+borderColor: 'rgb(75, 192, 192)',
+tension: 0.1
+}, {
+label: 'Target Revenue',
+data: [175000, 185000, 200000, 220000, 240000, 250000],
+borderColor: 'rgb(255, 99, 132)',
+borderDash: [5, 5],
+tension: 0.1
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Revenue ($)'
+    }
+}
+}
+}
+});
+
+// Revenue Breakdown Chart
+const breakdownCtx = document.getElementById('revenueBreakdownChart').getContext('2d');
+new Chart(breakdownCtx, {
+type: 'doughnut',
+data: {
+labels: ['Hardwood', 'Vinyl', 'Tile', 'Installation', 'Other'],
+datasets: [{
+data: [40, 25, 15, 15, 5],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(255, 99, 132, 0.8)',
+    'rgba(153, 102, 255, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'bottom'
+}
+}
+}
+});
+});
+
+
+    </script>
+</body>
+</html>

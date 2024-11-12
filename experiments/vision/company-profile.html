@@ -1,0 +1,623 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            background-color: white; /* Ensure the iframe has a white background */
+        }
+
+        
+.profile-section {
+background-color: #f8f9fa;
+border-radius: 8px;
+padding: 20px;
+margin-bottom: 20px;
+}
+.location-card {
+border-left: 4px solid #007bff;
+}
+.competitor-card {
+transition: transform 0.2s;
+}
+.competitor-card:hover {
+transform: translateY(-5px);
+}
+.market-share-indicator {
+width: 100px;
+height: 100px;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 24px;
+font-weight: bold;
+color: white;
+background: linear-gradient(45deg, #007bff, #00bcd4);
+}
+
+
+    </style>
+</head>
+<body>
+    <!-- company-profile.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Company Profile - Luxury Flooring SEO</title>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.3/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.profile-section {
+background-color: #f8f9fa;
+border-radius: 8px;
+padding: 20px;
+margin-bottom: 20px;
+}
+.location-card {
+border-left: 4px solid #007bff;
+}
+.competitor-card {
+transition: transform 0.2s;
+}
+.competitor-card:hover {
+transform: translateY(-5px);
+}
+.market-share-indicator {
+width: 100px;
+height: 100px;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+font-size: 24px;
+font-weight: bold;
+color: white;
+background: linear-gradient(45deg, #007bff, #00bcd4);
+}
+</style>
+</head>
+<body>
+<!-- Navigation (same as index.html) -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<!-- ... (copy navigation from index.html) ... -->
+</nav>
+
+<div class="container-fluid mt-4">
+<!-- Header Section -->
+<div class="row mb-4">
+<div class="col-md-8">
+<h1>Company Profile</h1>
+<p class="text-muted">Luxury Flooring Store - Market Position & Business Intelligence</p>
+</div>
+<div class="col-md-4 text-right">
+<button class="btn btn-outline-primary mr-2">
+<i class="fas fa-download"></i> Export Profile
+</button>
+<button class="btn btn-primary">
+<i class="fas fa-edit"></i> Edit Profile
+</button>
+</div>
+</div>
+
+<!-- Company Overview -->
+<div class="row mb-4">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Business Information</h5>
+</div>
+<div class="card-body">
+<div class="row mb-3">
+    <div class="col-md-4">
+        <strong>Company Name:</strong>
+    </div>
+    <div class="col-md-8">
+        Luxury Flooring Store
+    </div>
+</div>
+<div class="row mb-3">
+    <div class="col-md-4">
+        <strong>Established:</strong>
+    </div>
+    <div class="col-md-8">
+        2005
+    </div>
+</div>
+<div class="row mb-3">
+    <div class="col-md-4">
+        <strong>Primary Focus:</strong>
+    </div>
+    <div class="col-md-8">
+        High-end residential & commercial flooring
+    </div>
+</div>
+<div class="row mb-3">
+    <div class="col-md-4">
+        <strong>Service Area:</strong>
+    </div>
+    <div class="col-md-8">
+        Greater Boston Metropolitan Area
+    </div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Market Position</h5>
+</div>
+<div class="card-body">
+<div class="row align-items-center">
+    <div class="col-md-4 text-center">
+        <div class="market-share-indicator">
+            18%
+        </div>
+        <p class="mt-2 mb-0">Market Share</p>
+    </div>
+    <div class="col-md-8">
+        <canvas id="marketPositionChart"></canvas>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Product & Service Mix -->
+<div class="row mb-4">
+<div class="col-md-12">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Product & Service Mix</h5>
+</div>
+<div class="card-body">
+<div class="row">
+    <div class="col-md-8">
+        <canvas id="productMixChart"></canvas>
+    </div>
+    <div class="col-md-4">
+        <h6>Key Products & Services</h6>
+        <ul class="list-group">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Hardwood Flooring
+                <span class="badge badge-primary badge-pill">45%</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Luxury Vinyl
+                <span class="badge badge-primary badge-pill">25%</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Installation Services
+                <span class="badge badge-primary badge-pill">20%</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Maintenance & Repairs
+                <span class="badge badge-primary badge-pill">10%</span>
+            </li>
+        </ul>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Target Audience -->
+<div class="row mb-4">
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Target Audience Demographics</h5>
+</div>
+<div class="card-body">
+<div class="mb-4">
+    <h6>Primary Customer Segments</h6>
+    <ul>
+        <li>Luxury homeowners (35-65 years old)</li>
+        <li>High-end residential contractors</li>
+        <li>Commercial property managers</li>
+        <li>Interior designers & architects</li>
+    </ul>
+</div>
+<div class="mb-4">
+    <h6>Income Level</h6>
+    <div class="progress mb-2">
+        <div class="progress-bar" role="progressbar" style="width: 75%" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">$150k+</div>
+    </div>
+    <small class="text-muted">75% of customers have household income >$150k</small>
+</div>
+<div>
+    <h6>Geographic Distribution</h6>
+    <canvas id="geographicDistributionChart"></canvas>
+</div>
+</div>
+</div>
+</div>
+<div class="col-md-6">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Customer Behavior Analysis</h5>
+</div>
+<div class="card-body">
+<canvas id="customerBehaviorChart"></canvas>
+<div class="mt-4">
+    <h6>Key Insights:</h6>
+    <ul>
+        <li>70% research online before store visit</li>
+        <li>Average consideration period: 3-4 weeks</li>
+        <li>85% request samples before purchase</li>
+        <li>60% opt for professional installation</li>
+    </ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Competitive Analysis -->
+<div class="row">
+<div class="col-md-12">
+<div class="card">
+<div class="card-header">
+<h5 class="card-title mb-0">Competitive Landscape</h5>
+</div>
+<div class="card-body">
+<div class="row">
+    <div class="col-md-6">
+        <h6>Direct Competitors</h6>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Competitor</th>
+                        <th>Market Share</th>
+                        <th>Strengths</th>
+                        <th>Weaknesses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Elite Floors</td>
+                        <td>22%</td>
+                        <td>Brand recognition, Multiple locations</td>
+                        <td>Higher prices, Limited selection</td>
+                    </tr>
+                    <tr>
+                        <td>FloorMaster Pro</td>
+                        <td>15%</td>
+                        <td>Competitive pricing, Fast installation</td>
+                        <td>Quality inconsistency</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h6>Competitive Position Analysis</h6>
+        <canvas id="competitivePositionChart"></canvas>
+    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+// Market Position Chart
+const marketCtx = document.getElementById('marketPositionChart').getContext('2d');
+new Chart(marketCtx, {
+type: 'line',
+data: {
+labels: ['2019', '2020', '2021', '2022', '2023'],
+datasets: [{
+label: 'Market Share %',
+data: [12, 14, 15, 16.5, 18],
+borderColor: 'rgb(75, 192, 192)',
+tension: 0.1
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Market Share %'
+    }
+}
+}
+}
+});
+
+// Product Mix Chart
+const productCtx = document.getElementById('productMixChart').getContext('2d');
+new Chart(productCtx, {
+type: 'doughnut',
+data: {
+labels: ['Hardwood', 'Luxury Vinyl', 'Installation', 'Maintenance'],
+datasets: [{
+data: [45, 25, 20, 10],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(255, 99, 132, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'right'
+}
+}
+}
+});
+
+// Geographic Distribution Chart
+const geoCtx = document.getElementById('geographicDistributionChart').getContext('2d');
+new Chart(geoCtx, {
+type: 'bar',
+data: {
+labels: ['Boston', 'Cambridge', 'Newton', 'Brookline', 'Other'],
+datasets: [{
+label: 'Customer Distribution',
+data: [40, 25, 15, 12, 8],
+backgroundColor: 'rgba(75, 192, 192, 0.8)'
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Percentage'
+    }
+}
+}
+}
+});
+
+// Customer Behavior Chart
+const behaviorCtx = document.getElementById('customerBehaviorChart').getContext('2d');
+new Chart(behaviorCtx, {
+type: 'radar',
+data: {
+labels: ['Online Research', 'Sample Requests', 'Store Visits', 'Professional Installation', 'Repeat Business'],
+datasets: [{
+label: 'Customer Behavior',
+data: [70, 85, 65, 60, 40],
+backgroundColor: 'rgba(75, 192, 192, 0.2)',
+borderColor: 'rgb(75, 192, 192)',
+pointBackgroundColor: 'rgb(75, 192, 192)'
+}]
+},
+options: {
+responsive: true,
+scales: {
+r: {
+    beginAtZero: true,
+    max: 100
+}
+}
+}
+});
+
+// Competitive Position Chart
+const competitiveCtx = document.getElementById('competitivePositionChart').getContext('2d');
+new Chart(competitiveCtx, {
+type: 'bubble',
+data: {
+datasets: [{
+label: 'Market Position',
+data: [
+    {x: 80, y: 75, r: 20}, // Our Company
+    {x: 85, y: 65, r: 25}, // Elite Floors
+    {x: 60, y: 70, r: 15}  // FloorMaster Pro
+],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.6)',
+    'rgba(255, 99, 132, 0.6)',
+    'rgba(54, 162, 235, 0.6)'
+]
+}]
+},
+options: {
+responsive: true,
+scales: {
+x: {
+    title: {
+        display: true,
+        text: 'Quality Score'
+    },
+    min: 0,
+    max: 100
+},
+y: {
+    title: {
+        display: true,
+        text: 'Customer Satisfaction'
+    },
+    min: 0,
+    max: 100
+}
+}
+}
+});
+});
+</script>
+</body>
+</html>
+
+
+
+    <script>
+        
+document.addEventListener('DOMContentLoaded', function() {
+// Market Position Chart
+const marketCtx = document.getElementById('marketPositionChart').getContext('2d');
+new Chart(marketCtx, {
+type: 'line',
+data: {
+labels: ['2019', '2020', '2021', '2022', '2023'],
+datasets: [{
+label: 'Market Share %',
+data: [12, 14, 15, 16.5, 18],
+borderColor: 'rgb(75, 192, 192)',
+tension: 0.1
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Market Share %'
+    }
+}
+}
+}
+});
+
+// Product Mix Chart
+const productCtx = document.getElementById('productMixChart').getContext('2d');
+new Chart(productCtx, {
+type: 'doughnut',
+data: {
+labels: ['Hardwood', 'Luxury Vinyl', 'Installation', 'Maintenance'],
+datasets: [{
+data: [45, 25, 20, 10],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(255, 206, 86, 0.8)',
+    'rgba(255, 99, 132, 0.8)'
+]
+}]
+},
+options: {
+responsive: true,
+plugins: {
+legend: {
+    position: 'right'
+}
+}
+}
+});
+
+// Geographic Distribution Chart
+const geoCtx = document.getElementById('geographicDistributionChart').getContext('2d');
+new Chart(geoCtx, {
+type: 'bar',
+data: {
+labels: ['Boston', 'Cambridge', 'Newton', 'Brookline', 'Other'],
+datasets: [{
+label: 'Customer Distribution',
+data: [40, 25, 15, 12, 8],
+backgroundColor: 'rgba(75, 192, 192, 0.8)'
+}]
+},
+options: {
+responsive: true,
+scales: {
+y: {
+    beginAtZero: true,
+    title: {
+        display: true,
+        text: 'Percentage'
+    }
+}
+}
+}
+});
+
+// Customer Behavior Chart
+const behaviorCtx = document.getElementById('customerBehaviorChart').getContext('2d');
+new Chart(behaviorCtx, {
+type: 'radar',
+data: {
+labels: ['Online Research', 'Sample Requests', 'Store Visits', 'Professional Installation', 'Repeat Business'],
+datasets: [{
+label: 'Customer Behavior',
+data: [70, 85, 65, 60, 40],
+backgroundColor: 'rgba(75, 192, 192, 0.2)',
+borderColor: 'rgb(75, 192, 192)',
+pointBackgroundColor: 'rgb(75, 192, 192)'
+}]
+},
+options: {
+responsive: true,
+scales: {
+r: {
+    beginAtZero: true,
+    max: 100
+}
+}
+}
+});
+
+// Competitive Position Chart
+const competitiveCtx = document.getElementById('competitivePositionChart').getContext('2d');
+new Chart(competitiveCtx, {
+type: 'bubble',
+data: {
+datasets: [{
+label: 'Market Position',
+data: [
+    {x: 80, y: 75, r: 20}, // Our Company
+    {x: 85, y: 65, r: 25}, // Elite Floors
+    {x: 60, y: 70, r: 15}  // FloorMaster Pro
+],
+backgroundColor: [
+    'rgba(75, 192, 192, 0.6)',
+    'rgba(255, 99, 132, 0.6)',
+    'rgba(54, 162, 235, 0.6)'
+]
+}]
+},
+options: {
+responsive: true,
+scales: {
+x: {
+    title: {
+        display: true,
+        text: 'Quality Score'
+    },
+    min: 0,
+    max: 100
+},
+y: {
+    title: {
+        display: true,
+        text: 'Customer Satisfaction'
+    },
+    min: 0,
+    max: 100
+}
+}
+}
+});
+});
+
+
+    </script>
+</body>
+</html>
