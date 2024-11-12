@@ -20,8 +20,9 @@ def client_analytics(request, client_id):
     ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
     sc_credentials = get_object_or_404(SearchConsoleCredentials, client=client)
     
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    # Set date range to end yesterday
+    end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=29)).strftime('%Y-%m-%d')  # 28 days before end_date
     
     context = {
         'client': client,
@@ -36,24 +37,29 @@ def client_analytics(request, client_id):
     if analytics_service:
         try:
             logger.info("Fetching data using GoogleAnalyticsTool")
-            ga_tool = GoogleAnalyticsTool()
+            ga_tool = GoogleAnalyticsTool(credentials=ga_credentials)
             
-            property_id = f"properties/{ga_credentials.get_property_id()}" if not ga_credentials.view_id.startswith('properties/') else ga_credentials.view_id
+            property_id = ga_credentials.get_property_id()
             
-            ga_tool_data = ga_tool._run(
+            analytics_data = ga_tool._run(
                 service=analytics_service,
                 start_date=start_date,
                 end_date=end_date,
                 property_id=property_id
             )
             
-            # JSON encode the array for the template
-            context['analytics_data'] = json.dumps(ga_tool_data['analytics_data'])
-            context['start_date'] = ga_tool_data['start_date']
-            context['end_date'] = ga_tool_data['end_date']
+            if analytics_data and 'analytics_data' in analytics_data:
+                # Log data for debugging
+                logger.info(f"Number of data points: {len(analytics_data['analytics_data'])}")
+                if analytics_data['analytics_data']:
+                    logger.info(f"Sample data point: {analytics_data['analytics_data'][0]}")
+                
+                context['analytics_data'] = json.dumps(analytics_data['analytics_data'])
+                context['start_date'] = analytics_data['start_date']
+                context['end_date'] = analytics_data['end_date']
             
         except Exception as e:
-            logger.error(f"Error fetching GA data: {str(e)}")
+            logger.error(f"Error fetching GA data: {str(e)}", exc_info=True)
             messages.warning(request, "Unable to fetch Google Analytics data.")
     else:
         logger.warning(f"No valid GA service for client {client.name}")

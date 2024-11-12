@@ -6,66 +6,218 @@
 {% block content %}
 <div class="container-fluid py-4">
     <h1>Analytics for {{ client.name }}</h1>
+    
+    {% if analytics_data %}
+    <!-- First Row -->
     <div class="row">
-        <div class="col-12">
-            {% if analytics_data %}
-            <div class="card mb-4">
-                <div class="card-header pb-0">
-                    <h6>Google Analytics Data</h6>
-                </div>
-                <div class="card-body px-0 pt-0 pb-2">
-                    <div id="analytics-line-chart" style="height: 350px;"></div>
-                </div>
-            </div>
-            {% else %}
-            <div class="card mb-4">
-                <div class="card-body">
-                    <p class="text-warning">Google Analytics data is currently unavailable. This may be due to an authentication issue or an error in data retrieval.</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if search_console_data %}
-            <div class="card mb-4">
-                <div class="card-header pb-0">
-                    <h6>Search Console Performance Data</h6>
-                </div>
-                <div class="card-body px-0 pt-0 pb-2">
-                    <div class="table-responsive p-0">
-                        <table class="table table-flush table-striped text-xs table-sm" id="search-console-table">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Query</th>
-                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Impressions</th>
-                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Clicks</th>
-                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">CTR</th>
-                                    <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Position</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in search_console_data %}
-                                <tr>
-                                    <td class="text-xs font-weight-normal">{{ item.query }}</td>
-                                    <td class="text-xs font-weight-normal">{{ item.impressions }}</td>
-                                    <td class="text-xs font-weight-normal">{{ item.clicks }}</td>
-                                    <td class="text-xs font-weight-normal">{{ item.ctr|floatformat:2 }}%</td>
-                                    <td class="text-xs font-weight-normal">{{ item.position|floatformat:1 }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+        <!-- Active Users Card -->
+        <div class="col-xl-4 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Active Users</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="active-users-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="active-users-change"></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <div id="active-users-chart" class="mt-2 h-50"></div>
                 </div>
             </div>
-            {% else %}
-            <div class="card mb-4">
-                <div class="card-body">
-                    <p class="text-warning">Search Console data is currently unavailable. This may be due to an authentication issue or an error in data retrieval.</p>
+        </div>
+
+        <!-- Sessions Card -->
+        <div class="col-xl-4 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Sessions</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="sessions-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="sessions-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="sessions-chart" class="mt-2 h-50"></div>
                 </div>
             </div>
-            {% endif %}
+        </div>
+
+        <!-- Average Session Duration Card -->
+        <div class="col-xl-4 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Average Session Duration</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="avg-duration-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="avg-duration-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="avg-duration-chart" class="mt-2 h-50"></div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Second Row -->
+    <div class="row">
+        <!-- Page Views Card -->
+        <div class="col-xl-4 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Page Views</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="page-views-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="page-views-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="page-views-chart" class="mt-2 h-50"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pages/Session Card -->
+        <div class="col-xl-4 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Pages/Session</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="pages-per-session-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="pages-per-session-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="pages-per-session-chart" class="mt-2 h-50"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Users Card -->
+        <div class="col-xl-4 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">New Users</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="new-users-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="new-users-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="new-users-chart" class="mt-2 h-50"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Third Row -->
+    <div class="row">
+        <!-- Bounce Rate Card -->
+        <div class="col-xl-6 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Bounce Rate</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="bounce-rate-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="bounce-rate-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="bounce-rate-chart" class="mt-2 h-50"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Engaged Sessions Card -->
+        <div class="col-xl-6 col-sm-6 mb-4">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div class="row">
+                        <div class="col-8">
+                            <div class="numbers">
+                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Engaged Sessions</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="font-weight-bolder mb-0" id="engaged-sessions-count">Loading...</h5>
+                                    <span class="text-sm ms-1" id="engaged-sessions-change"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="engaged-sessions-chart" class="mt-2 h-50"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card mb-4">
+        <div class="card-body">
+            <p class="text-warning">Google Analytics data is currently unavailable.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Search Console Data Section -->
+    {% if search_console_data %}
+    <div class="card mb-4">
+        <div class="card-header pb-0">
+            <h6>Search Console Performance Data</h6>
+        </div>
+        <div class="card-body px-0 pt-0 pb-2">
+            <div class="table-responsive p-0">
+                <table class="table table-flush table-striped text-xs table-sm" id="search-console-table">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Query</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Impressions</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Clicks</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">CTR</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Position</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in search_console_data %}
+                        <tr>
+                            <td class="text-xs font-weight-normal">{{ item.query }}</td>
+                            <td class="text-xs font-weight-normal">{{ item.impressions }}</td>
+                            <td class="text-xs font-weight-normal">{{ item.clicks }}</td>
+                            <td class="text-xs font-weight-normal">{{ item.ctr|floatformat:2 }}%</td>
+                            <td class="text-xs font-weight-normal">{{ item.position|floatformat:1 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock content %}
 
@@ -75,82 +227,265 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         {% if analytics_data %}
-        // Google Analytics chart
-        const analyticsData = {{ analytics_data|safe }};
-        const activeUsers = analyticsData.map(data => ({ x: new Date(data.date).getTime(), y: data.active_users }));
-        const sessions = analyticsData.map(data => ({ x: new Date(data.date).getTime(), y: data.sessions }));
-
-        const startDate = '{{ start_date }}';
-        const endDate = '{{ end_date }}';
-        const formattedStartDate = new Date(startDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-        const formattedEndDate = new Date(endDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-
-        const chartOptions = {
-            series: [{
-                name: 'Active Users',
-                data: activeUsers
-            }, {
-                name: 'Sessions',
-                data: sessions
-            }],
-            chart: {
-                height: 350,
-                type: 'line',
-                zoom: {
+        (function setupAnalyticsCharts() {
+            const analyticsData = JSON.parse('{{ analytics_data|escapejs }}');
+            
+            // Common chart options
+            const commonChartOptions = {
+                chart: {
+                    type: 'line',
+                    height: 150,
+                    sparkline: false,
+                    toolbar: {
+                        show: false
+                    },
+                    animations: {
+                        enabled: true,
+                        easing: 'linear',
+                        speed: 800
+                    }
+                },
+                stroke: {
+                    curve: 'smooth',
+                    width: 2,
+                    colors: ['#00E5FF']
+                },
+                grid: {
+                    show: true,
+                    borderColor: '#f0f0f0',
+                    strokeDashArray: 0,
+                    position: 'back',
+                    xaxis: {
+                        lines: {
+                            show: true
+                        }
+                    },
+                    yaxis: {
+                        lines: {
+                            show: true
+                        }
+                    },
+                    padding: {
+                        top: 10,
+                        right: 10,
+                        bottom: 10,
+                        left: 10
+                    }
+                },
+                dataLabels: {
                     enabled: false
                 },
-            },
-            dataLabels: {
-                enabled: false
-            },
-            stroke: {
-                curve: 'straight'
-            },
-            title: {
-                text: `${formattedStartDate} - ${formattedEndDate}`,
-                align: 'left'
-            },
-            grid: {
-                row: {
-                    colors: ['#f3f3f3', 'transparent'],
-                    opacity: 0.5
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        show: true,
+                        format: 'MMM dd',
+                        style: {
+                            colors: '#8e8da4',
+                            fontSize: '11px'
+                        }
+                    },
+                    axisBorder: {
+                        show: false
+                    },
+                    axisTicks: {
+                        show: false
+                    }
                 },
-            },
-            xaxis: {
-                type: 'datetime',
-                labels: {
-                    formatter: function(value, timestamp) {
-                        return new Date(timestamp).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+                yaxis: {
+                    show: true,
+                    showAlways: true,
+                    showForNullSeries: true,
+                    seriesName: undefined,
+                    opposite: false,
+                    reversed: false,
+                    logarithmic: false,
+                    forceNiceScale: true,
+                    floating: false,
+                    labels: {
+                        show: true,
+                        style: {
+                            colors: '#8e8da4',
+                            fontSize: '11px'
+                        },
+                        formatter: function(value) {
+                            return Math.round(value);
+                        }
+                    }
+                },
+                tooltip: {
+                    enabled: true,
+                    shared: true,
+                    intersect: false,
+                    followCursor: true,
+                    x: {
+                        format: 'MMM dd'
+                    }
+                },
+                markers: {
+                    size: 3,
+                    colors: ['#00E5FF'],
+                    strokeColors: '#fff',
+                    strokeWidth: 2,
+                    hover: {
+                        size: 5
+                    }
+                },
+                fill: {
+                    type: 'solid',
+                    opacity: 1
+                }
+            };
+
+            // Create charts for each metric
+            const metrics = [
+                { 
+                    id: 'active-users', 
+                    key: 'active_users', 
+                    format: value => value.toLocaleString()
+                },
+                { 
+                    id: 'sessions', 
+                    key: 'sessions', 
+                    format: value => value.toLocaleString()
+                },
+                { 
+                    id: 'avg-duration', 
+                    key: 'avg_session_duration', 
+                    format: value => formatDuration(value)
+                },
+                { 
+                    id: 'page-views', 
+                    key: 'page_views', 
+                    format: value => value.toLocaleString()
+                },
+                { 
+                    id: 'pages-per-session', 
+                    key: 'pages_per_session', 
+                    format: value => value.toFixed(2)
+                },
+                { 
+                    id: 'new-users', 
+                    key: 'new_users', 
+                    format: value => value.toLocaleString()
+                },
+                { 
+                    id: 'bounce-rate', 
+                    key: 'bounce_rate', 
+                    format: value => value.toFixed(2) + '%'
+                },
+                { 
+                    id: 'engaged-sessions', 
+                    key: 'engaged_sessions', 
+                    format: value => value.toLocaleString()
+                }
+            ];
+
+            metrics.forEach(metric => {
+                const data = analyticsData
+                    .map(item => ({
+                        x: new Date(item.date).getTime(),
+                        y: parseFloat(item[metric.key]) || 0
+                    }))
+                    .sort((a, b) => a.x - b.x);
+
+                // Calculate min and max for y-axis based on data
+                const values = data.map(point => point.y);
+                const maxValue = Math.max(...values);
+                const minValue = 0;
+
+                // Calculate summary value for the header
+                let summaryValue;
+                if (['bounce_rate', 'pages_per_session', 'avg_session_duration'].includes(metric.key)) {
+                    // Use average for rate-based metrics
+                    summaryValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+                } else {
+                    // Use total for count-based metrics
+                    summaryValue = values.reduce((sum, val) => sum + val, 0);
+                }
+
+                // Update the header value
+                const headerElement = document.getElementById(`${metric.id}-count`);
+                if (headerElement) {
+                    headerElement.textContent = metric.format(summaryValue);
+                }
+
+                // Calculate and update change percentage
+                const previousValue = data[data.length - 2]?.y;
+                const currentValue = data[data.length - 1]?.y;
+                if (previousValue) {
+                    const change = ((currentValue - previousValue) / previousValue) * 100;
+                    const changeElement = document.getElementById(`${metric.id}-change`);
+                    if (changeElement) {
+                        changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                        changeElement.className = `text-${change >= 0 ? 'success' : 'danger'} text-sm font-weight-bolder`;
                     }
                 }
-            },
-            yaxis: {
-                title: {
-                    text: 'Count'
-                }
-            },
-            legend: {
-                position: 'top',
-                horizontalAlign: 'right',
-                floating: true,
-                offsetY: -25,
-                offsetX: -5
-            }
-        };
 
-        const chart = new ApexCharts(document.querySelector("#analytics-line-chart"), chartOptions);
-        chart.render();
+                // Calculate nice round number for max value
+                const orderOfMagnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
+                const niceMax = Math.ceil(maxValue / orderOfMagnitude) * orderOfMagnitude;
+
+                // Create chart with dynamic y-axis configuration
+                const chartOptions = {
+                    ...commonChartOptions,
+                    chart: {
+                        ...commonChartOptions.chart,
+                        id: metric.id,
+                        height: 120,
+                        toolbar: { show: false }
+                    },
+                    yaxis: {
+                        ...commonChartOptions.yaxis,
+                        min: minValue,
+                        max: niceMax,
+                        tickAmount: 4,
+                        labels: {
+                            formatter: function(value) {
+                                if (metric.key === 'avg_session_duration') {
+                                    return formatDuration(value);
+                                }
+                                if (metric.key === 'bounce_rate') {
+                                    return value.toFixed(0) + '%';
+                                }
+                                if (value >= 1000) {
+                                    return (value / 1000).toFixed(1) + 'k';
+                                }
+                                return value.toFixed(0);
+                            }
+                        }
+                    },
+                    series: [{
+                        name: metric.id,
+                        data: data
+                    }]
+                };
+
+                new ApexCharts(document.querySelector(`#${metric.id}-chart`), chartOptions).render();
+            });
+        })();
         {% endif %}
 
         {% if search_console_data %}
-        // Initialize DataTable for Search Console data
         const dataTableSearchConsole = new simpleDatatables.DataTable("#search-console-table", {
             searchable: true,
-            perPageSelect: [10,25,50,100,200],
             fixedHeight: true,
-            classes: {}
+            perPage: 10,
+            perPageSelect: [10, 25, 50, 100],
+            columns: [{
+                select: [3, 4],
+                sortable: true,
+                type: 'number'
+            }]
         });
         {% endif %}
     });
+
+    function formatDuration(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
 </script>
 {% endblock extra_js %}

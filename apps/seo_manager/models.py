@@ -12,6 +12,7 @@ from google.oauth2 import service_account
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from googleapiclient.discovery import build
 import google.auth.transport.requests
+from google.auth.transport.requests import Request
 
 logger = logging.getLogger(__name__)
 
@@ -137,52 +138,34 @@ class GoogleAnalyticsCredentials(models.Model):
     def get_credentials(self):
         """Returns refreshed Google Analytics credentials"""
         try:
-            # First try service account if configured
             if self.use_service_account and self.service_account_json:
-                logger.info(f"Using service account for {self.client.name}")
                 service_account_info = json.loads(self.service_account_json)
                 return service_account.Credentials.from_service_account_info(
                     service_account_info,
-                    scopes=self.required_scopes
+                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
                 )
 
-            # Then try OAuth credentials
-            # Check for required OAuth fields
-            required_fields = {
-                'refresh_token': self.refresh_token,
-                'token_uri': self.token_uri,
-                'client_id': self.ga_client_id,
-                'client_secret': self.client_secret
-            }
-            
-            # Log which fields are missing
-            missing_fields = [field for field, value in required_fields.items() if not value]
-            if missing_fields:
-                logger.error(f"Missing OAuth fields for {self.client.name}: {', '.join(missing_fields)}")
-                return None
-
-            logger.info(f"Using OAuth credentials for {self.client.name}")
-            credentials = Credentials(
-                token=self.access_token,
-                refresh_token=self.refresh_token,
-                token_uri=self.token_uri,
-                client_id=self.ga_client_id,
-                client_secret=self.client_secret,
-                scopes=self.required_scopes
+            # Create credentials for GA4
+            credentials = Credentials.from_authorized_user_info(
+                {
+                    "token": self.access_token,
+                    "refresh_token": self.refresh_token,
+                    "token_uri": self.token_uri,
+                    "client_id": self.ga_client_id,
+                    "client_secret": self.client_secret,
+                },
+                scopes=['https://www.googleapis.com/auth/analytics.readonly']
             )
 
-            # Refresh token if needed
             if not credentials.valid:
-                request = google.auth.transport.requests.Request()
-                credentials.refresh(request)
+                credentials.refresh(Request())
                 self.access_token = credentials.token
                 self.save(update_fields=['access_token'])
-                logger.info(f"Refreshed access token for {self.client.name}")
 
             return credentials
 
         except Exception as e:
-            logger.error(f"Error getting GA credentials for {self.client.name}: {str(e)}")
+            logger.error(f"Error getting GA credentials: {str(e)}")
             return None
 
     def get_property_id(self):
@@ -196,12 +179,18 @@ class GoogleAnalyticsCredentials(models.Model):
         try:
             credentials = self.get_credentials()
             if not credentials:
-                logger.warning(f"No valid credentials available for {self.client.name}")
                 return None
-                
-            return BetaAnalyticsDataClient(credentials=credentials)
+
+            # Create service with credentials specifically for GA4
+            service = BetaAnalyticsDataClient(
+                credentials=credentials,
+                # Remove client_options and transport which were causing issues
+            )
+            
+            return service
+            
         except Exception as e:
-            logger.error(f"Error creating Analytics service for {self.client.name}: {str(e)}")
+            logger.error(f"Error creating Analytics service: {str(e)}")
             return None
 
 class SearchConsoleCredentials(models.Model):
