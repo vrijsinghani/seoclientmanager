@@ -14,7 +14,7 @@
         <div class="col-xl-4 col-sm-6 mb-4">
             <div class="card">
                 <div class="card-body p-2">
-                    <div class="row">
+                    <div class="row mb-0">
                         <div class="col-8">
                             <div class="numbers">
                                 <p class="text-sm mb-0 text-capitalize font-weight-bold">Active Users</p>
@@ -25,7 +25,7 @@
                             </div>
                         </div>
                     </div>
-                    <div id="active-users-chart" class="mt-2 h-50"></div>
+                    <div id="active-users-chart" style="min-height: 250px;"></div>
                 </div>
             </div>
         </div>
@@ -234,7 +234,7 @@
             const commonChartOptions = {
                 chart: {
                     type: 'line',
-                    height: 150,
+                    height: 250,
                     sparkline: false,
                     toolbar: {
                         show: false
@@ -248,7 +248,7 @@
                 stroke: {
                     curve: 'smooth',
                     width: 2,
-                    colors: ['#00E5FF']
+                    colors: ['#8a9b8e']
                 },
                 grid: {
                     show: true,
@@ -324,7 +324,7 @@
                 },
                 markers: {
                     size: 3,
-                    colors: ['#00E5FF'],
+                    colors: ['#4b5a4f'],
                     strokeColors: '#fff',
                     strokeWidth: 2,
                     hover: {
@@ -389,40 +389,41 @@
                     }))
                     .sort((a, b) => a.x - b.x);
 
-                // Calculate min and max for y-axis based on data
-                const values = data.map(point => point.y);
-                const maxValue = Math.max(...values);
-                const minValue = 0;
+                // Split data into current and previous periods
+                const midPoint = Math.floor(data.length / 2);
+                const previousPeriod = data.slice(0, midPoint);
+                const currentPeriod = data.slice(midPoint);
 
-                // Calculate summary value for the header
-                let summaryValue;
+                // Calculate period values based on metric type
+                let currentValue, previousValue;
                 if (['bounce_rate', 'pages_per_session', 'avg_session_duration'].includes(metric.key)) {
                     // Use average for rate-based metrics
-                    summaryValue = values.reduce((sum, val) => sum + val, 0) / values.length;
+                    currentValue = currentPeriod.reduce((sum, val) => sum + val.y, 0) / currentPeriod.length;
+                    previousValue = previousPeriod.reduce((sum, val) => sum + val.y, 0) / previousPeriod.length;
                 } else {
-                    // Use total for count-based metrics
-                    summaryValue = values.reduce((sum, val) => sum + val, 0);
+                    // Use sum for count-based metrics
+                    currentValue = currentPeriod.reduce((sum, val) => sum + val.y, 0);
+                    previousValue = previousPeriod.reduce((sum, val) => sum + val.y, 0);
                 }
 
-                // Update the header value
+                // Update the header value with the current value
                 const headerElement = document.getElementById(`${metric.id}-count`);
                 if (headerElement) {
-                    headerElement.textContent = metric.format(summaryValue);
+                    headerElement.textContent = metric.format(currentValue);  // Use current value, not summary
                 }
 
-                // Calculate and update change percentage
-                const previousValue = data[data.length - 2]?.y;
-                const currentValue = data[data.length - 1]?.y;
+                // Calculate and display the percentage change
                 if (previousValue) {
                     const change = ((currentValue - previousValue) / previousValue) * 100;
                     const changeElement = document.getElementById(`${metric.id}-change`);
                     if (changeElement) {
                         changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-                        changeElement.className = `text-${change >= 0 ? 'success' : 'danger'} text-sm font-weight-bolder`;
+                        changeElement.className = `text-sm font-weight-bolder ${change >= 0 ? 'text-info' : 'text-danger'}`;
                     }
                 }
 
                 // Calculate nice round number for max value
+                const maxValue = Math.max(...data.map(point => point.y));
                 const orderOfMagnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
                 const niceMax = Math.ceil(maxValue / orderOfMagnitude) * orderOfMagnitude;
 
@@ -432,12 +433,11 @@
                     chart: {
                         ...commonChartOptions.chart,
                         id: metric.id,
-                        height: 120,
                         toolbar: { show: false }
                     },
                     yaxis: {
                         ...commonChartOptions.yaxis,
-                        min: minValue,
+                        min: 0,
                         max: niceMax,
                         tickAmount: 4,
                         labels: {
