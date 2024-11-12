@@ -7,6 +7,7 @@ from .models import Client, GoogleAnalyticsCredentials, SearchConsoleCredentials
 from .google_auth import get_search_console_properties
 from datetime import datetime, timedelta
 from google.auth.exceptions import RefreshError
+from googleapiclient.errors import HttpError
 from apps.agents.tools.google_analytics_tool.google_analytics_tool import GoogleAnalyticsTool
 from django.core.serializers.json import DjangoJSONEncoder
 from apps.common.tools.user_activity_tool import user_activity_tool
@@ -19,58 +20,68 @@ def client_analytics(request, client_id):
     ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
     sc_credentials = get_object_or_404(SearchConsoleCredentials, client=client)
     
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    
     context = {
         'client': client,
         'analytics_data': None,
         'search_console_data': None,
-        'start_date': None,
-        'end_date': None,
+        'start_date': start_date,
+        'end_date': end_date,
     }
 
-    try:
-        end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-
-        # New method using GoogleAnalyticsTool
-        logger.info("Fetching data using GoogleAnalyticsTool")
-        ga_tool = GoogleAnalyticsTool()
-        
-        ga_tool_data = ga_tool._run(start_date=start_date, end_date=end_date, client_id=client_id)
-        
-        # Parse the JSON string returned by the tool
+    # Try to get Google Analytics data
+    analytics_service = ga_credentials.get_service()
+    if analytics_service:
         try:
-            analytics_data = json.loads(ga_tool_data['analytics_data'])
+            logger.info("Fetching data using GoogleAnalyticsTool")
+            ga_tool = GoogleAnalyticsTool()
             
-            # Convert the data back to JSON string using DjangoJSONEncoder
-            context['analytics_data'] = json.dumps(analytics_data, cls=DjangoJSONEncoder)
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error: {str(e)}")
-            messages.error(request, "Error parsing analytics data. Please try again later.")
-        
-        context['start_date'] = ga_tool_data['start_date']
-        context['end_date'] = ga_tool_data['end_date']
-        
-        logger.info("Successfully fetched data using GoogleAnalyticsTool")
+            property_id = f"properties/{ga_credentials.get_property_id()}" if not ga_credentials.view_id.startswith('properties/') else ga_credentials.view_id
+            
+            ga_tool_data = ga_tool._run(
+                service=analytics_service,
+                start_date=start_date,
+                end_date=end_date,
+                property_id=property_id
+            )
+            
+            # JSON encode the array for the template
+            context['analytics_data'] = json.dumps(ga_tool_data['analytics_data'])
+            context['start_date'] = ga_tool_data['start_date']
+            context['end_date'] = ga_tool_data['end_date']
+            
+        except Exception as e:
+            logger.error(f"Error fetching GA data: {str(e)}")
+            messages.warning(request, "Unable to fetch Google Analytics data.")
+    else:
+        logger.warning(f"No valid GA service for client {client.name}")
+        messages.warning(request, "Google Analytics credentials are incomplete.")
 
-    except RefreshError:
-        logger.error("Google Analytics token has expired. Please re-authenticate.", exc_info=True)
-        messages.error(request, "Google Analytics token has expired. Please re-authenticate.")
-    except Exception as e:
-        logger.error(f"Unexpected error in Google Analytics: {str(e)}", exc_info=True)
-        messages.error(request, f"An error occurred while fetching Google Analytics data: {str(e)}")
-
+    # Try to get Search Console data
     try:
-        search_console_client = get_search_console_service(sc_credentials, request)
-        search_console_data = get_search_console_data(search_console_client, sc_credentials.property_url, start_date, end_date)
-        context['search_console_data'] = search_console_data
-    except RefreshError:
-        logger.error("Search Console token has expired. Please re-authenticate.", exc_info=True)
-        messages.error(request, "Search Console token has expired. Please re-authenticate.")
+        search_console_service = sc_credentials.get_service()
+        if search_console_service:
+            # Get properly parsed property URL
+            property_url = sc_credentials.get_property_url()
+            if property_url:
+                logger.info(f"Using Search Console property URL: {property_url}")
+                search_console_data = get_search_console_data(
+                    search_console_service, 
+                    property_url,  # Use the clean URL
+                    start_date, 
+                    end_date
+                )
+                context['search_console_data'] = search_console_data
+            else:
+                messages.warning(request, "Invalid Search Console property URL format.")
+        else:
+            messages.warning(request, "Search Console credentials are incomplete.")
     except Exception as e:
-        logger.error(f"Unexpected error in Search Console: {str(e)}", exc_info=True)
-        messages.error(request, f"An error occurred while fetching Search Console data: {str(e)}")
+        logger.error(f"Error fetching Search Console data: {str(e)}")
+        messages.warning(request, "Unable to fetch Search Console data.")
 
-    #user_activity_tool.run(request.user, 'view', f"Viewed analytics for client: {client.name}", client=client)
     return render(request, 'seo_manager/client_analytics.html', context)
 
 def get_search_console_service(credentials, request):

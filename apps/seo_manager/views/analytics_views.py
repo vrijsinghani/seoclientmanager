@@ -10,6 +10,9 @@ from ..google_auth import (
     get_search_console_properties
 )
 from apps.common.tools.user_activity_tool import user_activity_tool
+import logging
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def client_ads(request, client_id):
@@ -37,6 +40,15 @@ def google_oauth_callback(request):
     
     credentials = flow.credentials
     
+    logger.info(f"""
+    OAuth Callback received credentials for {client.name}:
+    Token: {'Present' if credentials.token else 'Missing'}
+    Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
+    Token URI: {credentials.token_uri}
+    Client ID: {credentials.client_id}
+    Client Secret: {'Present' if credentials.client_secret else 'Missing'}
+    """)
+    
     if credential_type == 'ga':
         accounts = get_analytics_accounts_oauth(credentials)
         request.session['accounts'] = accounts
@@ -45,6 +57,16 @@ def google_oauth_callback(request):
         request.session['token_uri'] = credentials.token_uri
         request.session['client_id'] = credentials.client_id
         request.session['client_secret'] = credentials.client_secret
+        
+        logger.info(f"""
+        Storing in session for {client.name}:
+        Access Token: {'Present' if credentials.token else 'Missing'}
+        Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
+        Token URI: {credentials.token_uri}
+        Client ID: {credentials.client_id}
+        Client Secret: {'Present' if credentials.client_secret else 'Missing'}
+        """)
+        
         return redirect('seo_manager:add_ga_credentials_oauth', client_id=client_id)
     elif credential_type == 'sc':
         properties = get_search_console_properties(credentials)
@@ -68,19 +90,49 @@ def add_ga_credentials_oauth(request, client_id):
         if selected_account:
             accounts = request.session.get('accounts', [])
             account_data = next((account for account in accounts if account['property_id'] == selected_account), None)
+            
             if account_data:
-                GoogleAnalyticsCredentials.objects.update_or_create(
+                logger.info(f"""
+                Retrieving from session for {client.name}:
+                Access Token: {'Present' if request.session.get('access_token') else 'Missing'}
+                Refresh Token: {'Present' if request.session.get('refresh_token') else 'Missing'}
+                Token URI: {request.session.get('token_uri')}
+                Client ID: {request.session.get('client_id')}
+                Client Secret: {'Present' if request.session.get('client_secret') else 'Missing'}
+                """)
+
+                credentials, created = GoogleAnalyticsCredentials.objects.update_or_create(
                     client=client,
                     defaults={
-                        'access_token': request.session.get('access_token', ''),
-                        'refresh_token': request.session.get('refresh_token', ''),
-                        'token_uri': request.session.get('token_uri', ''),
-                        'ga_client_id': request.session.get('client_id', ''),
-                        'client_secret': request.session.get('client_secret', ''),
+                        'access_token': request.session.get('access_token'),
+                        'refresh_token': request.session.get('refresh_token'),
+                        'token_uri': request.session.get('token_uri'),
+                        'ga_client_id': request.session.get('client_id'),
+                        'client_secret': request.session.get('client_secret'),
                         'use_service_account': False,
                         'view_id': account_data['property_id'],
+                        'user_email': request.user.email,
+                        'scopes': [
+                            'https://www.googleapis.com/auth/analytics.readonly',
+                            'https://www.googleapis.com/auth/userinfo.email',
+                            'https://www.googleapis.com/auth/userinfo.profile'
+                        ]
                     }
                 )
+
+                logger.info(f"""
+                Saved to database for {client.name}:
+                Access Token: {'Present' if credentials.access_token else 'Missing'}
+                Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
+                Token URI: {credentials.token_uri}
+                Client ID: {credentials.ga_client_id}
+                Client Secret: {'Present' if credentials.client_secret else 'Missing'}
+                View ID: {credentials.view_id}
+                """)
+
+                for key in ['access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret', 'accounts']:
+                    request.session.pop(key, None)
+
                 user_activity_tool.run(request.user, 'create', f"Added Google Analytics credentials (OAuth) for client: {client.name}", client=client)
                 messages.success(request, "Google Analytics credentials (OAuth) added successfully.")
                 return redirect('seo_manager:client_detail', client_id=client.id)

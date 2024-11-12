@@ -116,79 +116,93 @@ class AIProvider(models.Model):
 
 class GoogleAnalyticsCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='ga_credentials')
-    view_id = models.CharField(max_length=100, blank=True, null=True)  # Allow null values
-    access_token = models.TextField(blank=True, null=True)  # Allow null for service accounts
-    refresh_token = models.TextField(blank=True, null=True)  # Allow null for service accounts
-    token_uri = models.URLField(blank=True, null=True)  # Allow null for service accounts
-    ga_client_id = models.CharField(max_length=100, blank=True, null=True)  # Allow null for service accounts
-    client_secret = models.CharField(max_length=100, blank=True, null=True)  # Allow null for service accounts
+    view_id = models.CharField(max_length=100, blank=True, null=True)
+    access_token = models.TextField(blank=True, null=True)
+    refresh_token = models.TextField(blank=True, null=True)
+    token_uri = models.URLField(blank=True, null=True)
+    ga_client_id = models.CharField(max_length=100, blank=True, null=True)
+    client_secret = models.CharField(max_length=100, blank=True, null=True)
     use_service_account = models.BooleanField(default=False)
     service_account_json = models.TextField(blank=True, null=True)
-    user_email = models.EmailField()  # Add this field if it doesn't exist
-    # Add the scopes attribute with a default value
+    user_email = models.EmailField()
     scopes = models.JSONField(default=list)
 
     def __str__(self):
         return f"GA Credentials for {self.client.name}"
 
+    @property
+    def required_scopes(self):
+        return ['https://www.googleapis.com/auth/analytics.readonly']
+
     def get_credentials(self):
         """Returns refreshed Google Analytics credentials"""
         try:
-            if self.use_service_account:
-                logger.info("Using service account for Google Analytics")
+            # First try service account if configured
+            if self.use_service_account and self.service_account_json:
+                logger.info(f"Using service account for {self.client.name}")
                 service_account_info = json.loads(self.service_account_json)
                 return service_account.Credentials.from_service_account_info(
                     service_account_info,
-                    scopes=['https://www.googleapis.com/auth/analytics.readonly']
+                    scopes=self.required_scopes
                 )
-            
-            if not self.refresh_token:
-                raise AuthError("No refresh token available. Reauthorization required.")
 
-            logger.info("Using OAuth credentials for Google Analytics")
+            # Then try OAuth credentials
+            # Check for required OAuth fields
+            required_fields = {
+                'refresh_token': self.refresh_token,
+                'token_uri': self.token_uri,
+                'client_id': self.ga_client_id,
+                'client_secret': self.client_secret
+            }
+            
+            # Log which fields are missing
+            missing_fields = [field for field, value in required_fields.items() if not value]
+            if missing_fields:
+                logger.error(f"Missing OAuth fields for {self.client.name}: {', '.join(missing_fields)}")
+                return None
+
+            logger.info(f"Using OAuth credentials for {self.client.name}")
             credentials = Credentials(
                 token=self.access_token,
                 refresh_token=self.refresh_token,
                 token_uri=self.token_uri,
                 client_id=self.ga_client_id,
                 client_secret=self.client_secret,
-                scopes=['https://www.googleapis.com/auth/analytics.readonly']
+                scopes=self.required_scopes
             )
 
-            # Only refresh if token is expired or missing
-            if not self.access_token or not credentials.valid:
+            # Refresh token if needed
+            if not credentials.valid:
                 request = google.auth.transport.requests.Request()
-                try:
-                    credentials.refresh(request)
-                    
-                    # Update stored credentials
-                    self.access_token = credentials.token
-                    self.save(update_fields=['access_token'])
-                    
-                    logger.info(f"Successfully refreshed Google Analytics OAuth credentials for {self.client.name}")
-                except Exception as e:
-                    if 'invalid_grant' in str(e):
-                        # Clear invalid credentials to force reauthorization
-                        self.access_token = None
-                        self.refresh_token = None
-                        self.save(update_fields=['access_token', 'refresh_token'])
-                        raise AuthError("Stored credentials are no longer valid. Please reauthorize Google Analytics access.")
-                    raise
+                credentials.refresh(request)
+                self.access_token = credentials.token
+                self.save(update_fields=['access_token'])
+                logger.info(f"Refreshed access token for {self.client.name}")
 
             return credentials
 
         except Exception as e:
-            logger.error(f"Failed to refresh Google Analytics credentials for {self.client.name}: {str(e)}")
-            raise AuthError(f"Failed to get valid Google Analytics credentials: {str(e)}")
+            logger.error(f"Error getting GA credentials for {self.client.name}: {str(e)}")
+            return None
+
+    def get_property_id(self):
+        """Get the clean property ID without 'properties/' prefix"""
+        if self.view_id:
+            return self.view_id.replace('properties/', '')
+        return None
 
     def get_service(self):
-        """Returns an authenticated Google Analytics service"""
+        """Returns an authenticated Analytics service"""
         try:
             credentials = self.get_credentials()
+            if not credentials:
+                logger.warning(f"No valid credentials available for {self.client.name}")
+                return None
+                
             return BetaAnalyticsDataClient(credentials=credentials)
         except Exception as e:
-            logger.error(f"Failed to create Analytics service: {str(e)}")
-            raise AuthError(f"Failed to initialize Analytics service: {str(e)}")
+            logger.error(f"Error creating Analytics service for {self.client.name}: {str(e)}")
+            return None
 
 class SearchConsoleCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='sc_credentials')
@@ -247,10 +261,30 @@ class SearchConsoleCredentials(models.Model):
         """Returns an authenticated Search Console service"""
         try:
             credentials = self.get_credentials()
-            return build('searchconsole', 'v1', credentials=credentials, cache_discovery=False)
+            if not credentials:
+                logger.warning(f"No valid credentials available for {self.client.name}")
+                return None
+                
+            return build('searchconsole', 'v1', credentials=credentials)
         except Exception as e:
-            logger.error(f"Failed to create Search Console service: {str(e)}")
-            raise AuthError(f"Failed to initialize Search Console service: {str(e)}")
+            logger.error(f"Error creating Search Console service for {self.client.name}: {str(e)}")
+            return None
+
+    def get_property_url(self):
+        """Parse and return the correct property URL format"""
+        try:
+            if isinstance(self.property_url, str):
+                if '{' in self.property_url:
+                    # Parse JSON-like string
+                    data = json.loads(self.property_url.replace("'", '"'))
+                    return data.get('url')  # Use get() to safely access 'url'
+                return self.property_url
+            elif isinstance(self.property_url, dict):
+                return self.property_url.get('url')
+            return self.property_url
+        except Exception as e:
+            logger.error(f"Error parsing property URL for {self.client.name}: {str(e)}")
+            return None
 
 class SummarizerUsage(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

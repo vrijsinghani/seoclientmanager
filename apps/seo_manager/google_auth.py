@@ -9,14 +9,11 @@ import json
 def get_google_auth_flow(request):
     """
     Creates OAuth2 flow for Google Analytics and Search Console authentication.
-    Includes scopes for analytics, search console, and user profile data.
     """
     flow = Flow.from_client_secrets_file(
-        # Path to the OAuth 2.0 client secrets JSON file downloaded from Google Cloud Console
         settings.GOOGLE_CLIENT_SECRETS_FILE,
-        # List of OAuth scopes required for accessing Google APIs
         scopes=[
-            'https://www.googleapis.com/auth/analytics.readonly',
+            'https://www.googleapis.com/auth/analytics.readonly',  # GA4 scope
             'https://www.googleapis.com/auth/webmasters.readonly',
             'openid',
             'https://www.googleapis.com/auth/userinfo.email',

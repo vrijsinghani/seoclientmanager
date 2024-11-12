@@ -8,7 +8,7 @@ from crewai_tools.tools.base_tool import BaseTool
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
-from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest
+from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest, OrderBy
 from google.auth.transport.requests import Request
 from datetime import datetime, timedelta
 
@@ -95,69 +95,78 @@ class GoogleAnalyticsTool(BaseTool):
         logger.error(f"Error creating analytics service: {str(e)}", exc_info=True)
         raise
   
-  def _run(self, start_date: str, end_date: str, credentials: dict, **kwargs: Any) -> Any:
-    print(f"GoogleAnalyticsTool._run called with dates: {start_date} to {end_date}", file=sys.stderr)
-    logger.info(f"GoogleAnalyticsTool._run called with dates: {start_date} to {end_date}")
+  def _run(self, service, start_date: str, end_date: str, property_id: str, **kwargs: Any) -> Any:
+    """
+    Run Google Analytics report with the provided service
+    
+    Args:
+        service: BetaAnalyticsDataClient instance
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        property_id: GA4 property ID
+    """
     try:
-        logger.info(f"Entering GoogleAnalyticsTool._run with start_date: {start_date}, end_date: {end_date}")
-        logger.info(f"Credentials received: {json.dumps(credentials, default=str)}")
-        
-        if credentials is not None:
-            # Convert the dictionary to a GoogleAnalyticsCredentials object
-            credentials_obj = GACredentials(**credentials)
-            self.set_credentials(credentials_obj)
-        
-        if not self.credentials:
-            raise ValueError(f"Credentials have not been set. Use set_credentials() method to set them. inputs: {start_date} - {end_date} - {kwargs}")
-        
-        client = self._get_analytics_service()
-        
-        property_id = self.credentials.view_id.replace('properties/', '')
-        
-        logger.info(f"Fetching analytics data for Property ID: {property_id}, Start Date: {start_date}, End Date: {end_date}")
+        logger.info(f"Running GA report for property: {property_id}")
         
         request = RunReportRequest(
-            property=f"properties/{property_id}",
+            property=property_id,
             date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
-            metrics=[Metric(name="activeUsers"), Metric(name="sessions")],
-            dimensions=[Dimension(name="date")]
-        )        
-        response = client.run_report(request)
+            metrics=[
+                Metric(name="activeUsers"),
+                Metric(name="sessions"),
+                Metric(name="screenPageViews"),
+                Metric(name="bounceRate"),
+                Metric(name="averageSessionDuration"),
+            ],
+            dimensions=[
+                Dimension(name="date")
+            ],
+            order_bys=[
+                OrderBy(
+                    dimension=OrderBy.DimensionOrderBy(dimension_name="date"),
+                    desc=False
+                )
+            ]
+        )
+        
+        response = service.run_report(request)
         logger.info("Analytics data fetched successfully")
         
-        processed_data = self._process_analytics_data(response)
-        
-        result = {
-            'analytics_data': json.dumps(processed_data),
+        return {
+            'analytics_data': self._process_analytics_data(response),
             'start_date': start_date,
             'end_date': end_date
         }
-        logger.info(f"Returning result: {json.dumps(result, default=str)}")
-        return result
+        
     except Exception as e:
-        logger.error(f"Failed to fetch Google Analytics data. Error: {str(e)}", exc_info=True)
-        print(f"GoogleAnalyticsTool error: {str(e)}")  # Print to stdout for immediate visibility
-        return {
-            'analytics_data': json.dumps([]),
-            'start_date': start_date,
-            'end_date': end_date,
-            'error': str(e)
-        }
+        logger.error(f"Failed to fetch Google Analytics data: {str(e)}", exc_info=True)
+        raise
 
   def _process_analytics_data(self, response):
-    processed_data = []
+    """Process GA4 response into sorted daily metrics"""
     try:
+        # Create array format that frontend expects
+        analytics_data = []
+        
         for row in response.rows:
             date = datetime.strptime(row.dimension_values[0].value, '%Y%m%d').strftime('%Y-%m-%d')
-            active_users = int(row.metric_values[0].value)
-            sessions = int(row.metric_values[1].value)
-            processed_data.append({
+            
+            analytics_data.append({
                 'date': date,
-                'active_users': active_users,
-                'sessions': sessions
+                'active_users': int(row.metric_values[0].value),  # activeUsers
+                'sessions': int(row.metric_values[1].value),      # sessions
+                'pageviews': int(row.metric_values[2].value),     # screenPageViews
+                'bounce_rate': float(row.metric_values[3].value), # bounceRate
+                'avg_session_duration': float(row.metric_values[4].value)  # averageSessionDuration
             })
-        processed_data.sort(key=lambda x: x['date'])
+        
+        # Sort by date
+        analytics_data.sort(key=lambda x: x['date'])
+        logger.info(f"Processed {len(analytics_data)} days of analytics data")
+        
+        # Return just the array that frontend expects
+        return analytics_data
+        
     except Exception as e:
         logger.error(f"Error processing analytics data: {str(e)}", exc_info=True)
-        print(f"Error processing analytics data: {str(e)}")  # Print to stdout for immediate visibility
-    return processed_data
+        return []
