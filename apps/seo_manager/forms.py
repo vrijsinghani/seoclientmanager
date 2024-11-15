@@ -14,22 +14,28 @@ class ClientForm(forms.ModelForm):
 
 class BusinessObjectiveForm(forms.Form):
     goal = forms.CharField(
-        widget=forms.TextInput(attrs={
+        widget=forms.Textarea(attrs={
             'class': 'form-control',
-            'placeholder': 'Enter objective goal'
-        })
+            'rows': 3,
+            'placeholder': 'Describe the business objective in detail'
+        }),
+        help_text="What specific outcome do you want to achieve?"
     )
     metric = forms.CharField(
-        widget=forms.TextInput(attrs={
+        widget=forms.Textarea(attrs={
             'class': 'form-control',
-            'placeholder': 'Enter metric'
-        })
+            'rows': 2,
+            'placeholder': 'How will you measure success?'
+        }),
+        help_text="Define the key metrics that will track progress"
     )
     target_date = forms.DateField(
         widget=forms.DateInput(attrs={
-            'class': 'form-control',
-            'type': 'date'
-        })
+            'class': 'form-control flatpickr-date',
+            'data-toggle': 'flatpickr',
+            'placeholder': 'Select target date'
+        }),
+        help_text="When do you aim to achieve this objective?"
     )
     status = forms.BooleanField(
         required=False,
