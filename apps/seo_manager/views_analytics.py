@@ -33,37 +33,32 @@ def client_analytics(request, client_id):
     }
 
     # Try to get Google Analytics data
-    analytics_service = ga_credentials.get_service()
-    if analytics_service:
-        try:
-            logger.info("Fetching data using GoogleAnalyticsTool")
-            ga_tool = GoogleAnalyticsTool(credentials=ga_credentials)
+    try:
+        logger.info("Fetching data using GoogleAnalyticsTool")
+        ga_tool = GoogleAnalyticsTool()
+        
+        analytics_data = ga_tool._run(
+            start_date=start_date,
+            end_date=end_date,
+            client_id=client_id
+        )
+        
+        if analytics_data['success']:
+            # Log data for debugging
+            logger.info(f"Number of data points: {len(analytics_data['analytics_data'])}")
+            if analytics_data['analytics_data']:
+                logger.info(f"Sample data point: {analytics_data['analytics_data'][0]}")
             
-            property_id = ga_credentials.get_property_id()
-            
-            analytics_data = ga_tool._run(
-                service=analytics_service,
-                start_date=start_date,
-                end_date=end_date,
-                property_id=property_id
-            )
-            
-            if analytics_data and 'analytics_data' in analytics_data:
-                # Log data for debugging
-                logger.info(f"Number of data points: {len(analytics_data['analytics_data'])}")
-                if analytics_data['analytics_data']:
-                    logger.info(f"Sample data point: {analytics_data['analytics_data'][0]}")
-                
-                context['analytics_data'] = json.dumps(analytics_data['analytics_data'])
-                context['start_date'] = analytics_data['start_date']
-                context['end_date'] = analytics_data['end_date']
-            
-        except Exception as e:
-            logger.error(f"Error fetching GA data: {str(e)}", exc_info=True)
+            context['analytics_data'] = json.dumps(analytics_data['analytics_data'])
+            context['start_date'] = analytics_data['start_date']
+            context['end_date'] = analytics_data['end_date']
+        else:
+            logger.warning(f"Failed to fetch GA data: {analytics_data.get('error')}")
             messages.warning(request, "Unable to fetch Google Analytics data.")
-    else:
-        logger.warning(f"No valid GA service for client {client.name}")
-        messages.warning(request, "Google Analytics credentials are incomplete.")
+            
+    except Exception as e:
+        logger.error(f"Error fetching GA data: {str(e)}", exc_info=True)
+        messages.warning(request, "Unable to fetch Google Analytics data.")
 
     # Try to get Search Console data
     try:
@@ -75,7 +70,7 @@ def client_analytics(request, client_id):
                 logger.info(f"Using Search Console property URL: {property_url}")
                 search_console_data = get_search_console_data(
                     search_console_service, 
-                    property_url,  # Use the clean URL
+                    property_url,
                     start_date, 
                     end_date
                 )

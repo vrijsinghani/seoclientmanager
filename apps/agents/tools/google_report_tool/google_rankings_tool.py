@@ -1,50 +1,32 @@
-import os
-import json
 import logging
-import sys
 from typing import Any, Type, List, Optional
-from pydantic.v1 import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from crewai_tools.tools.base_tool import BaseTool
-from google.oauth2.credentials import Credentials
-from google.oauth2 import service_account
-from google.analytics.data_v1beta import BetaAnalyticsDataClient
-from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest, OrderBy
-from google.auth.transport.requests import Request
-from datetime import datetime, timedelta
-import pandas as pd
-from googleapiclient.discovery import build
+from datetime import datetime
+import json
 from googleapiclient.errors import HttpError
-from google.auth.exceptions import RefreshError
-import google.auth.transport.requests
 
 # Import Django models
 from django.core.exceptions import ObjectDoesNotExist
 from apps.seo_manager.models import (
     Client, 
-    GoogleAnalyticsCredentials, 
-    SearchConsoleCredentials,
     KeywordRankingHistory,
     TargetedKeyword
 )
 from django.db import transaction
-
-# Add this import at the top with other imports
 from apps.seo_manager.utils import get_monthly_date_ranges
 
 logger = logging.getLogger(__name__)
 
-class AuthError(Exception):
-    """Custom exception for authentication errors"""
-    pass
-
 class GoogleRankingsToolInput(BaseModel):
-    """Input schema for GoogleReportTool."""
-    start_date: str = Field(..., description="The start date for the analytics data (YYYY-MM-DD).")
-    end_date: str = Field(..., description="The end date for the analytics data (YYYY-MM-DD).")
-    client_id: int = Field(..., description="The ID of the client to fetch Google Analytics data for.")
+    """Input schema for GoogleRankingsTool."""
+    start_date: str = Field(description="The start date for the analytics data (YYYY-MM-DD).")
+    end_date: str = Field(description="The end date for the analytics data (YYYY-MM-DD).")
+    client_id: int = Field(description="The ID of the client to fetch Google Analytics data for.")
 
-    @validator("start_date", "end_date")
-    def validate_dates(cls, value):
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def validate_dates(cls, value: str) -> str:
         try:
             datetime.strptime(value, "%Y-%m-%d")
             return value
@@ -52,8 +34,8 @@ class GoogleRankingsToolInput(BaseModel):
             raise ValueError("Invalid date format. Use YYYY-MM-DD.")
 
 class GoogleRankingsTool(BaseTool):
-    name: str = "Google Analytics and Search Console Report Fetcher"
-    description: str = "Fetches Google Analytics and Search Console reports for a specified client and date range."
+    name: str = "Google Search Console Rankings Fetcher"
+    description: str = "Fetches and stores Google Search Console ranking data for a specified client and date range."
     args_schema: Type[BaseModel] = GoogleRankingsToolInput
 
     def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
@@ -67,7 +49,13 @@ class GoogleRankingsTool(BaseTool):
             
             # Get authenticated service using model method
             search_console_service = sc_credentials.get_service()
-            property_url = sc_credentials.property_url
+            if not search_console_service:
+                raise ValueError("Failed to initialize Search Console service")
+                
+            # Get property URL using model method
+            property_url = sc_credentials.get_property_url()
+            if not property_url:
+                raise ValueError("Missing or invalid Search Console property URL")
             
             # Check if specific dates were provided (for collect_rankings)
             if start_date and end_date:
@@ -117,13 +105,6 @@ class GoogleRankingsTool(BaseTool):
                     'stored_rankings_count': 0
                 }
             
-        except AuthError as e:
-            logger.error(f"Authentication error: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e),
-                'stored_rankings_count': total_stored_rankings
-            }
         except Exception as e:
             logger.error(f"Error in ranking tool: {str(e)}")
             return {

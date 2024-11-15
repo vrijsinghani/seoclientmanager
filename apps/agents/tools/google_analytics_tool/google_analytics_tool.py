@@ -3,38 +3,26 @@ import json
 import logging
 import sys
 from typing import Any, Type, List, Optional
-from pydantic.v1 import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from crewai_tools.tools.base_tool import BaseTool
-from google.oauth2.credentials import Credentials
-from google.oauth2 import service_account
-from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest, OrderBy
-from google.auth.transport.requests import Request
-from datetime import datetime, timedelta
+from datetime import datetime
+
+# Import Django models
+from django.core.exceptions import ObjectDoesNotExist
+from apps.seo_manager.models import Client, GoogleAnalyticsCredentials
 
 logger = logging.getLogger(__name__)
 
-class GACredentials(BaseModel):
-    view_id: str = None
-    client_id: Optional[str] = None
-    access_token: str = None
-    refresh_token: str = None
-    token_uri: str = None
-    ga_client_id: str = None
-    client_secret: str = None
-    use_service_account: bool = False
-    service_account_json: Optional[str] = None
-    user_email: str
-    scopes: List[str] = []
-
 class GoogleAnalyticsToolInput(BaseModel):
     """Input schema for GoogleAnalyticsTool."""
-    start_date: str = Field(..., description="The start date for the analytics data (YYYY-MM-DD).")
-    end_date: str = Field(..., description="The end date for the analytics data (YYYY-MM-DD).")
-    credentials: GACredentials = Field(..., description="The credentials for the Google Analytics API.")
+    start_date: str = Field(description="The start date for the analytics data (YYYY-MM-DD).")
+    end_date: str = Field(description="The end date for the analytics data (YYYY-MM-DD).")
+    client_id: int = Field(description="The ID of the client to fetch Google Analytics data for.")
 
-    @validator('start_date', 'end_date', allow_reuse=True)
-    def validate_dates(cls, value):
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def validate_dates(cls, value: str) -> str:
         try:
             datetime.strptime(value, "%Y-%m-%d")
             return value
@@ -43,14 +31,12 @@ class GoogleAnalyticsToolInput(BaseModel):
 
 class GoogleAnalyticsTool(BaseTool):
     name: str = "Google Analytics Data Fetcher"
-    description: str = "Fetches Google Analytics data for a specified property and date range."
+    description: str = "Fetches Google Analytics data for a specified client and date range."
     args_schema: Type[BaseModel] = GoogleAnalyticsToolInput
     
     def __init__(self, **kwargs):
         super().__init__()
-        print("GoogleAnalyticsTool initialized", file=sys.stderr)
         logger.info("GoogleAnalyticsTool initialized")
-        self._ga_credentials = kwargs.get('credentials')
         self._initialize_dimensions_metrics()
 
     def _initialize_dimensions_metrics(self):
@@ -70,16 +56,27 @@ class GoogleAnalyticsTool(BaseTool):
             Metric(name="engagedSessions")
         ]
 
-    def _run(self, service, start_date, end_date, property_id):
-        """
-        Run the Google Analytics report with metrics matching the dashboard
-        """
+    def _run(self, start_date: str, end_date: str, client_id: int) -> dict:
         try:
+            # Get client and credentials
+            client = Client.objects.get(id=client_id)
+            ga_credentials = client.ga_credentials
+            
+            if not ga_credentials:
+                raise ValueError("Missing Google Analytics credentials")
+            
+            # Get authenticated service using model method
+            service = ga_credentials.get_service()
             if not service:
-                raise ValueError("Analytics service is required")
+                raise ValueError("Failed to initialize Analytics service")
+            
+            # Get property ID using model method
+            property_id = ga_credentials.get_property_id()
+            if not property_id:
+                raise ValueError("Missing or invalid Google Analytics property ID")
 
             request = RunReportRequest(
-                property=f"properties/{property_id}" if not property_id.startswith('properties/') else property_id,
+                property=f"properties/{property_id}",
                 dimensions=self._dimensions,
                 metrics=self._metrics,
                 date_ranges=[DateRange(
@@ -96,9 +93,7 @@ class GoogleAnalyticsTool(BaseTool):
                 ]
             )
 
-            # Make the API call
             response = service.run_report(request)
-            
             analytics_data = []
             
             for row in response.rows:
@@ -125,6 +120,7 @@ class GoogleAnalyticsTool(BaseTool):
             analytics_data.sort(key=lambda x: x['date'])
 
             return {
+                'success': True,
                 'analytics_data': analytics_data,
                 'start_date': start_date,
                 'end_date': end_date
@@ -132,13 +128,9 @@ class GoogleAnalyticsTool(BaseTool):
 
         except Exception as e:
             logger.error(f"Error fetching GA4 data: {str(e)}")
-            # Log the full error details
             logger.error("Full error details:", exc_info=True)
-            raise
-
-    def _format_duration(self, seconds):
-        """Convert seconds to HH:MM:SS format"""
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        seconds = int(seconds % 60)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+            return {
+                'success': False,
+                'error': str(e),
+                'analytics_data': []
+            }
