@@ -45,7 +45,7 @@ class GoogleReportTool(BaseTool):
     description: str = "Fetches Google Analytics and Search Console reports for a specified client and date range."
     args_schema: Type[BaseModel] = GoogleReportToolInput
 
-    def _run(self, start_date: str, end_date: str, client_id: int, **kwargs: Any) -> Any:
+    def _run(self, start_date: str, end_date: str, client_id: int) -> str:
         try:
             # Get client and credentials
             client = Client.objects.get(id=client_id)
@@ -122,7 +122,7 @@ class GoogleReportTool(BaseTool):
             
             # Check if we got any data at all
             if not analytics_data and not keyword_data and not landing_page_data:
-                return {
+                return json.dumps({
                     'success': False,
                     'error': "No data was collected from either Google Analytics or Search Console",
                     'analytics_data': [],
@@ -131,9 +131,9 @@ class GoogleReportTool(BaseTool):
                     'start_date': start_date,
                     'end_date': end_date,
                     'client_id': client_id
-                }
+                })
             
-            return {
+            return json.dumps({
                 'success': True,
                 'analytics_data': analytics_data,
                 'keyword_data': keyword_data,
@@ -141,20 +141,18 @@ class GoogleReportTool(BaseTool):
                 'start_date': start_date,
                 'end_date': end_date,
                 'client_id': client_id
-            }
+            })
             
         except Exception as e:
-            logger.error(f"Error in report tool: {str(e)}")
-            return {
+            error_message = f"Error fetching GA4 data: {str(e)}"
+            logger.error(error_message)
+            logger.error("Full error details:", exc_info=True)
+            # Return error as string
+            return json.dumps({
                 'success': False,
                 'error': str(e),
-                'analytics_data': [],
-                'keyword_data': [],
-                'landing_page_data': [],
-                'start_date': start_date,
-                'end_date': end_date,
-                'client_id': client_id
-            }
+                'analytics_data': []
+            })
 
     def _process_analytics_data(self, response):
         processed_data = []
