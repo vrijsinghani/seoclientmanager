@@ -39,7 +39,7 @@ Example usage:
 """
 
 class GoogleAnalyticsRequest(BaseModel):
-    """Input schema for the generic Google Analytics tool."""
+    """Input schema for the generic Google Analytics Request tool."""
     start_date: str = Field(
         default="28daysAgo",
         description="Start date (YYYY-MM-DD) or relative date ('today', 'yesterday', 'NdaysAgo', etc)."
@@ -89,7 +89,7 @@ class GoogleAnalyticsRequest(BaseModel):
     def validate_dates(cls, value: str) -> str:
         # Allow relative dates
         relative_dates = ['today', 'yesterday', '7daysAgo', '14daysAgo', '28daysAgo', '30daysAgo', '90daysAgo']
-        if value in relative_dates:
+        if value in relative_dates or cls.is_relative_date(value):
             return value
         
         # Validate actual dates
@@ -97,8 +97,19 @@ class GoogleAnalyticsRequest(BaseModel):
             datetime.strptime(value, "%Y-%m-%d")
             return value
         except ValueError:
-            raise ValueError("Invalid date format. Use YYYY-MM-DD or relative dates (today, yesterday, 7daysAgo, etc)")
+            raise ValueError("Invalid date format. Use YYYY-MM-DD or relative dates (today, yesterday, NdDaysAgo, etc)")
 
+    @classmethod
+    def is_relative_date(cls, value: str) -> bool:
+        """Check if the value is in the format of NdDaysAgo."""
+        if len(value) > 8 and value.endswith("daysAgo"):
+            try:
+                int(value[:-8])  # Check if the prefix is an integer
+                return True
+            except ValueError:
+                return False
+        return False
+    
 class GenericGoogleAnalyticsTool(BaseTool):
     name: str = "Generic Google Analytics Data Fetcher"
     description: str = "Fetches Google Analytics data with customizable metrics and dimensions."

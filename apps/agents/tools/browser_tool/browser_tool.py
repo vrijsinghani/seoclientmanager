@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 class BrowserToolSchema(BaseModel):
   """Input for BrowserTool."""
   website: str = Field(..., title="Website", description="Full URL of the website to scrape (e.g., https://google.com)")
+  output_type: str = Field(
+      default="text",
+      title="Output Type",
+      description="Type of output desired: 'text' for cleaned content or 'raw' for HTML"
+  )
 
 class BrowserTool(BaseTool):
   name: str = "Scrape website content"
@@ -38,11 +43,12 @@ class BrowserTool(BaseTool):
   def _run(
       self,
       website: str,
+      output_type: str = "text",
       **kwargs: Any,
   ) -> Any:
       """Scrape website content."""
-      logger.info(f"Scraping website: {website}")
-      content = self.get_content(website)
+      logger.info(f"Scraping website: {website} with output type: {output_type}")
+      content = self.get_content(website, output_type)
       return f'\nContent of {website}: {content}\n'
 
   def clean_content(self, content: str) -> str:
@@ -135,7 +141,7 @@ class BrowserTool(BaseTool):
       return content
 
 #  @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-  def get_content(self, url: str) -> str:
+  def get_content(self, url: str, output_type: str = "text") -> str:
       """Scrape website content with retry mechanism."""
       payload = {
           "url": url,
@@ -151,10 +157,15 @@ class BrowserTool(BaseTool):
           response.raise_for_status()
           data = response.json()
           html_content = data['data'][0]['results'][0]['html']
-          # Detect content type
+
+          # Return raw HTML if requested
+          if output_type.lower() == "raw":
+              return html_content
+
+          # Otherwise process the content as before
           content_type = self.detect_content_type(url, html_content)
-          # Extract and process content
           extracted_content = self.extract_content(url, html_content)
+          
           # Format the final output
           result = f"Title: {extracted_content['title']}\n\n"
           result += f"Content Type: {content_type}\n\n"

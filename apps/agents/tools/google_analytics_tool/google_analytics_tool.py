@@ -16,19 +16,44 @@ logger = logging.getLogger(__name__)
 
 class GoogleAnalyticsToolInput(BaseModel):
     """Input schema for GoogleAnalyticsTool."""
-    start_date: str = Field(description="The start date for the analytics data (YYYY-MM-DD).")
-    end_date: str = Field(description="The end date for the analytics data (YYYY-MM-DD).")
-    client_id: int = Field(description="The ID of the client to fetch Google Analytics data for.")
+    start_date: str = Field(
+        default="28daysAgo",
+        description="Start date (YYYY-MM-DD) or relative date ('today', 'yesterday', 'NdaysAgo', etc)."
+    )
+    end_date: str = Field(
+        default="today",
+        description="End date (YYYY-MM-DD) or relative date ('today', 'yesterday', 'NdaysAgo', etc)."
+    )
+    client_id: int = Field(
+        description="The ID of the client."
+    )
 
     @field_validator("start_date", "end_date")
     @classmethod
     def validate_dates(cls, value: str) -> str:
+        # Allow relative dates
+        relative_dates = ['today', 'yesterday', '7daysAgo', '14daysAgo', '28daysAgo', '30daysAgo', '90daysAgo']
+        if value in relative_dates or cls.is_relative_date(value):
+            return value
+        
+        # Validate actual dates
         try:
             datetime.strptime(value, "%Y-%m-%d")
             return value
         except ValueError:
-            raise ValueError("Invalid date format. Use YYYY-MM-DD.")
+            raise ValueError("Invalid date format. Use YYYY-MM-DD or relative dates (today, yesterday, NdDaysAgo, etc)")
 
+    @classmethod
+    def is_relative_date(cls, value: str) -> bool:
+        """Check if the value is in the format of NdDaysAgo."""
+        if len(value) > 8 and value.endswith("daysAgo"):
+            try:
+                int(value[:-8])  # Check if the prefix is an integer
+                return True
+            except ValueError:
+                return False
+        return False
+    
 class GoogleAnalyticsTool(BaseTool):
     name: str = "Google Analytics Data Fetcher"
     description: str = "Fetches Google Analytics data for a specified client and date range."

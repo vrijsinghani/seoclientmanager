@@ -4,6 +4,7 @@ from . import views_agents
 from . import views_tasks
 from . import views_tools
 from . import views_crews
+from .views_chat import ChatView
 
 
 app_name = 'agents'
@@ -47,4 +48,5 @@ urlpatterns = [
     path('manage/crews/card-view/', views_crews.manage_crews_card_view, name='manage_crews_card_view'),
     
     path('connection-test/', views.connection_test, name='connection_test'),
+    path('chat/', ChatView.as_view(), name='chat'),
 ]

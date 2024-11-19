@@ -344,3 +344,15 @@ class AgentToolSettings(models.Model):
 
     class Meta:
         unique_together = ('agent', 'tool')
+
+class ChatMessage(models.Model):
+    session_id = models.UUIDField(default=uuid.uuid4)
+    agent = models.ForeignKey('Agent', on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    content = models.TextField()
+    is_agent = models.BooleanField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    model = models.CharField(max_length=100)
+
+    class Meta:
+        ordering = ['timestamp']

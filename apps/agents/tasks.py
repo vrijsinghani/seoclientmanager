@@ -247,9 +247,20 @@ def save_result_to_file(execution, result):
     logger.info(log_message)
 
 def initialize_crew(execution):
-    agents = create_crewai_agents(execution.crew.agents.all(), execution.id)
+    # Create regular agents (excluding manager)
+    regular_agents = list(execution.crew.agents.all())
     
-    # Fetch and order the tasks based on CrewTask
+    # Create CrewAI agents for regular agents
+    agents = create_crewai_agents(regular_agents, execution.id)
+    
+    # Create manager agent separately if it exists
+    manager_agent = None
+    if execution.crew.manager_agent:
+        manager_agents = create_crewai_agents([execution.crew.manager_agent], execution.id)
+        if manager_agents:
+            manager_agent = manager_agents[0]
+    
+    # Fetch and order the tasks
     ordered_tasks = Task.objects.filter(
         crewtask__crew=execution.crew
     ).order_by('crewtask__order')
@@ -269,6 +280,10 @@ def initialize_crew(execution):
         'execution_id': execution.id,
     }
 
+    # Add manager agent if it exists
+    if manager_agent:
+        crew_params['manager_agent'] = manager_agent
+
     # Handle additional LLM fields for Crew
     llm_fields = ['manager_llm', 'function_calling_llm', 'planning_llm']
     for field in llm_fields:
@@ -279,8 +294,8 @@ def initialize_crew(execution):
 
     optional_params = [
         'memory', 'max_rpm', 'language', 'language_file', 'full_output',
-        'share_crew', 'output_log_file', 'planning', 'manager_agent',
-        'manager_callbacks', 'prompt_file', 'cache', 'embedder'
+        'share_crew', 'output_log_file', 'planning', 'manager_callbacks', 
+        'prompt_file', 'cache', 'embedder'
     ]
 
     for param in optional_params:
