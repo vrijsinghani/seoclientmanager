@@ -51,8 +51,20 @@
                             </div>
                         </div>
                     </div>
-                    <div id="connection-status" class="ms-3" style="width: 12px; height: 12px; border-radius: 50%; background-color: #ffc107;" 
-                         data-bs-toggle="tooltip" data-bs-placement="left" title="Connecting...">
+                    <div class="d-flex align-items-center gap-2">
+                        <button id="new-chat-btn" 
+                                class="btn btn-icon-only btn-link text-dark px-2  d-flex align-items-center" 
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="left" 
+                                title="Start New Chat">
+                            <i class="fas fa-comments fa-2x me-1"></i>
+                        </button>
+                        <div id="connection-status" 
+                             style="width: 12px; height: 12px; border-radius: 50%; background-color: #ffc107;" 
+                             data-bs-toggle="tooltip" 
+                             data-bs-placement="left" 
+                             title="Connecting...">
+                        </div>
                     </div>
                 </div>
 
@@ -374,6 +386,47 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.message) {
             appendMessage(data.message, data.is_agent);
         }
+    }
+
+    // Add new chat button functionality
+    const newChatBtn = document.getElementById('new-chat-btn');
+    
+    function startNewChat() {
+        console.log('Starting new chat...');
+        
+        // Clear the chat messages
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.innerHTML = '';
+        
+        // Reset the message input
+        messageInput.value = '';
+        
+        // Generate new session ID and reinitialize WebSocket
+        socket.close();
+        initializeWebSocket();
+        
+        // Show success notification using SweetAlert2
+        Swal.fire({
+            icon: 'success',
+            title: 'New Chat Started',
+            toast: true,
+            position: 'bottom-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+    }
+    
+    // Add click event listener to new chat button
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', startNewChat);
+        console.log('New chat button listener added');
+    } else {
+        console.error('New chat button not found');
     }
 });
 

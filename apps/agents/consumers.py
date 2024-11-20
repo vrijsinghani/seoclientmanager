@@ -23,6 +23,8 @@ from typing import Dict, Any, List
 from pydantic import create_model
 from langchain.memory import ConversationBufferMemory
 from langchain_core.chat_history import BaseChatMessageHistory
+import re
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +293,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.logger = logging.getLogger(__name__)
         self.session_id = str(uuid.uuid4())
         self.group_name = f"chat_{self.session_id}"
-    
+        self._agent_executor = None
+        self._callback_handler = None
+
+    async def _get_or_create_agent_executor(self, agent, model_name, client_data):
+        """Get existing agent executor or create a new one"""
+        if self._agent_executor is None:
+            self._agent_executor = await database_sync_to_async(self._initialize_agent)(
+                agent, model_name, client_data
+            )
+        return self._agent_executor
+
     async def connect(self):
         try:
             await self.channel_layer.group_add(self.group_name, self.channel_name)
@@ -316,163 +328,132 @@ class ChatConsumer(AsyncWebsocketConsumer):
             agent = await self.get_agent(agent_id)
             client_data = await self.client_manager.get_client_data(client_id) if client_id else None
 
-            # Initialize agent
-            agent_executor = await database_sync_to_async(self._initialize_agent)(agent, model_name, client_data)
+            # Get or create agent executor
+            agent_executor = await self._get_or_create_agent_executor(agent, model_name, client_data)
             
             # Execute agent with proper error handling
-            try:
-                response = await database_sync_to_async(self._execute_agent_with_retry)(
-                    agent_executor,
-                    message,
-                    max_retries=3
-                )
-            except Exception as e:
-                response = f"I apologize, but I encountered an error: {str(e)}"
+            response = await self._execute_agent_with_retry(
+                agent_executor,
+                message,
+                max_retries=3
+            )
             
             # Save and send response
             await self._handle_response(response, agent_id, model_name)
             
         except Exception as e:
+            self.logger.error(f"Error in receive: {str(e)}", exc_info=True)
             await self._handle_error(str(e))
 
-    def _execute_agent_with_retry(self, agent_executor, message, max_retries=3):
+    async def _execute_agent_with_retry(self, agent_executor, message, max_retries=3):
         """Execute agent with retry logic and proper response formatting"""
         last_error = None
         
         for attempt in range(max_retries):
             try:
-                # Execute the agent
-                response = agent_executor.run(
-                    input=message,
-                    callbacks=[self._create_callback_handler()]
+                # Add input validation
+                if not message or not message.strip():
+                    raise ValueError("Empty or invalid input message")
+
+                # Execute the agent asynchronously with timeout
+                response = await asyncio.wait_for(
+                    database_sync_to_async(agent_executor.run)(  # Changed to run instead of arun
+                        input=message,
+                        callbacks=[self._create_callback_handler()]
+                    ),
+                    timeout=30
                 )
                 
-                # Check for successful analytics response
-                if isinstance(response, str):
-                    try:
-                        # Try to parse as JSON
-                        parsed_response = json.loads(response)
-                        if isinstance(parsed_response, dict):
-                            if parsed_response.get('success') is True:
-                                formatted = self._format_analytics_response(parsed_response)
-                                # Force agent to stop by returning final response
-                                agent_executor.agent.return_values = {"output": formatted}
-                                return formatted
-                    except json.JSONDecodeError:
-                        pass
-
-                # Check if response contains analytics data in string form
-                if isinstance(response, str) and ('analytics_data' in response or 'success' in response):
-                    try:
-                        # Try to extract and parse JSON from the string
-                        start_idx = response.find('{')
-                        end_idx = response.rfind('}') + 1
-                        if start_idx >= 0 and end_idx > start_idx:
-                            json_str = response[start_idx:end_idx]
-                            data = json.loads(json_str)
-                            if data.get('success') is True:
-                                formatted = self._format_analytics_response(data)
-                                # Force agent to stop by returning final response
-                                agent_executor.agent.return_values = {"output": formatted}
-                                return formatted
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-
-                # If we got any valid response, return it
-                if response and str(response).strip():
-                    return str(response).strip()
+                # Log the raw response for debugging
+                self.logger.debug(f"Raw agent response: {response}")
                 
-                raise Exception("Invalid or empty response from agent")
+                # Process the response
+                formatted_response = await self._process_agent_response(response)
+                if formatted_response:
+                    return formatted_response
+                
+                raise ValueError("Invalid or empty response from agent")
+                
+            except asyncio.TimeoutError:
+                self.logger.error(f"Agent execution timed out on attempt {attempt + 1}")
+                await asyncio.sleep(1)  # Brief pause before retry
+                if attempt == max_retries - 1:
+                    return "I apologize, but the request timed out. Please try again with a simpler query."
                 
             except Exception as e:
                 last_error = e
-                self.logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}")
-                
-                # Try to parse error message for success response
-                error_str = str(e)
-                if 'success' in error_str.lower():
-                    try:
-                        start_idx = error_str.find('{')
-                        end_idx = error_str.rfind('}') + 1
-                        if start_idx >= 0 and end_idx > start_idx:
-                            error_data = json.loads(error_str[start_idx:end_idx])
-                            if error_data.get('success') is True:
-                                formatted = self._format_analytics_response(error_data)
-                                # Force agent to stop
-                                agent_executor.agent.return_values = {"output": formatted}
-                                return formatted
-                    except (json.JSONDecodeError, ValueError):
-                        pass
+                self.logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}", exc_info=True)
+                await asyncio.sleep(1)  # Brief pause before retry
                 
                 if attempt == max_retries - 1:
-                    raise last_error
+                    return f"I apologize, but I encountered an error: {str(last_error)}"
         
-        raise last_error if last_error else Exception("Agent execution failed")
+        return f"I apologize, but I encountered an error: {str(last_error)}"
 
-    def _format_analytics_response(self, response_data):
-        """Format analytics data into a readable response"""
+    async def _process_agent_response(self, response):
+        """Process and validate agent response"""
         try:
-            if not response_data.get('analytics_data'):
-                return "No analytics data available for the specified period."
+            # Handle dict responses (direct tool output)
+            if isinstance(response, dict):
+                if response.get('success') is True:
+                    formatted = self._format_analytics_response(response)
+                    return {
+                        "action": "Final Answer",
+                        "action_input": formatted
+                    }
+                return str(response)
             
-            # Format the analytics data into a readable message
-            data_points = response_data['analytics_data']
-            formatted_response = "Here's the analytics data:\n\n"
+            # Handle string responses
+            if isinstance(response, str):
+                # Check for Final Answer format
+                if '"action": "Final Answer"' in response:
+                    try:
+                        # Extract the action_input from Final Answer
+                        match = re.search(r'"action_input":\s*"([^"]+)"', response)
+                        if match:
+                            return match.group(1)
+                    except Exception:
+                        pass
+                
+                # Try to extract JSON from response
+                json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                if json_match:
+                    try:
+                        data = json.loads(json_match.group())
+                        if data.get('success') is True:
+                            formatted = self._format_analytics_response(data)
+                            return {
+                                "action": "Final Answer",
+                                "action_input": formatted
+                            }
+                    except json.JSONDecodeError:
+                        pass
+                
+                # Return non-empty string responses
+                if response.strip():
+                    return response.strip()
             
-            for point in data_points:
-                formatted_response += "Date: {}\n".format(point.get('date', 'N/A'))
-                for key, value in point.items():
-                    if key != 'date':
-                        formatted_response += "{}: {}\n".format(key, value)
-                formatted_response += "\n"
-            
-            return formatted_response.strip()
+            return None
             
         except Exception as e:
-            self.logger.error(f"Error formatting analytics response: {str(e)}")
-            return str(response_data)  # Return raw response if formatting fails
-
-    async def _handle_response(self, response, agent_id, model_name):
-        """Handle the agent's response with better error handling"""
-        try:
-            # Ensure response is properly formatted
-            if not isinstance(response, str):
-                response = str(response)
-            
-            response = response.strip()
-            
-            # Save message using sync_to_async correctly
-            await self.save_message(response, agent_id, True, model_name)
-            
-            # Send response
-            await self.send(text_data=json.dumps({
-                'message': response,
-                'is_agent': True,
-                'timestamp': datetime.datetime.now().isoformat()
-            }))
-            
-        except Exception as e:
-            error_msg = f"Error handling response: {str(e)}"
-            self.logger.error(error_msg)
-            await self.send(text_data=json.dumps({
-                'message': error_msg,
-                'is_agent': True,
-                'error': True
-            }))
+            self.logger.error(f"Error processing agent response: {str(e)}", exc_info=True)
+            return None
 
     def _initialize_agent(self, agent, model_name, client_data):
         """Initialize the agent with tools and memory"""
         try:
+            # Load tools only once
             tools = self._load_tools_sync(agent)
+            
+            # Get LLM instance
             llm, _ = get_llm(model_name)
             
-            # Initialize memory with Django's cache backend
+            # Initialize memory
             message_history = DjangoCacheMessageHistory(
                 session_id=self.session_id,
-                ttl=3600  # 1 hour expiry
+                ttl=3600
             )
 
-            # Use ConversationBufferMemory instead of ConversationSummaryBufferMemory
             memory = ConversationBufferMemory(
                 memory_key="chat_history",
                 return_messages=True,
@@ -480,6 +461,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 output_key="output"
             )
             
+            # Create agent executor with specific configuration
             return initialize_agent(
                 tools=tools,
                 llm=llm,
@@ -488,19 +470,36 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 memory=memory,
                 agent_kwargs={
                     "prefix": self._create_agent_prompt(agent, client_data),
-                    "format_instructions": self._get_format_instructions()
-                }
+                    "format_instructions": self._get_format_instructions(),
+                    "input_variables": ["input", "agent_scratchpad", "chat_history"],
+                    "output_variables": ["output"],
+                    "handle_parsing_errors": True,
+                    # Add these to help agent understand when to stop
+                    "max_iterations": 3,  # Limit number of iterations
+                    "early_stopping_method": "generate",
+                    "return_intermediate_steps": True
+                },
+                handle_parsing_errors=True
             )
+            
         except Exception as e:
-            self.logger.error(f"Error initializing agent: {str(e)}")
+            self.logger.error(f"Error initializing agent: {str(e)}", exc_info=True)
             raise
 
     def _load_tools_sync(self, agent):
         """Synchronously load and initialize agent tools"""
         try:
             tools = []
+            seen_tools = set()  # Track which tools we've already initialized
+            
             for tool_model in agent.tools.all():
                 try:
+                    # Skip if we've already initialized this tool
+                    tool_key = f"{tool_model.tool_class}_{tool_model.tool_subclass}"
+                    if tool_key in seen_tools:
+                        continue
+                    seen_tools.add(tool_key)
+
                     tool_classes = get_tool_classes(tool_model.tool_class)
                     tool_class = next((cls for cls in tool_classes 
                                    if cls.__name__ == tool_model.tool_subclass), None)
@@ -517,35 +516,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         # Create tool description
                         tool_description = self._create_tool_description(tool_instance, tool_model)
                         
-                        # Create wrapper functions
-                        def create_tool_func(tool=tool_instance):
-                            def tool_func(**kwargs):
-                                try:
-                                    self.logger.info(f"Tool input parameters: {kwargs}")
-                                    return tool._run(**kwargs)
-                                except Exception as e:
-                                    self.logger.error(f"Tool execution error: {str(e)}")
-                                    return str(e)
-                            return tool_func
-
-                        def create_async_func(tool=tool_instance):
-                            async def async_func(**kwargs):
-                                try:
-                                    self.logger.info(f"Async tool input parameters: {kwargs}")
-                                    if hasattr(tool, 'arun'):
-                                        return await tool.arun(**kwargs)
-                                    return await database_sync_to_async(tool._run)(**kwargs)
-                                except Exception as e:
-                                    self.logger.error(f"Async tool execution error: {str(e)}")
-                                    return str(e)
-                            return async_func
-
-                        # Create Langchain tool
+                        # Create Langchain tool with direct reference to tool instance methods
                         langchain_tool = StructuredTool(
                             name=tool_model.name,
                             description=tool_description,
-                            func=create_tool_func(),
-                            coroutine=create_async_func(),
+                            func=tool_instance._run,  # Direct reference to method
+                            coroutine=tool_instance.arun if hasattr(tool_instance, 'arun') else None,
                             args_schema=tool_instance.args_schema
                         )
                         
@@ -555,8 +531,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         self.logger.error(f"Tool class not found: {tool_model.tool_subclass}")
                 except Exception as e:
                     self.logger.error(f"Error loading tool {tool_model.name}: {str(e)}", exc_info=True)
-                    
+            
             return tools
+            
         except Exception as e:
             self.logger.error(f"Error loading tools: {str(e)}", exc_info=True)
             return []
@@ -600,14 +577,37 @@ Required Parameters:
 
     def _get_format_instructions(self):
         """Get format instructions for the agent"""
-        return """
-When using tools:
-1. Always use the exact parameter names as specified in the tool's description
-2. All dates should be in YYYY-MM-DD format unless otherwise specified
-3. Get the client_id from the client context
-4. Make sure all required parameters are included
+        # Use raw string and double curly braces to escape them
+        return """RESPONSE FORMAT INSTRUCTIONS
+----------------------------
 
-Always check the tool's description for specific parameter requirements.
+When you have a final response to say to the Human, you MUST use the format:
+
+{{{{
+    "action": "Final Answer",
+    "action_input": "your response here"
+}}}}
+
+When using tools, you MUST use the format:
+
+{{{{
+    "action": "{tool_names}",
+    "action_input": {{{{
+        "param1": "value1",
+        "param2": "value2"
+    }}}}
+}}}}
+
+For analytics data:
+1. After receiving data, format it into a clear, readable response
+2. Use the Final Answer format to return the formatted data
+3. Do not make additional tool calls after getting successful data
+
+Remember:
+- Always use exact parameter names from tool descriptions
+- All dates should be in YYYY-MM-DD format
+- Get client_id from context
+- Include all required parameters
 """
 
     async def _handle_error(self, error_message):
@@ -701,6 +701,10 @@ Respond to the user's message while staying in character and using the client co
 
     def _create_callback_handler(self):
         """Create a callback handler for logging"""
+        # Return cached handler if it exists
+        if self._callback_handler is not None:
+            return self._callback_handler
+
         class WebSocketCallbackHandler(BaseCallbackHandler):
             def __init__(self, logger):
                 self.logger = logger
@@ -708,19 +712,18 @@ Respond to the user's message while staying in character and using the client co
 
             def on_llm_start(self, serialized, prompts, **kwargs):
                 try:
-                    # Safely log only the first part of prompts
+                    # Log only first 100 chars of first prompt
                     prompt_preview = str(prompts[0])[:100] if prompts else "No prompt"
-                    self.logger.info(f"LLM starting with prompt: {prompt_preview}...")
+                    self.logger.debug(f"LLM starting with prompt: {prompt_preview}...")
                 except Exception as e:
                     self.logger.error(f"Error in on_llm_start: {str(e)}")
 
             def on_llm_end(self, response, **kwargs):
                 try:
-                    # Safely handle LLMResult object
                     generations = getattr(response, 'generations', [])
                     if generations and generations[0]:
                         output = str(generations[0][0].text)[:100]
-                        self.logger.info(f"LLM completed with output: {output}...")
+                        self.logger.debug(f"LLM completed with output: {output}...")
                 except Exception as e:
                     self.logger.error(f"Error in on_llm_end: {str(e)}")
 
@@ -733,7 +736,6 @@ Respond to the user's message while staying in character and using the client co
 
             def on_tool_end(self, output, **kwargs):
                 try:
-                    # Safely log tool output
                     output_preview = str(output)[:100] if output else "No output"
                     self.logger.info(f"Tool execution completed: {output_preview}...")
                 except Exception as e:
@@ -741,20 +743,18 @@ Respond to the user's message while staying in character and using the client co
 
             def on_chain_start(self, serialized, inputs, **kwargs):
                 try:
-                    # Safely log chain inputs
                     input_preview = str(inputs)[:100] if inputs else "No input"
-                    self.logger.info(f"Chain starting with inputs: {input_preview}...")
+                    self.logger.debug(f"Chain starting with inputs: {input_preview}...")
                 except Exception as e:
                     self.logger.error(f"Error in on_chain_start: {str(e)}")
 
             def on_chain_end(self, outputs, **kwargs):
                 try:
-                    # Safely log chain outputs
                     if isinstance(outputs, dict):
                         output_preview = str(outputs.get('output', ''))[:100]
                     else:
                         output_preview = str(outputs)[:100]
-                    self.logger.info(f"Chain completed with outputs: {output_preview}...")
+                    self.logger.debug(f"Chain completed with outputs: {output_preview}...")
                 except Exception as e:
                     self.logger.error(f"Error in on_chain_end: {str(e)}")
 
@@ -769,13 +769,14 @@ Respond to the user's message while staying in character and using the client co
 
             def on_text(self, text, **kwargs):
                 try:
-                    # Safely log text
                     text_preview = str(text)[:100] if text else "No text"
-                    self.logger.info(f"Text received: {text_preview}...")
+                    self.logger.debug(f"Text received: {text_preview}...")
                 except Exception as e:
                     self.logger.error(f"Error in on_text: {str(e)}")
 
-        return WebSocketCallbackHandler(self.logger)
+        # Create and cache the handler
+        self._callback_handler = WebSocketCallbackHandler(self.logger)
+        return self._callback_handler
 
     def _create_agent_prompt(self, agent, client_data):
         """Create the agent's prompt template with client context"""
@@ -812,3 +813,31 @@ START_JSON
 }
 END_JSON
 """
+
+    async def _handle_response(self, response, agent_id, model_name):
+        """Handle the agent's response"""
+        try:
+            # Ensure response is properly formatted
+            if not isinstance(response, str):
+                response = str(response)
+            
+            response = response.strip()
+            
+            # Save message to database
+            await self.save_message(response, agent_id, True, model_name)
+            
+            # Send response to websocket
+            await self.send(text_data=json.dumps({
+                'message': response,
+                'is_agent': True,
+                'timestamp': datetime.datetime.now().isoformat()
+            }))
+            
+        except Exception as e:
+            error_msg = f"Error handling response: {str(e)}"
+            self.logger.error(error_msg, exc_info=True)
+            await self.send(text_data=json.dumps({
+                'message': error_msg,
+                'is_agent': True,
+                'error': True
+            }))
