@@ -33,7 +33,7 @@ class LiteLLMSpendLog(models.Model):
         app_label = 'home'
 
 class Last30dKeysBySpend(models.Model):
-    api_key = models.TextField(primary_key=True)
+    api_key = models.TextField(null=True)
     key_alias = models.TextField(null=True)
     key_name = models.TextField(null=True)
     total_spend = models.FloatField(null=True)
@@ -44,7 +44,7 @@ class Last30dKeysBySpend(models.Model):
         app_label = 'home'
 
 class Last30dModelsBySpend(models.Model):
-    model = models.TextField(primary_key=True)
+    model = models.TextField(null=True)
     total_spend = models.FloatField(null=True)
 
     class Meta:
@@ -53,7 +53,7 @@ class Last30dModelsBySpend(models.Model):
         app_label = 'home'
 
 class Last30dTopEndUsersSpend(models.Model):
-    end_user = models.TextField(primary_key=True)
+    end_user = models.TextField(null=True)
     total_events = models.BigIntegerField(null=True)
     total_spend = models.FloatField(null=True)
 

@@ -9,7 +9,25 @@ class ClientForm(forms.ModelForm):
         model = Client
         fields = ['name', 'website_url', 'status', 'group', 'target_audience']
         widgets = {
-            'target_audience': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Enter client name'
+            }),
+            'website_url': forms.URLInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'https://example.com'
+            }),
+            'status': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'group': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'target_audience': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Describe the target audience'
+            }),
         }
 
 class BusinessObjectiveForm(forms.Form):

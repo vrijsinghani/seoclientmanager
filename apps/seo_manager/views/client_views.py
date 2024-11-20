@@ -31,12 +31,14 @@ __all__ = [
 @login_required
 def dashboard(request):
     clients = Client.objects.all().order_by('name')
-    return render(request, 'seo_manager/dashboard.html', {'clients': clients})
+    form = ClientForm()
+    return render(request, 'seo_manager/dashboard.html', {'clients': clients, 'form': form})
 
 @login_required
 def client_list(request):
     clients = Client.objects.all().order_by('name').select_related('group')
-    return render(request, 'seo_manager/client_list.html', {'clients': clients})
+    form = ClientForm()
+    return render(request, 'seo_manager/client_list.html', {'clients': clients, 'form': form})
 
 @login_required
 def add_client(request):
@@ -46,7 +48,21 @@ def add_client(request):
             client = form.save()
             user_activity_tool.run(request.user, 'create', f"Added new client: {client.name}", client=client)
             messages.success(request, f"Client '{client.name}' has been added successfully.")
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f"Client '{client.name}' has been added successfully.",
+                    'redirect_url': reverse('seo_manager:client_detail', args=[client.id])
+                })
+            
             return redirect('seo_manager:client_detail', client_id=client.id)
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'errors': form.errors
+                })
     else:
         form = ClientForm()
     

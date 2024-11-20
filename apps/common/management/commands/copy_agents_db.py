@@ -3,6 +3,7 @@ from django.apps import apps
 from django.db import connections
 from django.db.migrations.executor import MigrationExecutor
 from apps.agents import models as agent_models
+from django.db.models import Max
 
 class Command(BaseCommand):
     help = 'Copy data from agents app models (excluding runtime results) from source database to target database'
@@ -105,3 +106,51 @@ class Command(BaseCommand):
                 continue
 
         self.stdout.write(self.style.SUCCESS('Successfully completed agents database copy operation (excluding runtime results)'))
+
+    def copy_model(self, model, source_using='default', target_using='target'):
+        objects = model.objects.using(source_using).all()
+        if not objects:
+            self.stdout.write(f'No {model.__name__} objects to copy')
+            return
+        
+        self.stdout.write(f'Copying {model.__name__}...')
+        
+        # Get the max ID from the target database
+        max_id_target = model.objects.using(target_using).aggregate(Max('id'))['id__max'] or 0
+        
+        # Create a mapping of old IDs to new IDs
+        id_mapping = {}
+        
+        for obj in objects:
+            old_id = obj.id
+            # Assign a new ID that's guaranteed to be unique
+            obj.id = max_id_target + old_id + 1
+            id_mapping[old_id] = obj.id
+        
+        model.objects.using(target_using).bulk_create(objects)
+        self.stdout.write(f'Copied {len(objects)} {model.__name__} objects')
+        
+        return id_mapping
+
+    def restore_m2m_relationships(self, model, id_mapping, source_using='default', target_using='target'):
+        try:
+            for obj in model.objects.using(source_using).all():
+                new_obj = model.objects.using(target_using).get(id=id_mapping[obj.id])
+                
+                # Get all M2M fields
+                for field in model._meta.many_to_many:
+                    # Get the related objects from source
+                    related_objects = getattr(obj, field.name).all()
+                    
+                    # Clear existing relationships in target
+                    getattr(new_obj, field.name).clear()
+                    
+                    # Add the mapped related objects
+                    for related_obj in related_objects:
+                        if hasattr(related_obj, 'id'):
+                            mapped_id = id_mapping.get(related_obj.id)
+                            if mapped_id:
+                                getattr(new_obj, field.name).add(mapped_id)
+        
+        except Exception as e:
+            self.stdout.write(f'Error restoring M2M relationships for {model.__name__}: {str(e)}')
