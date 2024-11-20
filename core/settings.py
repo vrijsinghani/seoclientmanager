@@ -431,6 +431,16 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'apps.agents.consumers': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'websockets': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     },
 }
 

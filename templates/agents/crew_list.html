@@ -33,11 +33,11 @@
 <p>Select a crew from the list on the left to start a new execution or view previous tasks.</p>
 {% endblock %}
 
-{% block javascripts %}
+{% block extra_js %}
 {{ block.super }}
 <script>
     $(function () {
         $('[data-toggle="tooltip"]').tooltip()
     })
 </script>
-{% endblock %}
+{% endblock extra_js %}

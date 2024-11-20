@@ -107,11 +107,11 @@
 </div>
 {% endblock %}
 
-{% block javascripts %}
+{% block extra_js %}
 {{ block.super }}
 <script>
     $(function () {
         $('[data-toggle="tooltip"]').tooltip()
     })
 </script>
-{% endblock %}
+{% endblock extra_js %}

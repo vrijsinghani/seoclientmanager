@@ -4,10 +4,30 @@ from channels.db import database_sync_to_async
 from .models import CrewExecution, CrewMessage, ChatMessage, Agent
 from django.core.cache import cache
 from apps.common.utils import format_message, get_llm
+from .utils import get_tool_classes
 import logging
 import uuid
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, FunctionMessage
+import asyncio
+import tiktoken
+from langchain_community.chat_models import ChatLiteLLM
+from langchain_core.tools import Tool
+from django.utils import timezone
+from apps.seo_manager.models import Client
+from langchain.prompts import ChatPromptTemplate
+from langchain.agents import initialize_agent, AgentType
+from langchain_core.callbacks import BaseCallbackHandler
+import datetime
+from langchain.tools import StructuredTool
+from typing import Dict, Any
+from pydantic import create_model
 
 logger = logging.getLogger(__name__)
+
+def count_tokens(text):
+    """Count tokens in text using tiktoken"""
+    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    return len(encoding.encode(text))
 
 class ConnectionTestConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -122,54 +142,418 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
             'messages': formatted_messages,
         }))
 
-class ChatConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        self.session_id = str(uuid.uuid4())
-        await self.channel_layer.group_add(
-            f"chat_{self.session_id}",
-            self.channel_name
-        )
-        await self.accept()
+class AgentToolManager:
+  def __init__(self):
+      self.logger = logging.getLogger(__name__)
 
-    async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            f"chat_{self.session_id}",
-            self.channel_name
-        )
+  async def load_tools(self, agent):
+      """Load and initialize agent tools"""
+      tools = []
+      for tool_model in agent.tools.all():
+          try:
+              tool_classes = get_tool_classes(tool_model.tool_class)
+              tool_class = next((cls for cls in tool_classes 
+                               if cls.__name__ == tool_model.tool_subclass), None)
+              
+              if tool_class:
+                  self.logger.info(f"Initializing tool: {tool_class.__name__}")
+                  tool_instance = tool_class()
+                  tools.append(tool_instance)
+              else:
+                  self.logger.error(f"Tool class not found: {tool_model.tool_subclass}")
+          except Exception as e:
+              self.logger.error(f"Error loading tool {tool_model.name}: {str(e)}")
+      return tools
+
+  def convert_to_langchain_tools(self, tools):
+      """Convert custom tools to Langchain format"""
+      return [self._create_langchain_tool(tool) for tool in tools]
+
+  def _create_langchain_tool(self, tool):
+      """Create individual Langchain tool"""
+      formatted_name = ''.join(c for c in tool.name if c.isalnum() or c in '_-')[:64]
+      
+      async def tool_func(query: str, tool=tool):
+          try:
+              result = await self.execute_tool(tool, {"query": query})
+              return result
+          except Exception as e:
+              self.logger.error(f"Tool execution error: {str(e)}")
+              return f"Error: {str(e)}"
+
+      return Tool(
+          name=formatted_name,
+          description=self._create_tool_description(tool),
+          func=tool_func,
+          coroutine=tool_func
+      )
+
+  def _create_tool_description(self, tool):
+      """Create descriptive help text for tool"""
+      return f"""
+{tool.description}
+
+Use natural language to describe what data you need. The tool will extract parameters from your request and the client context.
+
+Examples:
+- "Get analytics data for the last 30 days"
+- "Show me search performance since January 1st"
+- "Generate a report for Q1"
+"""
+
+class ClientDataManager:
+  def __init__(self):
+      self.logger = logging.getLogger(__name__)
+
+  @database_sync_to_async
+  def get_client_data(self, client_id):
+      """Get and format client data"""
+      try:
+          client = Client.objects.get(id=client_id)
+          current_date = timezone.now().date()
+          
+          return {
+              'client_id': client.id,
+              'current_date': current_date.isoformat(),
+              'name': getattr(client, 'name', 'Not provided'),
+              'website': getattr(client, 'website', 'Not provided'),
+              'profile': getattr(client, 'client_profile', ''),
+              'target_audience': getattr(client, 'target_audience', ''),
+              'business_objectives': self._get_business_objectives(client),
+              'service_area': getattr(client, 'service_area', 'Not provided'),
+              'industry': getattr(client, 'industry', 'Not provided')
+          }
+      except Exception as e:
+          self.logger.error(f"Error getting client data: {str(e)}", exc_info=True)
+          return None
+
+  def _get_business_objectives(self, client):
+      """Extract business objectives from client"""
+      try:
+          if hasattr(client, 'business_objectives'):
+              if isinstance(client.business_objectives, list):
+                  return self._process_objectives_list(client.business_objectives)
+              return self._process_objectives_queryset(client.business_objectives.all())
+          elif hasattr(client, 'businessobjective_set'):
+              return self._process_objectives_queryset(client.businessobjective_set.all())
+          return []
+      except Exception as e:
+          self.logger.error(f"Error processing objectives: {str(e)}")
+          return []
+
+  def _process_objectives_list(self, objectives_data):
+      """Process list of objectives"""
+      return [
+          {
+              'goal': obj.get('goal', 'N/A'),
+              'metric': obj.get('metric', 'N/A'),
+              'target_date': obj.get('target_date', 'N/A'),
+              'status': obj.get('status', 'Inactive')
+          }
+          for obj in objectives_data if isinstance(obj, dict)
+      ]
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tool_manager = AgentToolManager()
+        self.client_manager = ClientDataManager()
+        self.logger = logging.getLogger(__name__)
+        self.session_id = str(uuid.uuid4())
+        self.group_name = f"chat_{self.session_id}"
+    
+    async def connect(self):
+        try:
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+            await self.accept()
+            await self.send(text_data=json.dumps({
+                'message': 'Connected to chat server',
+                'is_system': True
+            }))
+        except Exception as e:
+            self.logger.error(f"Connection error: {str(e)}", exc_info=True)
+            raise
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        message = data['message']
-        agent_id = data['agent_id']
-        model_name = data['model']
+        try:
+            data = json.loads(text_data)
+            message = data['message']
+            agent_id = data['agent_id']
+            model_name = data['model']
+            client_id = data.get('client_id')
+
+            # Get agent and client data
+            agent = await self.get_agent(agent_id)
+            client_data = await self.client_manager.get_client_data(client_id) if client_id else None
+
+            # Initialize agent
+            agent_executor = await database_sync_to_async(self._initialize_agent)(agent, model_name, client_data)
+            
+            # Execute agent with proper error handling
+            try:
+                response = await database_sync_to_async(self._execute_agent_with_retry)(
+                    agent_executor,
+                    message,
+                    max_retries=3
+                )
+            except Exception as e:
+                response = f"I apologize, but I encountered an error: {str(e)}"
+            
+            # Save and send response
+            await self._handle_response(response, agent_id, model_name)
+            
+        except Exception as e:
+            await self._handle_error(str(e))
+
+    def _execute_agent_with_retry(self, agent_executor, message, max_retries=3):
+        """Execute agent with retry logic and proper response formatting"""
+        last_error = None
         
-        # Save user message
-        await self.save_message(message, agent_id, False, model_name)
-        
-        # Get agent response
-        agent = await self.get_agent(agent_id)
-        llm, _ = get_llm(model_name)
-        
-        system_prompt = f"""Role: {agent.role}
-        Backstory: {agent.backstory}
-        Goal: {agent.goal}
-        
-        Respond to the user's message while staying in character."""
-        
-        response = await self.get_llm_response(llm, system_prompt, message)
-        
-        # Save agent response
-        await self.save_message(response, agent_id, True, model_name)
-        
-        # Send response back to WebSocket
+        for attempt in range(max_retries):
+            try:
+                response = agent_executor.run(
+                    input=message,
+                    callbacks=[self._create_callback_handler()]
+                )
+                
+                # Ensure response is a string
+                if isinstance(response, (dict, list)):
+                    response = json.dumps(response, ensure_ascii=False)
+                return str(response).strip()
+                
+            except Exception as e:
+                last_error = e
+                self.logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}")
+                if attempt == max_retries - 1:
+                    raise last_error
+                
+        raise last_error if last_error else Exception("Agent execution failed")
+
+    async def _handle_response(self, response, agent_id, model_name):
+        """Handle the agent's response with better error handling"""
+        try:
+            # Ensure response is properly formatted
+            if not isinstance(response, str):
+                response = str(response)
+            
+            response = response.strip()
+            
+            # Save message using sync_to_async correctly
+            await self.save_message(response, agent_id, True, model_name)
+            
+            # Send response
+            await self.send(text_data=json.dumps({
+                'message': response,
+                'is_agent': True,
+                'timestamp': datetime.datetime.now().isoformat()
+            }))
+            
+        except Exception as e:
+            error_msg = f"Error handling response: {str(e)}"
+            self.logger.error(error_msg)
+            await self.send(text_data=json.dumps({
+                'message': error_msg,
+                'is_agent': True,
+                'error': True
+            }))
+
+    def _initialize_agent(self, agent, model_name, client_data):
+        """Initialize the agent with tools and prompt - runs in sync context"""
+        try:
+            # Load tools synchronously since we're already in a sync context
+            tools = self._load_tools_sync(agent)
+            
+            llm, _ = get_llm(model_name)
+            prompt = self._create_agent_prompt(agent, client_data)
+            
+            return initialize_agent(
+                tools=tools,
+                llm=llm,
+                agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+                verbose=True,
+                handle_parsing_errors=True,
+                memory=None,
+                agent_kwargs={
+                    "prefix": prompt,
+                    "format_instructions": self._get_format_instructions()
+                }
+            )
+        except Exception as e:
+            self.logger.error(f"Error initializing agent: {str(e)}")
+            raise
+
+    def _load_tools_sync(self, agent):
+        """Synchronously load and initialize agent tools"""
+        try:
+            tools = []
+            for tool_model in agent.tools.all():
+                try:
+                    tool_classes = get_tool_classes(tool_model.tool_class)
+                    tool_class = next((cls for cls in tool_classes 
+                                   if cls.__name__ == tool_model.tool_subclass), None)
+                    
+                    if tool_class:
+                        self.logger.info(f"Initializing tool: {tool_class.__name__}")
+                        tool_instance = tool_class()
+                        
+                        # Ensure tool has required attributes
+                        if not hasattr(tool_instance, 'args_schema'):
+                            self.logger.error(f"Tool {tool_class.__name__} missing args_schema")
+                            continue
+                        
+                        # Create tool description
+                        tool_description = self._create_tool_description(tool_instance, tool_model)
+                        
+                        # Create wrapper functions
+                        def create_tool_func(tool=tool_instance):
+                            def tool_func(**kwargs):
+                                try:
+                                    self.logger.info(f"Tool input parameters: {kwargs}")
+                                    return tool._run(**kwargs)
+                                except Exception as e:
+                                    self.logger.error(f"Tool execution error: {str(e)}")
+                                    return str(e)
+                            return tool_func
+
+                        def create_async_func(tool=tool_instance):
+                            async def async_func(**kwargs):
+                                try:
+                                    self.logger.info(f"Async tool input parameters: {kwargs}")
+                                    if hasattr(tool, 'arun'):
+                                        return await tool.arun(**kwargs)
+                                    return await database_sync_to_async(tool._run)(**kwargs)
+                                except Exception as e:
+                                    self.logger.error(f"Async tool execution error: {str(e)}")
+                                    return str(e)
+                            return async_func
+
+                        # Create Langchain tool
+                        langchain_tool = StructuredTool(
+                            name=tool_model.name,
+                            description=tool_description,
+                            func=create_tool_func(),
+                            coroutine=create_async_func(),
+                            args_schema=tool_instance.args_schema
+                        )
+                        
+                        tools.append(langchain_tool)
+                        self.logger.info(f"Successfully loaded tool: {tool_model.name}")
+                    else:
+                        self.logger.error(f"Tool class not found: {tool_model.tool_subclass}")
+                except Exception as e:
+                    self.logger.error(f"Error loading tool {tool_model.name}: {str(e)}", exc_info=True)
+                    
+            return tools
+        except Exception as e:
+            self.logger.error(f"Error loading tools: {str(e)}", exc_info=True)
+            return []
+
+    def _create_tool_description(self, tool_instance, tool_model):
+        """Create a detailed description for the tool"""
+        try:
+            base_description = tool_instance.description or tool_model.description
+            schema = tool_instance.args_schema
+
+            # Get the schema fields and their descriptions
+            if schema:
+                field_descriptions = []
+                for field_name, field in schema.model_fields.items():  # Use model_fields instead of __fields__
+                    # Get field type and annotation
+                    field_type = str(field.annotation).replace('typing.', '')
+                    if hasattr(field.annotation, '__name__'):
+                        field_type = field.annotation.__name__
+                    
+                    # Get field description and default
+                    field_desc = field.description or ''
+                    default = field.default
+                    if default is Ellipsis:  # Handle required fields
+                        default = "Required"
+                    elif default is None:
+                        default = "Optional"
+                    
+                    field_descriptions.append(
+                        f"- {field_name} ({field_type}): {field_desc} Default: {default}"
+                    )
+
+                # Create the complete description
+                tool_description = f"""{base_description}
+
+Required Parameters:
+{chr(10).join(field_descriptions)}
+
+Example:
+{{
+    "client_id": <client_id>,
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-31"
+}}"""
+                
+                self.logger.debug(f"Created tool description: {tool_description}")
+                return tool_description
+            
+            return base_description
+
+        except Exception as e:
+            self.logger.error(f"Error creating tool description: {str(e)}")
+            # Return a basic description if there's an error
+            return base_description or "Tool description unavailable"
+
+    def _get_format_instructions(self):
+        """Get format instructions for the agent"""
+        return """
+        When using tools:
+        1. Always use the exact parameter names as specified in the tool's description
+        2. All dates should be in YYYY-MM-DD format unless otherwise specified
+        3. Get the client_id from the client context
+        4. Make sure all required parameters are included
+        5. Format your requests as valid JSON objects
+
+        Example tool usage:
+        {
+            "client_id": 123,
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-31",
+            "metrics": "totalUsers,sessions",
+            "dimensions": "date,country"
+        }
+
+        Always check the tool's description for specific parameter requirements.
+        """
+
+    async def _handle_error(self, error_message):
+        """Handle errors during execution"""
+        self.logger.error(error_message)
         await self.send(text_data=json.dumps({
-            'message': response,
-            'is_agent': True
+            'message': f"Error: {error_message}",
+            'is_agent': True,
+            'error': True
         }))
 
     @database_sync_to_async
-    def save_message(self, content, agent_id, is_agent, model):
-        ChatMessage.objects.create(
+    def get_agent(self, agent_id):
+        """Get agent from database"""
+        try:
+            return Agent.objects.get(id=agent_id)
+        except Agent.DoesNotExist:
+            self.logger.error(f"Agent with id {agent_id} not found")
+            raise
+        except Exception as e:
+            self.logger.error(f"Error getting agent: {str(e)}")
+            raise
+
+    async def save_message(self, content, agent_id, is_agent, model):
+        """Save chat message to database - async wrapper"""
+        try:
+            await database_sync_to_async(self._save_message_sync)(
+                content, agent_id, is_agent, model
+            )
+        except Exception as e:
+            self.logger.error(f"Error saving message: {str(e)}")
+            raise
+
+    def _save_message_sync(self, content, agent_id, is_agent, model):
+        """Synchronous method to save chat message to database"""
+        return ChatMessage.objects.create(
             session_id=self.session_id,
             agent_id=agent_id,
             user_id=self.scope["user"].id,
@@ -178,15 +562,127 @@ class ChatConsumer(AsyncWebsocketConsumer):
             model=model
         )
 
-    @database_sync_to_async
-    def get_agent(self, agent_id):
-        return Agent.objects.get(id=agent_id)
+    def _format_client_context(self, client_data):
+        """Format client context for prompt template"""
+        if not client_data:
+            return ""
+            
+        # Format business objectives as a bulleted list
+        objectives_text = ""
+        if client_data.get('business_objectives'):
+            objectives_text = "\nBusiness Objectives:"
+            if isinstance(client_data['business_objectives'], list):
+                for obj in client_data['business_objectives']:
+                    objectives_text += f"""
+• Goal: {obj.get('goal', 'Not set')}
+  Metric: {obj.get('metric', 'Not set')}
+  Target Date: {obj.get('target_date', 'Not set')}
+  Status: {'Active' if obj.get('status') else 'Inactive'}"""
+        
+        return f"""
+Client Context:
+Client ID: {client_data.get('client_id', 'Not provided')}
+Current Date: {client_data.get('current_date', timezone.now().date().isoformat())}
+Name: {client_data.get('name', 'Not provided')}
+Website: {client_data.get('website', 'Not provided')}
+Industry: {client_data.get('industry', 'Not provided')}
+Service Area: {client_data.get('service_area', 'Not provided')}
+Client Profile: {client_data.get('profile', 'Not provided')}
+Target Audience: {client_data.get('target_audience', 'Not provided')}
+{objectives_text}
+"""
 
-    async def get_llm_response(self, llm, system_prompt, user_message):
-        # This is a simplified example - you might want to use async LLM calls
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
-        response = await llm.achat(messages)
-        return response.content
+    def _get_system_prompt_template(self):
+        """Get the system prompt template"""
+        return """
+Role: {role}
+Backstory: {backstory}
+Goal: {goal}
+{client_context}
+
+You have access to the client's data above. When using tools:
+1. Extract all required parameters from the client context
+2. Format your tool calls as JSON objects with the necessary parameters
+3. Use proper date formats (YYYY-MM-DD)
+4. Include the client_id from context when needed
+
+Example tool calls:
+json
+{
+"start_date": "2024-01-01",
+"end_date": "2024-01-31",
+"client_id": 123
+}
+
+
+Always structure your tool inputs as valid JSON objects with all required parameters.
+Use the client context to fill in any required information.
+
+Respond to the user's message while staying in character and using the client context.
+"""
+
+    def _create_callback_handler(self):
+        """Create a callback handler for logging"""
+        class WebSocketCallbackHandler(BaseCallbackHandler):
+            def __init__(self, logger):
+                self.logger = logger
+                self.run_inline = True
+
+            def on_llm_start(self, serialized, prompts, **kwargs):
+                self.logger.info(f"LLM starting with prompts: {prompts}")
+
+            def on_llm_end(self, response, **kwargs):
+                self.logger.info(f"LLM completed: {response}")
+
+            def on_llm_error(self, error, **kwargs):
+                self.logger.error(f"LLM error: {error}")
+
+            def on_tool_start(self, serialized, input_str, **kwargs):
+                self.logger.info(f"Starting tool execution: {serialized.get('name', 'unknown')}")
+
+            def on_tool_end(self, output, **kwargs):
+                self.logger.info(f"Tool execution completed: {output}")
+
+            def on_tool_error(self, error, **kwargs):
+                self.logger.error(f"Tool execution error: {error}")
+
+            def on_chain_start(self, serialized, inputs, **kwargs):
+                self.logger.info(f"Chain starting with inputs: {inputs}")
+
+            def on_chain_end(self, outputs, **kwargs):
+                self.logger.info(f"Chain completed with outputs: {outputs}")
+
+            def on_chain_error(self, error, **kwargs):
+                self.logger.error(f"Chain error: {error}")
+
+            def on_text(self, text, **kwargs):
+                self.logger.info(f"Text received: {text}")
+
+        return WebSocketCallbackHandler(self.logger)
+
+    def _create_agent_prompt(self, agent, client_data):
+        """Create the agent's prompt template with client context"""
+        try:
+            system_template = self._get_system_prompt_template()
+            
+            # Format the client context
+            client_context = self._format_client_context(client_data) if client_data else ""
+            
+            # Create the complete prompt
+            prompt = system_template.format(
+                role=getattr(agent, 'role', 'AI Assistant'),
+                backstory=getattr(agent, 'backstory', ''),
+                goal=getattr(agent, 'goal', 'Help the user'),
+                client_context=client_context
+            )
+            
+            self.logger.debug(f"Created agent prompt: {prompt}")
+            return prompt
+            
+        except Exception as e:
+            self.logger.error(f"Error creating agent prompt: {str(e)}")
+            # Provide a fallback prompt in case of error
+            return """
+            You are an AI assistant. Your goal is to help the user while being clear and concise.
+            If you encounter any issues, please let the user know and ask for clarification.
+            """

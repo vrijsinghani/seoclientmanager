@@ -30,14 +30,14 @@ class CompressionTool(BaseTool):
     """
     args_schema: Type[BaseModel] = CompressionToolSchema
     
-    model_name: str = Field(default=settings.SUMMARIZER)
+    modelname: str = Field(default=settings.SUMMARIZER)
     llm: Optional[Any] = Field(default=None)
     token_counter_callback: Optional[Any] = Field(default=None)
     tokenizer: Any = Field(default_factory=lambda: tiktoken.get_encoding("cl100k_base"))
 
     def __init__(self, **data):
         super().__init__(**data)
-        self.llm, self.token_counter_callback = get_llm(self.model_name, temperature=0.0)
+        self.llm, self.token_counter_callback = get_llm(self.modelname, temperature=0.0)
 
     def _create_semantic_chunks(self, content: str, chunk_size: int) -> List[str]:
         """Split content into semantic chunks using recursive character splitting."""

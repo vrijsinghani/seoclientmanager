@@ -236,13 +236,10 @@
 
 {% endblock content %}
 
-{% block javascripts %}
-{{ block.super }}
-<script src="{% static 'assets/js/plugins/chartjs.min.js' %}"></script>
-{% endblock javascripts %}
-
 {% block extra_js %}
 {{ block.super }}
+<script src="{% static 'assets/js/plugins/chartjs.min.js' %}"></script>
+
 <script>
   $(function() {
     $('#client-select').change(function() {

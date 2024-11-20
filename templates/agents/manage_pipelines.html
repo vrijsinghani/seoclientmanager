@@ -125,7 +125,7 @@
 
 {% endblock content %}
 
-{% block javascripts %}
+{% block extra_js %}
 {{ block.super }}
 <script>
   let currentPipelineId = null;
@@ -204,4 +204,4 @@
     });
   });
 </script>
-{% endblock javascripts %}
+{% endblock extra_js %}

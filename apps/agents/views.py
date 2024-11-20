@@ -19,12 +19,18 @@ from django.conf import settings
 import os
 from apps.seo_manager.models import Client  # Import the Client model
 from markdown_it import MarkdownIt  # Import markdown-it
+from apps.common.utils import get_models
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
 
 # Initialize the MarkdownIt instance
 md = MarkdownIt()
+
+@login_required
+@csrf_exempt
+def connection_test(request):
+    return render(request, 'agents/connection_test.html')
 
 @login_required
 def crewai_home(request):
@@ -307,9 +313,6 @@ def manage_crews_card_view(request):
     }
     return render(request, 'agents/manage_crews_card_view.html', context)
 
-def connection_test(request):
-    return render(request, 'agents/connection_test.html')@csrf_exempt
-
 @login_required
 @require_POST
 def submit_human_input(request, execution_id):
@@ -334,3 +337,16 @@ def submit_human_input(request, execution_id):
     execution.save()
     
     return JsonResponse({'message': 'Human input received and processed'})
+
+@login_required
+def chat_view(request):
+    clients = Client.objects.all().order_by('name')
+    print(f"Found {clients.count()} clients")  # Debug print
+    
+    context = {
+        'agents': Agent.objects.all(),
+        'models': get_models(),
+        'default_model': settings.GENERAL_MODEL,
+        'clients': clients,
+    }
+    return render(request, 'agents/chat.html', context)

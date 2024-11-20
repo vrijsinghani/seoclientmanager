@@ -65,7 +65,7 @@
 
 {% endblock content %}
 
-{% block javascripts %}
+{% block extra_js %}
 {{ block.super }}
 <script>
   document.addEventListener("DOMContentLoaded", function() {
@@ -75,4 +75,4 @@
     });
   });
 </script>
-{% endblock javascripts %}
+{% endblock extra_js %}
