@@ -215,13 +215,13 @@ class ClientDataManager:
           return {
               'client_id': client.id,
               'current_date': current_date.isoformat(),
-              'name': getattr(client, 'name', 'Not provided'),
-              'website': getattr(client, 'website', 'Not provided'),
-              'profile': getattr(client, 'client_profile', ''),
-              'target_audience': getattr(client, 'target_audience', ''),
-              'business_objectives': self._get_business_objectives(client),
-              'service_area': getattr(client, 'service_area', 'Not provided'),
-              'industry': getattr(client, 'industry', 'Not provided')
+              #'name': getattr(client, 'name', 'Not provided'),
+              #'website': getattr(client, 'website', 'Not provided'),
+              #'profile': getattr(client, 'client_profile', ''),
+              #'target_audience': getattr(client, 'target_audience', ''),
+              #'business_objectives': self._get_business_objectives(client),
+              #'service_area': getattr(client, 'service_area', 'Not provided'),
+             # 'industry': getattr(client, 'industry', 'Not provided')
           }
       except Exception as e:
           self.logger.error(f"Error getting client data: {str(e)}", exc_info=True)
@@ -311,23 +311,96 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         for attempt in range(max_retries):
             try:
+                # Execute the agent
                 response = agent_executor.run(
                     input=message,
                     callbacks=[self._create_callback_handler()]
                 )
                 
-                # Ensure response is a string
-                if isinstance(response, (dict, list)):
-                    response = json.dumps(response, ensure_ascii=False)
-                return str(response).strip()
+                # Check for successful analytics response
+                if isinstance(response, str):
+                    try:
+                        # Try to parse as JSON
+                        parsed_response = json.loads(response)
+                        if isinstance(parsed_response, dict):
+                            if parsed_response.get('success') is True:
+                                formatted = self._format_analytics_response(parsed_response)
+                                # Force agent to stop by returning final response
+                                agent_executor.agent.return_values = {"output": formatted}
+                                return formatted
+                    except json.JSONDecodeError:
+                        pass
+
+                # Check if response contains analytics data in string form
+                if isinstance(response, str) and ('analytics_data' in response or 'success' in response):
+                    try:
+                        # Try to extract and parse JSON from the string
+                        start_idx = response.find('{')
+                        end_idx = response.rfind('}') + 1
+                        if start_idx >= 0 and end_idx > start_idx:
+                            json_str = response[start_idx:end_idx]
+                            data = json.loads(json_str)
+                            if data.get('success') is True:
+                                formatted = self._format_analytics_response(data)
+                                # Force agent to stop by returning final response
+                                agent_executor.agent.return_values = {"output": formatted}
+                                return formatted
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+
+                # If we got any valid response, return it
+                if response and str(response).strip():
+                    return str(response).strip()
+                
+                raise Exception("Invalid or empty response from agent")
                 
             except Exception as e:
                 last_error = e
                 self.logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}")
+                
+                # Try to parse error message for success response
+                error_str = str(e)
+                if 'success' in error_str.lower():
+                    try:
+                        start_idx = error_str.find('{')
+                        end_idx = error_str.rfind('}') + 1
+                        if start_idx >= 0 and end_idx > start_idx:
+                            error_data = json.loads(error_str[start_idx:end_idx])
+                            if error_data.get('success') is True:
+                                formatted = self._format_analytics_response(error_data)
+                                # Force agent to stop
+                                agent_executor.agent.return_values = {"output": formatted}
+                                return formatted
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                
                 if attempt == max_retries - 1:
                     raise last_error
-                
+        
         raise last_error if last_error else Exception("Agent execution failed")
+
+    def _format_analytics_response(self, response_data):
+        """Format analytics data into a readable response"""
+        try:
+            if not response_data.get('analytics_data'):
+                return "No analytics data available for the specified period."
+            
+            # Format the analytics data into a readable message
+            data_points = response_data['analytics_data']
+            formatted_response = "Here's the analytics data:\n\n"
+            
+            for point in data_points:
+                formatted_response += "Date: {}\n".format(point.get('date', 'N/A'))
+                for key, value in point.items():
+                    if key != 'date':
+                        formatted_response += "{}: {}\n".format(key, value)
+                formatted_response += "\n"
+            
+            return formatted_response.strip()
+            
+        except Exception as e:
+            self.logger.error(f"Error formatting analytics response: {str(e)}")
+            return str(response_data)  # Return raw response if formatting fails
 
     async def _handle_response(self, response, agent_id, model_name):
         """Handle the agent's response with better error handling"""
@@ -454,19 +527,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             base_description = tool_instance.description or tool_model.description
             schema = tool_instance.args_schema
 
-            # Get the schema fields and their descriptions
             if schema:
                 field_descriptions = []
-                for field_name, field in schema.model_fields.items():  # Use model_fields instead of __fields__
-                    # Get field type and annotation
+                for field_name, field in schema.model_fields.items():
                     field_type = str(field.annotation).replace('typing.', '')
                     if hasattr(field.annotation, '__name__'):
                         field_type = field.annotation.__name__
                     
-                    # Get field description and default
                     field_desc = field.description or ''
                     default = field.default
-                    if default is Ellipsis:  # Handle required fields
+                    if default is Ellipsis:
                         default = "Required"
                     elif default is None:
                         default = "Optional"
@@ -475,50 +545,30 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         f"- {field_name} ({field_type}): {field_desc} Default: {default}"
                     )
 
-                # Create the complete description
                 tool_description = f"""{base_description}
 
 Required Parameters:
-{chr(10).join(field_descriptions)}
-
-Example:
-{{
-    "client_id": <client_id>,
-    "start_date": "2024-01-01",
-    "end_date": "2024-01-31"
-}}"""
+{chr(10).join(field_descriptions)}"""
                 
-                self.logger.debug(f"Created tool description: {tool_description}")
                 return tool_description
             
             return base_description
 
         except Exception as e:
             self.logger.error(f"Error creating tool description: {str(e)}")
-            # Return a basic description if there's an error
             return base_description or "Tool description unavailable"
 
     def _get_format_instructions(self):
         """Get format instructions for the agent"""
         return """
-        When using tools:
-        1. Always use the exact parameter names as specified in the tool's description
-        2. All dates should be in YYYY-MM-DD format unless otherwise specified
-        3. Get the client_id from the client context
-        4. Make sure all required parameters are included
-        5. Format your requests as valid JSON objects
+When using tools:
+1. Always use the exact parameter names as specified in the tool's description
+2. All dates should be in YYYY-MM-DD format unless otherwise specified
+3. Get the client_id from the client context
+4. Make sure all required parameters are included
 
-        Example tool usage:
-        {
-            "client_id": 123,
-            "start_date": "2024-01-01",
-            "end_date": "2024-01-31",
-            "metrics": "totalUsers,sessions",
-            "dimensions": "date,country"
-        }
-
-        Always check the tool's description for specific parameter requirements.
-        """
+Always check the tool's description for specific parameter requirements.
+"""
 
     async def _handle_error(self, error_message):
         """Handle errors during execution"""
@@ -602,21 +652,9 @@ Goal: {goal}
 
 You have access to the client's data above. When using tools:
 1. Extract all required parameters from the client context
-2. Format your tool calls as JSON objects with the necessary parameters
-3. Use proper date formats (YYYY-MM-DD)
-4. Include the client_id from context when needed
-
-Example tool calls:
-json
-{
-"start_date": "2024-01-01",
-"end_date": "2024-01-31",
-"client_id": 123
-}
-
-
-Always structure your tool inputs as valid JSON objects with all required parameters.
-Use the client context to fill in any required information.
+2. Use proper date formats (YYYY-MM-DD)
+3. Include the client_id from context when needed
+4. Follow each tool's specific requirements
 
 Respond to the user's message while staying in character and using the client context.
 """
@@ -629,10 +667,10 @@ Respond to the user's message while staying in character and using the client co
                 self.run_inline = True
 
             def on_llm_start(self, serialized, prompts, **kwargs):
-                self.logger.info(f"LLM starting with prompts: {prompts}")
+                self.logger.info(f"LLM starting with prompts: {prompts[:50]}")
 
             def on_llm_end(self, response, **kwargs):
-                self.logger.info(f"LLM completed: {response}")
+                self.logger.info(f"LLM completed: {response[:50]}")
 
             def on_llm_error(self, error, **kwargs):
                 self.logger.error(f"LLM error: {error}")
@@ -641,22 +679,22 @@ Respond to the user's message while staying in character and using the client co
                 self.logger.info(f"Starting tool execution: {serialized.get('name', 'unknown')}")
 
             def on_tool_end(self, output, **kwargs):
-                self.logger.info(f"Tool execution completed: {output}")
+                self.logger.info(f"Tool execution completed: {output[:50]}")
 
             def on_tool_error(self, error, **kwargs):
                 self.logger.error(f"Tool execution error: {error}")
 
             def on_chain_start(self, serialized, inputs, **kwargs):
-                self.logger.info(f"Chain starting with inputs: {inputs}")
+                self.logger.info(f"Chain starting with inputs: {inputs[:50]}")
 
             def on_chain_end(self, outputs, **kwargs):
-                self.logger.info(f"Chain completed with outputs: {outputs}")
+                self.logger.info(f"Chain completed with outputs: {outputs[:50]}")
 
             def on_chain_error(self, error, **kwargs):
                 self.logger.error(f"Chain error: {error}")
 
             def on_text(self, text, **kwargs):
-                self.logger.info(f"Text received: {text}")
+                self.logger.info(f"Text received: {text[:50]}")
 
         return WebSocketCallbackHandler(self.logger)
 
@@ -670,19 +708,28 @@ Respond to the user's message while staying in character and using the client co
             
             # Create the complete prompt
             prompt = system_template.format(
-                role=getattr(agent, 'role', 'AI Assistant'),
-                backstory=getattr(agent, 'backstory', ''),
-                goal=getattr(agent, 'goal', 'Help the user'),
-                client_context=client_context
+                role=str(getattr(agent, 'role', 'AI Assistant')),
+                backstory=str(getattr(agent, 'backstory', '')),
+                goal=str(getattr(agent, 'goal', 'Help the user')),
+                client_context=str(client_context)
             )
             
-            self.logger.debug(f"Created agent prompt: {prompt}")
+            #self.logger.debug(f"Created agent prompt: {prompt}")
             return prompt
             
         except Exception as e:
-            self.logger.error(f"Error creating agent prompt: {str(e)}")
+            self.logger.error(f"Error creating agent prompt: {str(e)}", exc_info=True)
             # Provide a fallback prompt in case of error
-            return """
-            You are an AI assistant. Your goal is to help the user while being clear and concise.
-            If you encounter any issues, please let the user know and ask for clarification.
-            """
+            return r"""
+You are an AI assistant. Your goal is to help the user while being clear and concise.
+If you encounter any issues, please let the user know and ask for clarification.
+
+Example tool call (format your calls like this):
+START_JSON
+{
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-31",
+    "client_id": 123
+}
+END_JSON
+"""
