@@ -7,7 +7,7 @@ from apps.common.utils import format_message, get_llm
 from .utils import get_tool_classes
 import logging
 import uuid
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, FunctionMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, FunctionMessage, BaseMessage, messages_from_dict, messages_to_dict
 import asyncio
 import tiktoken
 from langchain_community.chat_models import ChatLiteLLM
@@ -19,8 +19,10 @@ from langchain.agents import initialize_agent, AgentType
 from langchain_core.callbacks import BaseCallbackHandler
 import datetime
 from langchain.tools import StructuredTool
-from typing import Dict, Any
+from typing import Dict, Any, List
 from pydantic import create_model
+from langchain.memory import ConversationBufferMemory
+from langchain_core.chat_history import BaseChatMessageHistory
 
 logger = logging.getLogger(__name__)
 
@@ -253,6 +255,34 @@ class ClientDataManager:
           for obj in objectives_data if isinstance(obj, dict)
       ]
 
+class DjangoCacheMessageHistory(BaseChatMessageHistory):
+    """Message history that uses Django's cache backend"""
+    
+    def __init__(self, session_id: str, ttl: int = 3600):
+        self.session_id = session_id
+        self.ttl = ttl
+        self.key = f"chat_history_{session_id}"
+
+    def add_message(self, message: BaseMessage) -> None:
+        """Append the message to the history in cache"""
+        messages = self.messages
+        messages.append(message)
+        cache.set(
+            self.key,
+            messages_to_dict(messages),
+            timeout=self.ttl
+        )
+
+    @property
+    def messages(self) -> List[BaseMessage]:
+        """Retrieve the messages from cache"""
+        messages_dict = cache.get(self.key, [])
+        return messages_from_dict(messages_dict) if messages_dict else []
+
+    def clear(self) -> None:
+        """Clear message history from cache"""
+        cache.delete(self.key)
+
 class ChatConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -431,23 +461,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
 
     def _initialize_agent(self, agent, model_name, client_data):
-        """Initialize the agent with tools and prompt - runs in sync context"""
+        """Initialize the agent with tools and memory"""
         try:
-            # Load tools synchronously since we're already in a sync context
             tools = self._load_tools_sync(agent)
-            
             llm, _ = get_llm(model_name)
-            prompt = self._create_agent_prompt(agent, client_data)
+            
+            # Initialize memory with Django's cache backend
+            message_history = DjangoCacheMessageHistory(
+                session_id=self.session_id,
+                ttl=3600  # 1 hour expiry
+            )
+
+            # Use ConversationBufferMemory instead of ConversationSummaryBufferMemory
+            memory = ConversationBufferMemory(
+                memory_key="chat_history",
+                return_messages=True,
+                chat_memory=message_history,
+                output_key="output"
+            )
             
             return initialize_agent(
                 tools=tools,
                 llm=llm,
                 agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
                 verbose=True,
-                handle_parsing_errors=True,
-                memory=None,
+                memory=memory,
                 agent_kwargs={
-                    "prefix": prompt,
+                    "prefix": self._create_agent_prompt(agent, client_data),
                     "format_instructions": self._get_format_instructions()
                 }
             )
@@ -667,34 +707,73 @@ Respond to the user's message while staying in character and using the client co
                 self.run_inline = True
 
             def on_llm_start(self, serialized, prompts, **kwargs):
-                self.logger.info(f"LLM starting with prompts: {prompts[:50]}")
+                try:
+                    # Safely log only the first part of prompts
+                    prompt_preview = str(prompts[0])[:100] if prompts else "No prompt"
+                    self.logger.info(f"LLM starting with prompt: {prompt_preview}...")
+                except Exception as e:
+                    self.logger.error(f"Error in on_llm_start: {str(e)}")
 
             def on_llm_end(self, response, **kwargs):
-                self.logger.info(f"LLM completed: {response[:50]}")
-
-            def on_llm_error(self, error, **kwargs):
-                self.logger.error(f"LLM error: {error}")
+                try:
+                    # Safely handle LLMResult object
+                    generations = getattr(response, 'generations', [])
+                    if generations and generations[0]:
+                        output = str(generations[0][0].text)[:100]
+                        self.logger.info(f"LLM completed with output: {output}...")
+                except Exception as e:
+                    self.logger.error(f"Error in on_llm_end: {str(e)}")
 
             def on_tool_start(self, serialized, input_str, **kwargs):
-                self.logger.info(f"Starting tool execution: {serialized.get('name', 'unknown')}")
+                try:
+                    tool_name = serialized.get('name', 'unknown')
+                    self.logger.info(f"Starting tool execution: {tool_name}")
+                except Exception as e:
+                    self.logger.error(f"Error in on_tool_start: {str(e)}")
 
             def on_tool_end(self, output, **kwargs):
-                self.logger.info(f"Tool execution completed: {output[:50]}")
-
-            def on_tool_error(self, error, **kwargs):
-                self.logger.error(f"Tool execution error: {error}")
+                try:
+                    # Safely log tool output
+                    output_preview = str(output)[:100] if output else "No output"
+                    self.logger.info(f"Tool execution completed: {output_preview}...")
+                except Exception as e:
+                    self.logger.error(f"Error in on_tool_end: {str(e)}")
 
             def on_chain_start(self, serialized, inputs, **kwargs):
-                self.logger.info(f"Chain starting with inputs: {inputs[:50]}")
+                try:
+                    # Safely log chain inputs
+                    input_preview = str(inputs)[:100] if inputs else "No input"
+                    self.logger.info(f"Chain starting with inputs: {input_preview}...")
+                except Exception as e:
+                    self.logger.error(f"Error in on_chain_start: {str(e)}")
 
             def on_chain_end(self, outputs, **kwargs):
-                self.logger.info(f"Chain completed with outputs: {outputs[:50]}")
+                try:
+                    # Safely log chain outputs
+                    if isinstance(outputs, dict):
+                        output_preview = str(outputs.get('output', ''))[:100]
+                    else:
+                        output_preview = str(outputs)[:100]
+                    self.logger.info(f"Chain completed with outputs: {output_preview}...")
+                except Exception as e:
+                    self.logger.error(f"Error in on_chain_end: {str(e)}")
 
             def on_chain_error(self, error, **kwargs):
-                self.logger.error(f"Chain error: {error}")
+                self.logger.error(f"Chain error: {str(error)}")
+
+            def on_tool_error(self, error, **kwargs):
+                self.logger.error(f"Tool execution error: {str(error)}")
+
+            def on_llm_error(self, error, **kwargs):
+                self.logger.error(f"LLM error: {str(error)}")
 
             def on_text(self, text, **kwargs):
-                self.logger.info(f"Text received: {text[:50]}")
+                try:
+                    # Safely log text
+                    text_preview = str(text)[:100] if text else "No text"
+                    self.logger.info(f"Text received: {text_preview}...")
+                except Exception as e:
+                    self.logger.error(f"Error in on_text: {str(e)}")
 
         return WebSocketCallbackHandler(self.logger)
 
