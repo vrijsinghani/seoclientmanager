@@ -28,6 +28,7 @@ import time
 
 logger = logging.getLogger(__name__)
 
+
 def count_tokens(text):
     """Count tokens in text using tiktoken"""
     encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
@@ -148,7 +149,7 @@ class CrewExecutionConsumer(AsyncWebsocketConsumer):
 
 class AgentToolManager:
   def __init__(self):
-      self.logger = logging.getLogger(__name__)
+      pass
 
   async def load_tools(self, agent):
       """Load and initialize agent tools"""
@@ -160,13 +161,13 @@ class AgentToolManager:
                                if cls.__name__ == tool_model.tool_subclass), None)
               
               if tool_class:
-                  self.logger.info(f"Initializing tool: {tool_class.__name__}")
+                  logger.info(f"Initializing tool: {tool_class.__name__}")
                   tool_instance = tool_class()
                   tools.append(tool_instance)
               else:
-                  self.logger.error(f"Tool class not found: {tool_model.tool_subclass}")
+                  logger.error(f"Tool class not found: {tool_model.tool_subclass}")
           except Exception as e:
-              self.logger.error(f"Error loading tool {tool_model.name}: {str(e)}")
+              logger.error(f"Error loading tool {tool_model.name}: {str(e)}")
       return tools
 
   def convert_to_langchain_tools(self, tools):
@@ -182,7 +183,7 @@ class AgentToolManager:
               result = await self.execute_tool(tool, {"query": query})
               return result
           except Exception as e:
-              self.logger.error(f"Tool execution error: {str(e)}")
+              logger.error(f"Tool execution error: {str(e)}")
               return f"Error: {str(e)}"
 
       return Tool(
@@ -207,7 +208,7 @@ Examples:
 
 class ClientDataManager:
   def __init__(self):
-      self.logger = logging.getLogger(__name__)
+      pass
 
   @database_sync_to_async
   def get_client_data(self, client_id):
@@ -228,7 +229,7 @@ class ClientDataManager:
              # 'industry': getattr(client, 'industry', 'Not provided')
           }
       except Exception as e:
-          self.logger.error(f"Error getting client data: {str(e)}", exc_info=True)
+          logger.error(f"Error getting client data: {str(e)}", exc_info=True)
           return None
 
   def _get_business_objectives(self, client):
@@ -242,7 +243,7 @@ class ClientDataManager:
               return self._process_objectives_queryset(client.businessobjective_set.all())
           return []
       except Exception as e:
-          self.logger.error(f"Error processing objectives: {str(e)}")
+          logger.error(f"Error processing objectives: {str(e)}")
           return []
 
   def _process_objectives_list(self, objectives_data):
@@ -290,11 +291,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         super().__init__(*args, **kwargs)
         self.tool_manager = AgentToolManager()
         self.client_manager = ClientDataManager()
-        self.logger = logging.getLogger(__name__)
         self.session_id = str(uuid.uuid4())
         self.group_name = f"chat_{self.session_id}"
         self._agent_executor = None
         self._callback_handler = None
+        self.is_connected = False  # Add connection state tracking
 
     async def _get_or_create_agent_executor(self, agent, model_name, client_data):
         """Get existing agent executor or create a new one"""
@@ -306,18 +307,81 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         try:
+            # Add connection lock
+            if self.is_connected:
+                return
+            
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.accept()
+            self.is_connected = True  # Mark as connected
+            
+            # Send initial connection message
             await self.send(text_data=json.dumps({
                 'message': 'Connected to chat server',
-                'is_system': True
+                'is_system': True,
+                'connection_status': 'connected'
             }))
+            
+            # Set up periodic connection check
+            self.connection_check_task = asyncio.create_task(self._check_connection())
+            
         except Exception as e:
-            self.logger.error(f"Connection error: {str(e)}", exc_info=True)
+            logger.error(f"Connection error: {str(e)}", exc_info=True)
+            self.is_connected = False
             raise
 
-    async def receive(self, text_data):
+    async def disconnect(self, close_code):
+        """Handle disconnect properly"""
         try:
+            self.is_connected = False
+            
+            # Cancel connection check task
+            if hasattr(self, 'connection_check_task'):
+                self.connection_check_task.cancel()
+                
+            # Clean up agent executor
+            if self._agent_executor:
+                await self._cleanup_agent_executor()
+                
+            # Remove from channel layer group
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            
+            logger.info(f"WebSocket disconnected with code: {close_code}")
+            
+        except Exception as e:
+            logger.error(f"Error in disconnect: {str(e)}", exc_info=True)
+
+    async def _check_connection(self):
+        """Periodic connection health check"""
+        while self.is_connected:
+            try:
+                # Send ping frame
+                await self.send(bytes_data=b'ping')
+                await asyncio.sleep(30)  # Check every 30 seconds
+            except Exception as e:
+                logger.error(f"Connection check failed: {str(e)}")
+                self.is_connected = False
+                break
+
+    async def receive(self, text_data=None, bytes_data=None):
+        """Handle incoming messages with better error handling"""
+        try:
+            # Handle ping/pong
+            if bytes_data == b'ping':
+                await self.send(bytes_data=b'pong')
+                return
+            elif bytes_data == b'pong':
+                return
+
+            # Process text messages
+            if not text_data:
+                return
+
+            # Verify connection state
+            if not self.is_connected:
+                await self.close()
+                return
+
             data = json.loads(text_data)
             message = data['message']
             agent_id = data['agent_id']
@@ -341,8 +405,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Save and send response
             await self._handle_response(response, agent_id, model_name)
             
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON received")
+            await self._handle_error("Invalid message format")
         except Exception as e:
-            self.logger.error(f"Error in receive: {str(e)}", exc_info=True)
+            logger.error(f"Error in receive: {str(e)}", exc_info=True)
             await self._handle_error(str(e))
 
     async def _execute_agent_with_retry(self, agent_executor, message, max_retries=3):
@@ -365,7 +432,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
                 
                 # Log the raw response for debugging
-                self.logger.debug(f"Raw agent response: {response}")
+                logger.debug(f"Raw agent response: {response}")
                 
                 # Process the response
                 formatted_response = await self._process_agent_response(response)
@@ -375,14 +442,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 raise ValueError("Invalid or empty response from agent")
                 
             except asyncio.TimeoutError:
-                self.logger.error(f"Agent execution timed out on attempt {attempt + 1}")
+                logger.error(f"Agent execution timed out on attempt {attempt + 1}")
                 await asyncio.sleep(1)  # Brief pause before retry
                 if attempt == max_retries - 1:
                     return "I apologize, but the request timed out. Please try again with a simpler query."
                 
             except Exception as e:
                 last_error = e
-                self.logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}", exc_info=True)
+                logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}", exc_info=True)
                 await asyncio.sleep(1)  # Brief pause before retry
                 
                 if attempt == max_retries - 1:
@@ -436,7 +503,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return None
             
         except Exception as e:
-            self.logger.error(f"Error processing agent response: {str(e)}", exc_info=True)
+            logger.error(f"Error processing agent response: {str(e)}", exc_info=True)
             return None
 
     def _initialize_agent(self, agent, model_name, client_data):
@@ -483,7 +550,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             
         except Exception as e:
-            self.logger.error(f"Error initializing agent: {str(e)}", exc_info=True)
+            logger.error(f"Error initializing agent: {str(e)}", exc_info=True)
             raise
 
     def _load_tools_sync(self, agent):
@@ -505,12 +572,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                    if cls.__name__ == tool_model.tool_subclass), None)
                     
                     if tool_class:
-                        self.logger.info(f"Initializing tool: {tool_class.__name__}")
+                        logger.info(f"Initializing tool: {tool_class.__name__}")
                         tool_instance = tool_class()
                         
                         # Ensure tool has required attributes
                         if not hasattr(tool_instance, 'args_schema'):
-                            self.logger.error(f"Tool {tool_class.__name__} missing args_schema")
+                            logger.error(f"Tool {tool_class.__name__} missing args_schema")
                             continue
                         
                         # Create tool description
@@ -526,16 +593,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         )
                         
                         tools.append(langchain_tool)
-                        self.logger.info(f"Successfully loaded tool: {tool_model.name}")
+                        logger.info(f"Successfully loaded tool: {tool_model.name}")
                     else:
-                        self.logger.error(f"Tool class not found: {tool_model.tool_subclass}")
+                        logger.error(f"Tool class not found: {tool_model.tool_subclass}")
                 except Exception as e:
-                    self.logger.error(f"Error loading tool {tool_model.name}: {str(e)}", exc_info=True)
+                    logger.error(f"Error loading tool {tool_model.name}: {str(e)}", exc_info=True)
             
             return tools
             
         except Exception as e:
-            self.logger.error(f"Error loading tools: {str(e)}", exc_info=True)
+            logger.error(f"Error loading tools: {str(e)}", exc_info=True)
             return []
 
     def _create_tool_description(self, tool_instance, tool_model):
@@ -572,7 +639,7 @@ Required Parameters:
             return base_description
 
         except Exception as e:
-            self.logger.error(f"Error creating tool description: {str(e)}")
+            logger.error(f"Error creating tool description: {str(e)}")
             return base_description or "Tool description unavailable"
 
     def _get_format_instructions(self):
@@ -612,7 +679,7 @@ Remember:
 
     async def _handle_error(self, error_message):
         """Handle errors during execution"""
-        self.logger.error(error_message)
+        logger.error(error_message)
         await self.send(text_data=json.dumps({
             'message': f"Error: {error_message}",
             'is_agent': True,
@@ -625,10 +692,10 @@ Remember:
         try:
             return Agent.objects.get(id=agent_id)
         except Agent.DoesNotExist:
-            self.logger.error(f"Agent with id {agent_id} not found")
+            logger.error(f"Agent with id {agent_id} not found")
             raise
         except Exception as e:
-            self.logger.error(f"Error getting agent: {str(e)}")
+            logger.error(f"Error getting agent: {str(e)}")
             raise
 
     async def save_message(self, content, agent_id, is_agent, model):
@@ -638,7 +705,7 @@ Remember:
                 content, agent_id, is_agent, model
             )
         except Exception as e:
-            self.logger.error(f"Error saving message: {str(e)}")
+            logger.error(f"Error saving message: {str(e)}")
             raise
 
     def _save_message_sync(self, content, agent_id, is_agent, model):
@@ -707,46 +774,46 @@ Respond to the user's message while staying in character and using the client co
 
         class WebSocketCallbackHandler(BaseCallbackHandler):
             def __init__(self, logger):
-                self.logger = logger
+                logger = logger
                 self.run_inline = True
 
             def on_llm_start(self, serialized, prompts, **kwargs):
                 try:
                     # Log only first 100 chars of first prompt
                     prompt_preview = str(prompts[0])[:100] if prompts else "No prompt"
-                    self.logger.debug(f"LLM starting with prompt: {prompt_preview}...")
+                    logger.debug(f"LLM starting with prompt: {prompt_preview}...")
                 except Exception as e:
-                    self.logger.error(f"Error in on_llm_start: {str(e)}")
+                    logger.error(f"Error in on_llm_start: {str(e)}")
 
             def on_llm_end(self, response, **kwargs):
                 try:
                     generations = getattr(response, 'generations', [])
                     if generations and generations[0]:
                         output = str(generations[0][0].text)[:100]
-                        self.logger.debug(f"LLM completed with output: {output}...")
+                        logger.debug(f"LLM completed with output: {output}...")
                 except Exception as e:
-                    self.logger.error(f"Error in on_llm_end: {str(e)}")
+                    logger.error(f"Error in on_llm_end: {str(e)}")
 
             def on_tool_start(self, serialized, input_str, **kwargs):
                 try:
                     tool_name = serialized.get('name', 'unknown')
-                    self.logger.info(f"Starting tool execution: {tool_name}")
+                    logger.info(f"Starting tool execution: {tool_name}")
                 except Exception as e:
-                    self.logger.error(f"Error in on_tool_start: {str(e)}")
+                    logger.error(f"Error in on_tool_start: {str(e)}")
 
             def on_tool_end(self, output, **kwargs):
                 try:
                     output_preview = str(output)[:100] if output else "No output"
-                    self.logger.info(f"Tool execution completed: {output_preview}...")
+                    logger.info(f"Tool execution completed: {output_preview}...")
                 except Exception as e:
-                    self.logger.error(f"Error in on_tool_end: {str(e)}")
+                    logger.error(f"Error in on_tool_end: {str(e)}")
 
             def on_chain_start(self, serialized, inputs, **kwargs):
                 try:
                     input_preview = str(inputs)[:100] if inputs else "No input"
-                    self.logger.debug(f"Chain starting with inputs: {input_preview}...")
+                    logger.debug(f"Chain starting with inputs: {input_preview}...")
                 except Exception as e:
-                    self.logger.error(f"Error in on_chain_start: {str(e)}")
+                    logger.error(f"Error in on_chain_start: {str(e)}")
 
             def on_chain_end(self, outputs, **kwargs):
                 try:
@@ -754,28 +821,28 @@ Respond to the user's message while staying in character and using the client co
                         output_preview = str(outputs.get('output', ''))[:100]
                     else:
                         output_preview = str(outputs)[:100]
-                    self.logger.debug(f"Chain completed with outputs: {output_preview}...")
+                    logger.debug(f"Chain completed with outputs: {output_preview}...")
                 except Exception as e:
-                    self.logger.error(f"Error in on_chain_end: {str(e)}")
+                    logger.error(f"Error in on_chain_end: {str(e)}")
 
             def on_chain_error(self, error, **kwargs):
-                self.logger.error(f"Chain error: {str(error)}")
+                logger.error(f"Chain error: {str(error)}")
 
             def on_tool_error(self, error, **kwargs):
-                self.logger.error(f"Tool execution error: {str(error)}")
+                logger.error(f"Tool execution error: {str(error)}")
 
             def on_llm_error(self, error, **kwargs):
-                self.logger.error(f"LLM error: {str(error)}")
+                logger.error(f"LLM error: {str(error)}")
 
             def on_text(self, text, **kwargs):
                 try:
                     text_preview = str(text)[:100] if text else "No text"
-                    self.logger.debug(f"Text received: {text_preview}...")
+                    logger.debug(f"Text received: {text_preview}...")
                 except Exception as e:
-                    self.logger.error(f"Error in on_text: {str(e)}")
+                    logger.error(f"Error in on_text: {str(e)}")
 
         # Create and cache the handler
-        self._callback_handler = WebSocketCallbackHandler(self.logger)
+        self._callback_handler = WebSocketCallbackHandler(logger)
         return self._callback_handler
 
     def _create_agent_prompt(self, agent, client_data):
@@ -794,11 +861,10 @@ Respond to the user's message while staying in character and using the client co
                 client_context=str(client_context)
             )
             
-            #self.logger.debug(f"Created agent prompt: {prompt}")
             return prompt
             
         except Exception as e:
-            self.logger.error(f"Error creating agent prompt: {str(e)}", exc_info=True)
+            logger.error(f"Error creating agent prompt: {str(e)}", exc_info=True)
             # Provide a fallback prompt in case of error
             return r"""
 You are an AI assistant. Your goal is to help the user while being clear and concise.
@@ -835,9 +901,19 @@ END_JSON
             
         except Exception as e:
             error_msg = f"Error handling response: {str(e)}"
-            self.logger.error(error_msg, exc_info=True)
+            logger.error(error_msg, exc_info=True)
             await self.send(text_data=json.dumps({
                 'message': error_msg,
                 'is_agent': True,
                 'error': True
             }))
+    async def _cleanup_agent_executor(self):
+        """Clean up agent executor resources"""
+        try:
+            if self._agent_executor:
+                # Clean up any resources
+                if hasattr(self._agent_executor, 'aclose'):
+                    await self._agent_executor.aclose()
+                self._agent_executor = None
+        except Exception as e:
+            logger.error(f"Error cleaning up agent executor: {str(e)}")

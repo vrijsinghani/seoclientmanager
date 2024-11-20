@@ -20,10 +20,79 @@
 <!DOCTYPE html>
 <html lang="en">
 
+<style>
+  html { visibility: hidden; }
+  html.dark-version { background: #141728 !important; }
+</style>
+
+<script>
+  // Immediately invoked function to set dark mode before any content renders
+  (function() {
+    if ('{{ request.user.profile.dark_mode }}' === 'True') {
+      document.documentElement.classList.add('dark-version');
+      localStorage.setItem('dark-mode', 'true');
+      
+      // Add the dark theme CSS variables inline
+      const darkThemeVars = `
+        :root.dark-version {
+          --bs-body-bg: #141728;
+          --bs-body-color: #fff;
+          --bs-dark: #222;
+          --bs-body-bg-rgb: 20, 23, 40;
+          --bs-dark-rgb: 34, 34, 34;
+          --bs-text-white: #fff;
+          --bs-gray-100: #1a1f33;
+          --bs-gray-200: #1a1f33;
+          --bs-gray-300: #3a416f;
+          --bs-gray-400: #858aad;
+          --bs-gray-500: #8f97c3;
+          --bs-gray-600: #4a547d;
+          --bs-gray-700: #111322;
+          --bs-gray-800: #1a1f33;
+          --bs-gray-900: #0f1421;
+          --bs-border-color: #3a416f;
+          --bs-card-bg: #1a1f33;
+          --bs-card-border-color: #3a416f;
+          --bs-white: #000;
+          --bs-black: #fff;
+          --bs-sidenav-header: #1a1f33;
+          --bs-sidenav-card: #1a1f33;
+          --bs-sidenav-item-color: #fff;
+          --bs-sidenav-item-hover: #000;
+          --bs-sidenav-navbar-box-shadow: 0 0 2rem 0 rgba(0, 0, 0, .15);
+          --bs-navbar-light-bg: #1a1f33;
+          --bs-navbar-light-hover-bg: #0f1421;
+          --bs-navbar-light-active-bg: #0f1421;
+          --bs-navbar-light-disabled-bg: #3a416f;
+          --bs-table-color: #fff;
+          --bs-table-bg: transparent;
+          --bs-table-border-color: #3a416f;
+          --bs-table-striped-bg: rgba(58, 65, 111, .05);
+          --bs-table-active-bg: rgba(58, 65, 111, .1);
+          --bs-table-hover-bg: rgba(58, 65, 111, .075);
+        }
+      `;
+      
+      // Insert styles immediately
+      const styleSheet = document.createElement('style');
+      styleSheet.textContent = darkThemeVars;
+      document.documentElement.appendChild(styleSheet);
+    }
+    // Make the page visible only after everything is set
+    document.addEventListener('DOMContentLoaded', function() {
+      document.documentElement.style.visibility = 'visible';
+    });
+  })();
+</script>
+
 <head>
   {% include 'includes/head.html' %}
   <!-- Add Sweet Alert CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.0.19/dist/sweetalert2.min.css">
+  
+  <!-- Add this script before any other scripts -->
+
+  
   {% block extrahead %}{% endblock extrahead %}
   {% block extrastyle %}{% endblock extrastyle %}
 </head>

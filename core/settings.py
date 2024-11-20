@@ -417,22 +417,12 @@ LOGGING = {
             'propagate': True,
         },
         'apps.agents': {
-            'handlers': ['file'],
+            'handlers': ['console','file'],
             'level': 'DEBUG',
-            'propagate': True,
-        },
-        'apps.agents.tools.google_analytics_tool': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'channels': {
             'handlers': ['file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'apps.agents.consumers': {
-            'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': True,
         },
