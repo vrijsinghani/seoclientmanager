@@ -7,7 +7,9 @@ from django.contrib.auth.decorators import login_required
 from datetime import datetime, timedelta
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncDay
-from .models import LiteLLMSpendLog
+from .models import LiteLLMSpendLog, Last30dModelsBySpend, Last30dTopEndUsersSpend, Last30dKeysBySpend
+from json import dumps
+from django.utils.safestring import mark_safe
 
 # Dashboard
 def default(request):
@@ -414,45 +416,58 @@ def i18n_view(request):
 
 @staff_member_required
 def llm_dashboard(request):
-    # Get date range (default last 30 days)
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)
-    
-    # Total spend
-    total_spend = LiteLLMSpendLog.objects.using('litellm_logs').aggregate(
-        total=Sum('spend'))['total'] or 0
-    
-    # Total tokens
-    total_tokens = LiteLLMSpendLog.objects.using('litellm_logs').aggregate(
-        total=Sum('total_tokens'))['total'] or 0
-    
-    # Requests count
-    total_requests = LiteLLMSpendLog.objects.using('litellm_logs').count()
-    
-    # Daily spend over time
-    daily_spend = LiteLLMSpendLog.objects.using('litellm_logs')\
-        .filter(startTime__gte=start_date)\
-        .annotate(day=TruncDay('startTime'))\
-        .values('day')\
-        .annotate(total_spend=Sum('spend'))\
-        .order_by('day')
-    
-    # Model usage breakdown - Using request_id for counting
-    model_usage = LiteLLMSpendLog.objects.using('litellm_logs')\
-        .values_list('model', flat=True)\
-        .annotate(
-            count=Count('request_id'),
-            total_spend=Sum('spend')
-        )\
-        .order_by('-count')[:5]
-    
-    context = {
-        'total_spend': round(total_spend, 2),
-        'total_tokens': total_tokens,
-        'total_requests': total_requests,
-        'daily_spend': list(daily_spend),
-        'model_usage': list(model_usage),
-        'segment': 'llm-dashboard'
-    }
+    try:
+        # Get date range with timezone
+        from django.utils import timezone
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=30)
+        
+        # Basic stats
+        total_spend = LiteLLMSpendLog.objects.using('litellm_logs')\
+            .filter(startTime__gte=start_date)\
+            .aggregate(total=Sum('spend'))['total'] or 0
+        
+        total_tokens = LiteLLMSpendLog.objects.using('litellm_logs')\
+            .filter(startTime__gte=start_date)\
+            .aggregate(total=Sum('total_tokens'))['total'] or 0
+        
+        total_requests = LiteLLMSpendLog.objects.using('litellm_logs')\
+            .filter(startTime__gte=start_date)\
+            .count()
+
+        # Daily spend query
+        daily_spend = LiteLLMSpendLog.objects.using('litellm_logs')\
+            .filter(startTime__gte=start_date)\
+            .annotate(day=TruncDay('startTime'))\
+            .values('day')\
+            .annotate(total_spend=Sum('spend'))\
+            .order_by('day')
+
+        # Prepare chart data
+        dates = []
+        spends = []
+        for d in daily_spend:
+            dates.append(d['day'].strftime('%Y-%m-%d'))
+            spends.append(float(d['total_spend']))
+
+        context = {
+          'total_spend': round(total_spend, 2),
+          'total_tokens': total_tokens,
+          'total_requests': total_requests,
+          'daily_spend': [{'day': datetime.strptime(date, '%Y-%m-%d'), 
+                  'total_spend': spend} 
+                for date, spend in zip(dates, spends)],
+          'top_models': Last30dModelsBySpend.objects.using('litellm_logs').all()[:10],
+          'top_keys': Last30dKeysBySpend.objects.using('litellm_logs').all()[:10],
+        }
+        
+        # Debug print
+        print("Chart data:")
+        print("Labels:", dates)
+        print("Values:", spends)
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        context = {'error': str(e)}
     
     return render(request, 'home/llm-dashboard.html', context)
