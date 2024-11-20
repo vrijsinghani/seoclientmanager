@@ -19,7 +19,7 @@ def is_admin(user):
 @login_required
 @user_passes_test(is_admin)
 def manage_crews(request):
-    crews = Crew.objects.all()
+    crews = Crew.objects.all().order_by('name')
     
     # Get the selected client_id from the session
     selected_client_id = request.session.get('selected_client_id')
@@ -103,7 +103,7 @@ def update_crew_agents(request, crew_id):
 @login_required
 @user_passes_test(is_admin)
 def manage_crews_card_view(request):
-    crews = Crew.objects.all()
+    crews = Crew.objects.all().order_by('name')
     
     # Get the selected client_id from the session
     selected_client_id = request.session.get('selected_client_id')

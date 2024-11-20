@@ -15,8 +15,17 @@ def is_admin(user):
 @login_required
 @user_passes_test(is_admin)
 def manage_agents(request):
-    agents = Agent.objects.all()
+    agents = Agent.objects.all().order_by('name')
     return render(request, 'agents/manage_agents.html', {'agents': agents})
+@login_required
+def manage_agents_card_view(request):
+    agents = Agent.objects.prefetch_related('crew_set', 'task_set', 'tools').all().order_by('name')
+    form = AgentForm()  # Now AgentForm is defined
+    context = {
+        'agents': agents,
+        'form': form,
+    }
+    return render(request, 'agents/manage_agents_card_view.html', context)
 
 @login_required
 @user_passes_test(is_admin)

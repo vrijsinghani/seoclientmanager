@@ -266,54 +266,6 @@ def manage_pipelines(request):
     return render(request, 'agents/manage_pipelines.html', context)
 
 @login_required
-def manage_agents_card_view(request):
-    agents = Agent.objects.prefetch_related('crew_set', 'task_set', 'tools').all()
-    form = AgentForm()  # Now AgentForm is defined
-    context = {
-        'agents': agents,
-        'form': form,
-    }
-    return render(request, 'agents/manage_agents_card_view.html', context)
-
-@login_required
-def manage_crews(request):
-    crews = Crew.objects.all()
-    
-    # Get the selected client_id from the session
-    selected_client_id = request.session.get('selected_client_id')
-    selected_client = None
-    
-    if selected_client_id:
-        selected_client = get_object_or_404(Client, id=selected_client_id)
-        # Optionally, you can filter crews by the selected client if there's a relationship
-        # crews = crews.filter(client=selected_client)
-    
-    context = {
-        'crews': crews,
-        'selected_client': selected_client,
-    }
-    return render(request, 'agents/manage_crews.html', context)
-
-@login_required
-def manage_crews_card_view(request):
-    crews = Crew.objects.all()
-    
-    # Get the selected client_id from the session
-    selected_client_id = request.session.get('selected_client_id')
-    selected_client = None
-    
-    if selected_client_id:
-        selected_client = get_object_or_404(Client, id=selected_client_id)
-        # Optionally, you can filter crews by the selected client if there's a relationship
-        # crews = crews.filter(client=selected_client)
-    
-    context = {
-        'crews': crews,
-        'selected_client': selected_client,
-    }
-    return render(request, 'agents/manage_crews_card_view.html', context)
-
-@login_required
 @require_POST
 def submit_human_input(request, execution_id):
     input_key = request.POST.get('input_key')

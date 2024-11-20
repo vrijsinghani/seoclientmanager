@@ -13,7 +13,7 @@ def is_admin(user):
 @login_required
 @user_passes_test(is_admin)
 def manage_tasks(request):
-    tasks = Task.objects.all()
+    tasks = Task.objects.all().order_by('description')
     return render(request, 'agents/manage_tasks.html', {'tasks': tasks})
 
 @login_required

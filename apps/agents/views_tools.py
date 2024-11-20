@@ -27,7 +27,7 @@ def count_tokens(text):
 @login_required
 @user_passes_test(is_admin)
 def manage_tools(request):
-    tools = Tool.objects.all().order_by('-id')
+    tools = Tool.objects.all().order_by('name')
     return render(request, 'agents/manage_tools.html', {'tools': tools})
 
 @login_required
