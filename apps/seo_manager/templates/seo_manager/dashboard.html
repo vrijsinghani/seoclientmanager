@@ -29,7 +29,7 @@
     </div>
     
     <!-- Updated Meta-Tags Snapshot Card -->
-    <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+    <div class="col-xl-4 col-sm-6 mb-xl-0 mb-2">
       <div class="card h-100">
         <div class="card-body p-3 d-flex flex-column justify-content-between">
           <div class="row">
@@ -54,7 +54,7 @@
   </div>
   
   <!-- Clients Table -->
-  <div class="row mt-4">
+  <div class="row mt-2">
     <div class="col-12">
       <div class="card">
         <!-- Card header -->
@@ -83,7 +83,7 @@
               {% for client in clients %}
               <tr data-id="{{ client.id }}">
                 <td class="text-sm font-weight-normal">
-                  <a href="{% url 'seo_manager:client_detail' client.id %}">{{ client.name }}</a>
+                  <a href="{% url 'seo_manager:client_detail' client.id %}" class="text-primary font-weight-bold">{{ client.name }}</a>
                 </td>
                 <td class="text-sm font-weight-normal">
                   <a href="{{ client.website_url }}" target="_blank" rel="noopener noreferrer">{{ client.website_url }}</a>

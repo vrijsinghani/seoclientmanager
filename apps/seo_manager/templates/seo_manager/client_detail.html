@@ -13,7 +13,7 @@
       <div class="card mb-4">
         <div class="card-header pb-0 d-flex justify-content-between align-items-center">
           <h6>Client Details: {{ client.name }}</h6>
-          <a href="{% url 'seo_manager:edit_client' client.id %}" class="btn btn-xxs btn-primary">Edit</a>
+          <a href="#" class="btn btn-xxs btn-primary" data-bs-toggle="modal" data-bs-target="#edit-client">Edit</a>
         </div>
         <div class="card-body px-0 pt-0 pb-2">
           <div class="table-responsive p-0">
@@ -669,6 +669,70 @@
 
 <!-- Add this after the existing cards in client_detail.html -->
 
+<!-- Add this modal markup before the closing content block -->
+<div class="modal fade" id="edit-client" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Client: {{ client.name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:edit_client' client.id %}" id="editClientForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="{{ form.name.id_for_label }}" class="form-control-label">Client Name</label>
+            {{ form.name }}
+            {% if form.name.errors %}
+            <div class="text-danger text-xs">{{ form.name.errors }}</div>
+            {% endif %}
+          </div>
+          
+          <div class="form-group mt-3">
+            <label for="{{ form.website_url.id_for_label }}" class="form-control-label">Website URL</label>
+            {{ form.website_url }}
+            {% if form.website_url.errors %}
+            <div class="text-danger text-xs">{{ form.website_url.errors }}</div>
+            {% endif %}
+          </div>
+          
+          <div class="row mt-3">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="{{ form.status.id_for_label }}" class="form-control-label">Status</label>
+                {{ form.status }}
+                {% if form.status.errors %}
+                <div class="text-danger text-xs">{{ form.status.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="{{ form.group.id_for_label }}" class="form-control-label">Group</label>
+                {{ form.group }}
+                {% if form.group.errors %}
+                <div class="text-danger text-xs">{{ form.group.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group mt-3">
+            <label for="{{ form.target_audience.id_for_label }}" class="form-control-label">Target Audience</label>
+            {{ form.target_audience }}
+            {% if form.target_audience.errors %}
+            <div class="text-danger text-xs">{{ form.target_audience.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Update Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 {% endblock content %}
 {% block extra_css %}
@@ -765,6 +829,40 @@
       }
 }
   </style>
+
+<!-- Add this to your extra_css block -->
+<style>
+  .form-control-label {
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #344767;
+  }
+  
+  .form-control,
+  .form-select {
+    border: 1px solid #d2d6da;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .form-control:focus,
+  .form-select:focus {
+    border-color: #5e72e4;
+    box-shadow: 0 0 0 2px rgba(94, 114, 228, 0.2);
+  }
+  
+  .text-danger {
+    margin-top: 0.25rem;
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+  }
+</style>
 {% endblock extra_css %}
 
 {% block extra_js %}
@@ -1120,4 +1218,58 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   </script>
+
+<!-- Add this to your extra_js block -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editClientForm = document.getElementById('editClientForm');
+    if (editClientForm) {
+        editClientForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: new FormData(this),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message and reload page
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: data.message,
+                        showConfirmButton: false,
+                        timer: 1500
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    // Show error messages
+                    let errorMessage = '';
+                    for (const [field, errors] of Object.entries(data.errors)) {
+                        errorMessage += `${field}: ${errors.join(', ')}\n`;
+                    }
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: errorMessage
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'An error occurred while updating the client.'
+                });
+            });
+        });
+    }
+});
+</script>
 {% endblock extra_js %}

@@ -74,6 +74,8 @@ def client_detail(request, client_id):
         'targeted_keywords'
     ), id=client_id)
     
+    edit_form = ClientForm(instance=client)
+    
     for keyword in client.targeted_keywords.all():
         history = KeywordRankingHistory.objects.filter(
             Q(keyword=keyword) | 
@@ -145,6 +147,7 @@ def client_detail(request, client_id):
         'latest_collection_date': latest_collection_date,
         'data_coverage_months': data_coverage_months,
         'tracked_keywords_count': tracked_keywords_count,
+        'form': edit_form,
     }
     
     return render(request, 'seo_manager/client_detail.html', context)
@@ -158,7 +161,21 @@ def edit_client(request, client_id):
             form.save()
             user_activity_tool.run(request.user, 'update', f"Updated client details: {client.name}", client=client)
             messages.success(request, f"Client '{client.name}' has been updated successfully.")
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'message': f"Client '{client.name}' has been updated successfully.",
+                    'redirect_url': reverse('seo_manager:client_detail', args=[client.id])
+                })
+            
             return redirect('seo_manager:client_detail', client_id=client.id)
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': False,
+                    'errors': form.errors
+                })
     else:
         form = ClientForm(instance=client)
     

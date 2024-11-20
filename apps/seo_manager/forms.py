@@ -30,6 +30,15 @@ class ClientForm(forms.ModelForm):
             }),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add any additional field customization here
+        for field in self.fields.values():
+            if not isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.update({
+                    'class': field.widget.attrs.get('class', '') + ' form-control'
+                })
+
 class BusinessObjectiveForm(forms.Form):
     goal = forms.CharField(
         widget=forms.Textarea(attrs={
