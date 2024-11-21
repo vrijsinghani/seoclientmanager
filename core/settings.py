@@ -285,8 +285,8 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-GOOGLE_CLIENT_SECRETS_FILE = os.getenv('GOOGLE_CLIENT_SECRETS_FILE', default="google_secrets.json")
-
+GOOGLE_CLIENT_SECRETS_FILE = os.getenv('GOOGLE_CLIENT_SECRETS_FILE', default="/secrets/google_secrets.json")
+SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', default="/secrets/service-account.json")
 # ### Async Tasks (Celery) Settings ###
 
 CELERY_SCRIPTS_DIR        = os.path.join(BASE_DIR, "tasks_scripts" )

@@ -17,106 +17,119 @@ logger = logging.getLogger(__name__)
 @login_required
 def client_analytics(request, client_id):
     client = get_object_or_404(Client, id=client_id)
-    ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
-    sc_credentials = get_object_or_404(SearchConsoleCredentials, client=client)
     
-    # Get separate date ranges for GA and SC
-    ga_range = request.GET.get('ga_range', '30')  # Changed from 'range' to 'ga_range'
-    sc_range = request.GET.get('sc_range', '30')
-    
-    # Calculate GA dates
-    ga_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    
-    if ga_range == 'custom':
-        ga_start_date = request.GET.get('ga_start_date')  # Changed from 'start_date'
-        ga_end_date = request.GET.get('ga_end_date')      # Changed from 'end_date'
-        if not ga_start_date or not ga_end_date:
-            messages.error(request, "Invalid GA date range provided")
-            return redirect('seo_manager:client_analytics', client_id=client_id)
-    else:
-        try:
-            days = int(ga_range)
-            ga_start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-        except ValueError:
-            messages.error(request, "Invalid GA date range")
-            return redirect('seo_manager:client_analytics', client_id=client_id)
+    # Get credentials without forcing 404
+    try:
+        ga_credentials = GoogleAnalyticsCredentials.objects.get(client=client)
+    except GoogleAnalyticsCredentials.DoesNotExist:
+        ga_credentials = None
+        
+    try:
+        sc_credentials = SearchConsoleCredentials.objects.get(client=client)
+    except SearchConsoleCredentials.DoesNotExist:
+        sc_credentials = None
 
-    # Calculate SC dates
-    sc_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    if sc_range == 'custom':
-        sc_start_date = request.GET.get('sc_start_date')
-        sc_end_date = request.GET.get('sc_end_date')
-        if not sc_start_date or not sc_end_date:
-            messages.error(request, "Invalid SC date range provided")
-            return redirect('seo_manager:client_analytics', client_id=client_id)
-    else:
-        try:
-            days = int(sc_range)
-            sc_start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-        except ValueError:
-            messages.error(request, "Invalid SC date range")
-            return redirect('seo_manager:client_analytics', client_id=client_id)
-    
     context = {
         'client': client,
         'analytics_data': None,
         'search_console_data': None,
-        'ga_start_date': ga_start_date,
-        'ga_end_date': ga_end_date,
-        'sc_start_date': sc_start_date,
-        'sc_end_date': sc_end_date,
-        'selected_ga_range': ga_range,    # Changed from 'selected_range'
-        'selected_sc_range': sc_range,
     }
 
-    # Update GA data fetch to use GA-specific dates
-    try:
-        logger.info("Fetching data using GoogleAnalyticsTool")
-        ga_tool = GoogleAnalyticsTool()
+    # Only process GA data if credentials exist
+    if ga_credentials:
+        ga_range = request.GET.get('ga_range', '30')
+        ga_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         
-        analytics_data = ga_tool._run(
-            start_date=ga_start_date,
-            end_date=ga_end_date,
-            client_id=client_id
-        )
-        
-        if analytics_data['success']:
-            # Log data for debugging
-            logger.info(f"Number of data points: {len(analytics_data['analytics_data'])}")
-            if analytics_data['analytics_data']:
-                logger.info(f"Sample data point: {analytics_data['analytics_data'][0]}")
-            
-            context['analytics_data'] = json.dumps(analytics_data['analytics_data'])
-            context['start_date'] = analytics_data['start_date']
-            context['end_date'] = analytics_data['end_date']
+        if ga_range == 'custom':
+            ga_start_date = request.GET.get('ga_start_date')
+            ga_end_date = request.GET.get('ga_end_date')
+            if not ga_start_date or not ga_end_date:
+                messages.error(request, "Invalid GA date range provided")
+                return redirect('seo_manager:client_analytics', client_id=client_id)
         else:
-            logger.warning(f"Failed to fetch GA data: {analytics_data.get('error')}")
-            messages.warning(request, "Unable to fetch Google Analytics data.")
-            
-    except Exception as e:
-        logger.error(f"Error fetching GA data: {str(e)}", exc_info=True)
-        messages.warning(request, "Unable to fetch Google Analytics data.")
+            try:
+                days = int(ga_range)
+                ga_start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+            except ValueError:
+                messages.error(request, "Invalid GA date range")
+                return redirect('seo_manager:client_analytics', client_id=client_id)
 
-    # Update SC data fetch to use SC-specific dates
-    try:
-        search_console_service = sc_credentials.get_service()
-        if search_console_service:
-            property_url = sc_credentials.get_property_url()
-            if property_url:
-                search_console_data = get_search_console_data(
-                    search_console_service, 
-                    property_url,
-                    sc_start_date,  # Use SC-specific date
-                    sc_end_date     # Use SC-specific date
-                )
-                context['search_console_data'] = search_console_data
+        context.update({
+            'ga_start_date': ga_start_date,
+            'ga_end_date': ga_end_date,
+            'selected_ga_range': ga_range,
+        })
+
+        try:
+            logger.info("Fetching data using GoogleAnalyticsTool")
+            ga_tool = GoogleAnalyticsTool()
+            
+            analytics_data = ga_tool._run(
+                start_date=ga_start_date,
+                end_date=ga_end_date,
+                client_id=client_id
+            )
+            
+            if analytics_data['success']:
+                logger.info(f"Number of data points: {len(analytics_data['analytics_data'])}")
+                if analytics_data['analytics_data']:
+                    logger.info(f"Sample data point: {analytics_data['analytics_data'][0]}")
+                
+                context['analytics_data'] = json.dumps(analytics_data['analytics_data'])
+                context['start_date'] = analytics_data['start_date']
+                context['end_date'] = analytics_data['end_date']
             else:
-                messages.warning(request, "Invalid Search Console property URL format.")
+                logger.warning(f"Failed to fetch GA data: {analytics_data.get('error')}")
+                messages.warning(request, "Unable to fetch Google Analytics data.")
+                
+        except Exception as e:
+            logger.error(f"Error fetching GA data: {str(e)}", exc_info=True)
+            messages.warning(request, "Unable to fetch Google Analytics data.")
+
+    # Only process SC data if credentials exist
+    if sc_credentials:
+        sc_range = request.GET.get('sc_range', '30')
+        sc_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        
+        if sc_range == 'custom':
+            sc_start_date = request.GET.get('sc_start_date')
+            sc_end_date = request.GET.get('sc_end_date')
+            if not sc_start_date or not sc_end_date:
+                messages.error(request, "Invalid SC date range provided")
+                return redirect('seo_manager:client_analytics', client_id=client_id)
         else:
-            messages.warning(request, "Search Console credentials are incomplete.")
-    except Exception as e:
-        logger.error(f"Error fetching Search Console data: {str(e)}")
-        messages.warning(request, "Unable to fetch Search Console data.")
+            try:
+                days = int(sc_range)
+                sc_start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+            except ValueError:
+                messages.error(request, "Invalid SC date range")
+                return redirect('seo_manager:client_analytics', client_id=client_id)
+
+        context.update({
+            'sc_start_date': sc_start_date,
+            'sc_end_date': sc_end_date,
+            'selected_sc_range': sc_range,
+        })
+
+        try:
+            search_console_service = sc_credentials.get_service()
+            if search_console_service:
+                property_url = sc_credentials.get_property_url()
+                if property_url:
+                    search_console_data = get_search_console_data(
+                        search_console_service, 
+                        property_url,
+                        sc_start_date,
+                        sc_end_date
+                    )
+                    context['search_console_data'] = search_console_data
+                else:
+                    messages.warning(request, "Invalid Search Console property URL format.")
+            else:
+                messages.warning(request, "Search Console credentials are incomplete.")
+        except Exception as e:
+            logger.error(f"Error fetching Search Console data: {str(e)}")
+            messages.warning(request, "Unable to fetch Search Console data.")
 
     return render(request, 'seo_manager/client_analytics.html', context)
 
