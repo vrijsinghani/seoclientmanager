@@ -15,7 +15,9 @@ from langchain_core.tools import Tool
 from django.utils import timezone
 from apps.seo_manager.models import Client
 from langchain.prompts import ChatPromptTemplate
-from langchain.agents import initialize_agent, AgentType
+from langchain.agents import initialize_agent, AgentType, AgentExecutor, create_structured_chat_agent
+from langchain.agents.format_scratchpad import format_to_openai_function_messages
+from langchain.agents.output_parsers import JSONAgentOutputParser
 from langchain_core.callbacks import BaseCallbackHandler
 import datetime
 from langchain.tools import StructuredTool
@@ -402,8 +404,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 max_retries=3
             )
             
-            # Save and send response
-            await self._handle_response(response, agent_id, model_name)
+            # Handle the response and stop if it's a final answer
+            if response:
+                await self._handle_response(response, agent_id, model_name)
+                return  # Add this to stop processing after final answer
             
         except json.JSONDecodeError:
             logger.error("Invalid JSON received")
@@ -418,93 +422,83 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         for attempt in range(max_retries):
             try:
-                # Add input validation
                 if not message or not message.strip():
                     raise ValueError("Empty or invalid input message")
 
-                # Execute the agent asynchronously with timeout
+                # Execute the agent using invoke instead of run
                 response = await asyncio.wait_for(
-                    database_sync_to_async(agent_executor.run)(  # Changed to run instead of arun
-                        input=message,
+                    database_sync_to_async(agent_executor.invoke)(
+                        {"input": message},
                         callbacks=[self._create_callback_handler()]
                     ),
                     timeout=30
                 )
                 
-                # Log the raw response for debugging
                 logger.debug(f"Raw agent response: {response}")
                 
-                # Process the response
-                formatted_response = await self._process_agent_response(response)
-                if formatted_response:
-                    return formatted_response
+                # Process the response to extract output
+                if isinstance(response, dict):
+                    # Handle dictionary response
+                    if response.get('output'):
+                        return response['output']
                 
+                # If we get here, we didn't get a valid response
                 raise ValueError("Invalid or empty response from agent")
                 
             except asyncio.TimeoutError:
                 logger.error(f"Agent execution timed out on attempt {attempt + 1}")
-                await asyncio.sleep(1)  # Brief pause before retry
+                await asyncio.sleep(1)
                 if attempt == max_retries - 1:
                     return "I apologize, but the request timed out. Please try again with a simpler query."
                 
             except Exception as e:
                 last_error = e
                 logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}", exc_info=True)
-                await asyncio.sleep(1)  # Brief pause before retry
+                await asyncio.sleep(1)
                 
                 if attempt == max_retries - 1:
                     return f"I apologize, but I encountered an error: {str(last_error)}"
         
         return f"I apologize, but I encountered an error: {str(last_error)}"
 
-    async def _process_agent_response(self, response):
-        """Process and validate agent response"""
+    async def _handle_response(self, response, agent_id, model_name):
+        """Handle the agent's response"""
         try:
-            # Handle dict responses (direct tool output)
-            if isinstance(response, dict):
-                if response.get('success') is True:
-                    formatted = self._format_analytics_response(response)
-                    return {
-                        "action": "Final Answer",
-                        "action_input": formatted
-                    }
-                return str(response)
+            # Ensure response is properly formatted
+            if not isinstance(response, str):
+                response = str(response)
             
-            # Handle string responses
-            if isinstance(response, str):
-                # Check for Final Answer format
+            response = response.strip()
+            
+            # Extract the actual response from Final Answer format if present
+            try:
                 if '"action": "Final Answer"' in response:
-                    try:
-                        # Extract the action_input from Final Answer
-                        match = re.search(r'"action_input":\s*"([^"]+)"', response)
-                        if match:
-                            return match.group(1)
-                    except Exception:
-                        pass
-                
-                # Try to extract JSON from response
-                json_match = re.search(r'\{.*\}', response, re.DOTALL)
-                if json_match:
-                    try:
-                        data = json.loads(json_match.group())
-                        if data.get('success') is True:
-                            formatted = self._format_analytics_response(data)
-                            return {
-                                "action": "Final Answer",
-                                "action_input": formatted
-                            }
-                    except json.JSONDecodeError:
-                        pass
-                
-                # Return non-empty string responses
-                if response.strip():
-                    return response.strip()
+                    json_match = re.search(r'\{.*\}', response, re.DOTALL)
+                    if json_match:
+                        json_response = json.loads(json_match.group())
+                        if json_response.get('action') == 'Final Answer':
+                            response = json_response.get('action_input', response)
+            except (json.JSONDecodeError, AttributeError):
+                pass
             
-            return None
+            # Save message to database
+            await self.save_message(response, agent_id, True, model_name)
+            
+            # Send response to websocket
+            await self.send(text_data=json.dumps({
+                'message': response,
+                'is_agent': True,
+                'timestamp': datetime.datetime.now().isoformat()
+            }))
             
         except Exception as e:
-            logger.error(f"Error processing agent response: {str(e)}", exc_info=True)
-            return None
+            error_msg = f"Error handling response: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            await self.send(text_data=json.dumps({
+                'message': error_msg,
+                'is_agent': True,
+                'error': True
+            }))
 
     def _initialize_agent(self, agent, model_name, client_data):
         """Initialize the agent with tools and memory"""
@@ -525,28 +519,79 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 memory_key="chat_history",
                 return_messages=True,
                 chat_memory=message_history,
-                output_key="output"
+                output_key="output",
+                input_key="input"
             )
-            
-            # Create agent executor with specific configuration
-            return initialize_agent(
-                tools=tools,
+
+            # Get tool names and descriptions for the prompt
+            tool_names = [tool.name for tool in tools]
+            tool_descriptions = [f"{tool.name}: {tool.description}" for tool in tools]
+
+            # Create prompt with required variables and proper tool format instructions
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", """
+{system_prompt}
+
+You have access to the following tools:
+{tools}
+
+Tool Names: {tool_names}
+
+IMPORTANT: Before using any tool, ALWAYS check your chat history for relevant information first.
+If the information you need is already in the chat history, use that instead of making a new tool call.
+
+To use a tool, respond with:
+{{"action": "tool_name", "action_input": {{"param1": "value1", "param2": "value2"}}}}
+
+For final responses, use:
+{{"action": "Final Answer", "action_input": "your response here"}}
+
+When you receive tool output:
+1. Format the data into a clear, readable response
+2. Use the Final Answer format to return your formatted response
+3. Always convert technical data into human-readable text
+4. Save important data points in your memory for future reference
+
+Remember:
+1. CHECK CHAT HISTORY FIRST before making tool calls
+2. Always use valid JSON format
+3. Tool parameters must match exactly what the tool expects
+4. Don't include code blocks or print statements
+5. Use the exact tool name from the Tool Names list
+"""),
+                ("human", "{input}"),
+                ("ai", "{agent_scratchpad}"),
+                ("system", "Previous conversation:\n{chat_history}")
+            ])
+
+            # Create the agent with specific output parser
+            agent = create_structured_chat_agent(
                 llm=llm,
-                agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-                verbose=True,
+                tools=tools,
+                prompt=prompt.partial(
+                    system_prompt=self._create_agent_prompt(agent, client_data),
+                    tools="\n".join(tool_descriptions),
+                    tool_names=", ".join(tool_names)
+                )
+            )
+
+            # Create agent executor with proper configuration for stopping
+            return AgentExecutor(
+                agent=agent,
+                tools=tools,
                 memory=memory,
+                verbose=True,
+                max_iterations=3,
+                early_stopping_method="force",
+                handle_parsing_errors=True,
+                return_intermediate_steps=False,
+                max_execution_time=None,
+                output_key="output",
+                input_key="input",
                 agent_kwargs={
-                    "prefix": self._create_agent_prompt(agent, client_data),
-                    "format_instructions": self._get_format_instructions(),
-                    "input_variables": ["input", "agent_scratchpad", "chat_history"],
-                    "output_variables": ["output"],
                     "handle_parsing_errors": True,
-                    # Add these to help agent understand when to stop
-                    "max_iterations": 3,  # Limit number of iterations
-                    "early_stopping_method": "generate",
-                    "return_intermediate_steps": True
-                },
-                handle_parsing_errors=True
+                    "memory_prompts": ["{chat_history}"]
+                }
             )
             
         except Exception as e:
@@ -557,11 +602,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """Synchronously load and initialize agent tools"""
         try:
             tools = []
-            seen_tools = set()  # Track which tools we've already initialized
+            seen_tools = set()
             
             for tool_model in agent.tools.all():
                 try:
-                    # Skip if we've already initialized this tool
                     tool_key = f"{tool_model.tool_class}_{tool_model.tool_subclass}"
                     if tool_key in seen_tools:
                         continue
@@ -575,34 +619,45 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         logger.info(f"Initializing tool: {tool_class.__name__}")
                         tool_instance = tool_class()
                         
-                        # Ensure tool has required attributes
-                        if not hasattr(tool_instance, 'args_schema'):
-                            logger.error(f"Tool {tool_class.__name__} missing args_schema")
-                            continue
+                        # Wrap the tool's run function to format the output
+                        def format_tool_output(func):
+                            def wrapper(*args, **kwargs):
+                                result = func(*args, **kwargs)
+                                if isinstance(result, dict):
+                                    return json.dumps(result, indent=2)
+                                return str(result)
+                            return wrapper
                         
-                        # Create tool description
-                        tool_description = self._create_tool_description(tool_instance, tool_model)
+                        # Create a structured tool with proper schema and output formatting
+                        if hasattr(tool_instance, 'args_schema'):
+                            wrapped_run = format_tool_output(tool_instance._run)
+                            tool = StructuredTool.from_function(
+                                func=wrapped_run,
+                                name=tool_model.name.lower().replace(" ", "_"),
+                                description=self._create_tool_description(tool_instance, tool_model),
+                                args_schema=tool_instance.args_schema,
+                                coroutine=tool_instance.arun if hasattr(tool_instance, 'arun') else None,
+                                return_direct=False  # Changed to False to allow agent to process the response
+                            )
+                        else:
+                            wrapped_run = format_tool_output(tool_instance._run)
+                            tool = Tool(
+                                name=tool_model.name.lower().replace(" ", "_"),
+                                description=self._create_tool_description(tool_instance, tool_model),
+                                func=wrapped_run,
+                                coroutine=tool_instance.arun if hasattr(tool_instance, 'arun') else None
+                            )
                         
-                        # Create Langchain tool with direct reference to tool instance methods
-                        langchain_tool = StructuredTool(
-                            name=tool_model.name,
-                            description=tool_description,
-                            func=tool_instance._run,  # Direct reference to method
-                            coroutine=tool_instance.arun if hasattr(tool_instance, 'arun') else None,
-                            args_schema=tool_instance.args_schema
-                        )
-                        
-                        tools.append(langchain_tool)
+                        tools.append(tool)
                         logger.info(f"Successfully loaded tool: {tool_model.name}")
-                    else:
-                        logger.error(f"Tool class not found: {tool_model.tool_subclass}")
+                        
                 except Exception as e:
-                    logger.error(f"Error loading tool {tool_model.name}: {str(e)}", exc_info=True)
-            
+                    logger.error(f"Error loading tool {tool_model.name}: {str(e)}")
+                    
             return tools
             
         except Exception as e:
-            logger.error(f"Error loading tools: {str(e)}", exc_info=True)
+            logger.error(f"Error loading tools: {str(e)}")
             return []
 
     def _create_tool_description(self, tool_instance, tool_model):
@@ -631,8 +686,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
                 tool_description = f"""{base_description}
 
-Required Parameters:
-{chr(10).join(field_descriptions)}"""
+Parameters:
+{chr(10).join(field_descriptions)}
+
+Example:
+{{"action": "{tool_model.name.lower().replace(' ', '_')}", 
+  "action_input": {{
+    "client_id": 123,
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-31",
+    "metrics": "newUsers",
+    "dimensions": "date"
+  }}
+}}"""
                 
                 return tool_description
             
@@ -865,48 +931,8 @@ Respond to the user's message while staying in character and using the client co
             
         except Exception as e:
             logger.error(f"Error creating agent prompt: {str(e)}", exc_info=True)
-            # Provide a fallback prompt in case of error
-            return r"""
-You are an AI assistant. Your goal is to help the user while being clear and concise.
-If you encounter any issues, please let the user know and ask for clarification.
+            return "You are an AI assistant. Help the user while being clear and concise."
 
-Example tool call (format your calls like this):
-START_JSON
-{
-    "start_date": "2024-01-01",
-    "end_date": "2024-01-31",
-    "client_id": 123
-}
-END_JSON
-"""
-
-    async def _handle_response(self, response, agent_id, model_name):
-        """Handle the agent's response"""
-        try:
-            # Ensure response is properly formatted
-            if not isinstance(response, str):
-                response = str(response)
-            
-            response = response.strip()
-            
-            # Save message to database
-            await self.save_message(response, agent_id, True, model_name)
-            
-            # Send response to websocket
-            await self.send(text_data=json.dumps({
-                'message': response,
-                'is_agent': True,
-                'timestamp': datetime.datetime.now().isoformat()
-            }))
-            
-        except Exception as e:
-            error_msg = f"Error handling response: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            await self.send(text_data=json.dumps({
-                'message': error_msg,
-                'is_agent': True,
-                'error': True
-            }))
     async def _cleanup_agent_executor(self):
         """Clean up agent executor resources"""
         try:

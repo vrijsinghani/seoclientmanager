@@ -1,69 +1,80 @@
+from pydantic import BaseModel, Field
+from crewai.tools import BaseTool
+from typing import Optional
+import logging
+from playwright.sync_api import sync_playwright
 import os
-import requests
-import json
-from typing import Any, Type
-from pydantic.v1 import BaseModel, Field
-from crewai_tools.tools.base_tool import BaseTool
-from django.conf import settings
-from urllib.parse import urlparse
-import re
-"""
-You can use the ScreenshotTool by 
- 1. importing 'from apps.common.tools.screenshot_tool import screenshot_tool'' and 
- 2. calling its run method with a URL as the argument: 'result = screenshot_tool.run(url=url)'
- """
+import time
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class ScreenshotToolSchema(BaseModel):
-    """Input schema for ScreenshotTool."""
-    url: str = Field(..., description="The URL of the website to capture a screenshot.")
+    """Schema for ScreenshotTool parameters"""
+    url: str = Field(
+        description="The URL of the webpage to screenshot",
+    )
+    wait_time: Optional[int] = Field(
+        description="Time to wait in seconds before taking screenshot",
+        default=5
+    )
+    full_page: Optional[bool] = Field(
+        description="Whether to capture full page or viewport",
+        default=True
+    )
+    output_path: Optional[str] = Field(
+        description="Path to save the screenshot",
+        default=None
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "url": "https://example.com",
+                    "wait_time": 5,
+                    "full_page": True,
+                    "output_path": "/path/to/screenshot.png"
+                }
+            ]
+        }
+    }
 
 class ScreenshotTool(BaseTool):
-    name: str = "Capture Website Screenshot"
-    description: str = "Captures a screenshot of a given website URL."
-    args_schema: Type[BaseModel] = ScreenshotToolSchema
-    
-    def _run(
-        self, 
-        url: str, 
-        **kwargs: Any
-    ) -> Any:
-        browserless_url = os.getenv('BROWSERLESS_BASE_URL')
-        api_key = os.getenv('BROWSERLESS_API_KEY')
-        
-        if not browserless_url or not api_key:
-            return {'error': 'Browserless configuration is missing'}
-        
-        screenshot_url = f"{browserless_url}/screenshot?token={api_key}"
-        
-        payload = {
-            "url": url,
-            "options": {
-                "fullPage": False,
-                "type": "png"
-            }
-        }
-        
-        response = requests.post(screenshot_url, json=payload)
-        
-        if response.status_code == 200:
-            # Generate a sanitized filename based on the URL
-            parsed_url = urlparse(url)
-            sanitized_name = re.sub(r'[^\w\-_\. ]', '_', parsed_url.netloc + parsed_url.path)
-            filename = f"{sanitized_name[:200]}.png"  # Limit filename length
-            filepath = os.path.join(settings.MEDIA_ROOT, 'crawled_screenshots', filename)
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            
-            # Save the image
-            with open(filepath, 'wb') as f:
-                f.write(response.content)
-            
-            # Generate the URL for the saved image
-            image_url = f"{settings.MEDIA_URL}crawled_screenshots/{filename}"
-            
-            return {'screenshot_url': image_url}
-        else:
-            return {'error': f'Failed to get screenshot. Status code: {response.status_code}'}
+    name: str = "Screenshot Tool"
+    description: str = "Take screenshots of webpages"
+    args_schema: type[ScreenshotToolSchema] = ScreenshotToolSchema
 
-# Initialize the tool
+    def _run(self, url: str, wait_time: int = 5, 
+             full_page: bool = True, output_path: Optional[str] = None) -> str:
+        """Take a screenshot of the specified webpage"""
+        try:
+            # Generate default output path if none provided
+            if not output_path:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"screenshot_{timestamp}.png"
+                output_path = os.path.join("media", "screenshots", filename)
+
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                page = browser.new_page()
+                page.goto(url)
+                time.sleep(wait_time)  # Wait for content to load
+                page.screenshot(path=output_path, full_page=full_page)
+                browser.close()
+
+            return f"Screenshot saved to {output_path}"
+        except Exception as e:
+            logger.error(f"Screenshot error: {str(e)}")
+            return f"Error taking screenshot: {str(e)}"
+
+    async def _arun(self, url: str, wait_time: int = 5,
+                    full_page: bool = True, output_path: Optional[str] = None) -> str:
+        """Async version of screenshot tool"""
+        return self._run(url, wait_time, full_page, output_path)
+
+# Initialize the tool instance
 screenshot_tool = ScreenshotTool()
