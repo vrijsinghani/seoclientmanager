@@ -5,7 +5,10 @@ from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import json
-# comments
+import logging
+
+logger = logging.getLogger('apps.seo_manager.google_auth')
+
 def get_google_auth_flow(request):
     """
     Creates OAuth2 flow for Google Analytics and Search Console authentication.
@@ -59,25 +62,42 @@ def fetch_analytics_accounts(analytics):
 def get_search_console_service(credentials):
     return build('searchconsole', 'v1', credentials=credentials)
 
-def get_search_console_properties(credentials):
+def get_search_console_properties(credentials_or_json):
     """
-    Get list of Search Console properties using OAuth credentials
+    Get list of Search Console properties using either OAuth credentials or service account JSON
     
     Args:
-        credentials: OAuth credentials object
+        credentials_or_json: Either an OAuth credentials object or service account JSON string
         
     Returns:
         list: List of Search Console properties
     """
-    service = build('searchconsole', 'v1', credentials=credentials)
-    sites = service.sites().list().execute()
-    
-    properties = []
-    if 'siteEntry' in sites:
-        for site in sites['siteEntry']:
-            properties.append({
-                'url': site['siteUrl'],
-                'permission_level': site.get('permissionLevel', '')
-            })
-    
-    return properties
+    try:
+        # Handle service account JSON string
+        if isinstance(credentials_or_json, str):
+            service_account_info = json.loads(credentials_or_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                service_account_info,
+                scopes=['https://www.googleapis.com/auth/webmasters.readonly']
+            )
+        else:
+            # Use provided OAuth credentials
+            credentials = credentials_or_json
+
+        # Build service with appropriate credentials
+        service = build('searchconsole', 'v1', credentials=credentials)
+        sites = service.sites().list().execute()
+        properties = []
+        if 'siteEntry' in sites:
+            for site in sites['siteEntry']:
+                logger.info(f"site: {site}")
+                properties.append({
+                    'url': site['siteUrl'],
+                    'permission_level': site.get('permissionLevel', '')
+                })
+        
+        return properties
+
+    except Exception as e:
+        logger.error(f"Error getting Search Console properties: {str(e)}")
+        raise

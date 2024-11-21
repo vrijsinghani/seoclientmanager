@@ -20,7 +20,9 @@
               <select class="form-control" name="selected_property" id="selected_property" required>
                 <option value="">-- Select a property --</option>
                 {% for property in properties %}
-                  <option value="{{ property }}">{{ property.url }} - {{ property.permission_level }}</option>
+                <option value="{{ property.url }}" {% if property.url == client.website_url %}selected{% endif %}>
+                  {{ property.url }} - {{ property.permission_level }}
+                </option>
                 {% endfor %}
               </select>
             </div>

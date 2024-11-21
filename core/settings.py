@@ -388,7 +388,7 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO',
+        'level': 'DEBUG',
     },
     'loggers': {
         'django': {
@@ -412,9 +412,9 @@ LOGGING = {
             'propagate': True,
         },
         'apps.seo_manager': {
-            'handlers': ['file'],
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'apps.agents': {
             'handlers': ['console','file'],

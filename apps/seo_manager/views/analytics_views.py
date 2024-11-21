@@ -85,6 +85,19 @@ def google_oauth_callback(request):
 def add_ga_credentials_oauth(request, client_id):
     client = get_object_or_404(Client, id=client_id)
     
+    # If we don't have accounts in session, start OAuth flow
+    if 'accounts' not in request.session:
+        flow = get_google_auth_flow(request)
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            state=f"{client_id}_ga",
+            prompt='consent'
+        )
+        request.session['oauth_state'] = state
+        return redirect(authorization_url)
+    
+    # Handle POST request for account selection
     if request.method == 'POST':
         selected_account = request.POST.get('selected_account')
         if selected_account:
@@ -130,6 +143,7 @@ def add_ga_credentials_oauth(request, client_id):
                 View ID: {credentials.view_id}
                 """)
 
+                # Clean up session
                 for key in ['access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret', 'accounts']:
                     request.session.pop(key, None)
 
@@ -141,21 +155,11 @@ def add_ga_credentials_oauth(request, client_id):
         else:
             messages.error(request, "Please select an account.")
     
-    if 'accounts' in request.session:
-        return render(request, 'seo_manager/select_analytics_account.html', {
-            'client': client,
-            'accounts': request.session['accounts'],
-        })
-    
-    flow = get_google_auth_flow(request)
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        state=f"{client_id}_ga",
-        prompt='consent'
-    )
-    request.session['oauth_state'] = state
-    return redirect(authorization_url)
+    # Show account selection page if we have accounts in session
+    return render(request, 'seo_manager/select_analytics_account.html', {
+        'client': client,
+        'accounts': request.session['accounts'],
+    })
 
 @login_required
 def add_ga_credentials_service_account(request, client_id):

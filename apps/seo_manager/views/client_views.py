@@ -13,9 +13,9 @@ from apps.common.tools.user_activity_tool import user_activity_tool
 from apps.agents.tools.client_profile_tool.client_profile_tool import ClientProfileTool
 from datetime import datetime
 from markdown_it import MarkdownIt  # Import markdown-it
+from django.urls import reverse
 
-
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('apps.seo_manager.google_auth')
 
 __all__ = [
     'dashboard',

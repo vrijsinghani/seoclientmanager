@@ -201,6 +201,7 @@ class SearchConsoleCredentials(models.Model):
     token_uri = models.URLField(blank=True, null=True)
     sc_client_id = models.CharField(max_length=100, blank=True, null=True)  # Renamed from client_id
     client_secret = models.CharField(max_length=100, blank=True, null=True)
+    service_account_json = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"Search Console Credentials for {self.client.name}"
@@ -208,6 +209,15 @@ class SearchConsoleCredentials(models.Model):
     def get_credentials(self):
         """Returns refreshed Google OAuth2 credentials"""
         try:
+            # Handle service account authentication
+            if self.service_account_json:
+                service_account_info = json.loads(self.service_account_json)
+                return service_account.Credentials.from_service_account_info(
+                    service_account_info,
+                    scopes=['https://www.googleapis.com/auth/webmasters.readonly']
+                )
+
+            # Handle OAuth2 authentication
             if not self.refresh_token:
                 raise AuthError("No refresh token available. Reauthorization required.")
 

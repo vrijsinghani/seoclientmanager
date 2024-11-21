@@ -49,6 +49,7 @@ urlpatterns = [
             path('credentials/', include([
                 path('ga/oauth/add/', views.add_ga_credentials_oauth, name='add_ga_credentials_oauth'),
                 path('ga/service-account/add/', views.add_ga_credentials_service_account, name='add_ga_credentials_service_account'),
+                path('sc/service-account/add/', views.add_sc_credentials_service_account, name='add_sc_credentials_service_account'),
                 path('ga/remove/', views.remove_ga_credentials, name='remove_ga_credentials'),
                 path('sc/add/', views.add_sc_credentials, name='add_sc_credentials'),
                 path('sc/remove/', views.remove_sc_credentials, name='remove_sc_credentials'),
