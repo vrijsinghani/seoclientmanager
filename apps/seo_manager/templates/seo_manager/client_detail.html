@@ -97,30 +97,9 @@
           </div>
           
           <div class="mt-4">
-            <h6>Add New Business Objective</h6>
-            <form method="post" action="{% url 'seo_manager:add_business_objective' client.id %}" class="row g-3 align-items-center">
-              {% csrf_token %}
-              <div class="col-auto">
-                {{ form.goal }}
-              </div>
-              <div class="col-auto">
-                {{ form.metric }}
-              </div>
-              <div class="col-auto">
-                {{ form.target_date }}
-              </div>
-              <div class="col-auto">
-                <div class="form-check">
-                  {{ form.status }}
-                  <label class="form-check-label" for="{{ form.status.id_for_label }}">
-                    Active
-                  </label>
-                </div>
-              </div>
-              <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Add Objective</button>
-              </div>
-            </form>
+            <button type="button" class="btn bg-gradient-primary" data-bs-toggle="modal" data-bs-target="#add-objective">
+              <i class="fas fa-plus"></i>&nbsp;&nbsp;Add Business Objective
+            </button>
           </div>
         </div>
       </div>
@@ -659,7 +638,11 @@
     <div class="col-12">
       <div class="card mb-4">
         <div class="card-body">
-          <button id="deleteClientBtn" class="btn btn-danger">Delete Client</button>
+          <button id="deleteClientBtn" class="btn btn-danger" 
+                  data-client-id="{{ client.id }}" 
+                  data-client-name="{{ client.name }}">
+            Delete Client
+          </button>
         </div>
       </div>
     </div>
@@ -728,6 +711,53 @@
         <div class="modal-footer">
           <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
           <button type="submit" class="btn bg-gradient-primary">Update Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Add Business Objective Modal -->
+<div class="modal fade" id="add-objective" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Business Objective</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'seo_manager:add_business_objective' client.id %}" id="addObjectiveForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- Goal Field -->
+          <div class="form-group mb-3">
+            <label class="form-control-label">Goal</label>
+            <textarea class="form-control" name="goal" rows="3" required></textarea>
+            <small class="text-muted">What specific outcome do you want to achieve?</small>
+          </div>
+          
+          <!-- Metric Field -->
+          <div class="form-group mb-3">
+            <label class="form-control-label">Metric</label>
+            <textarea class="form-control" name="metric" rows="2" required></textarea>
+            <small class="text-muted">Define the key metrics that will track progress</small>
+          </div>
+          
+          <!-- Target Date Field -->
+          <div class="form-group mb-3">
+            <label class="form-control-label">Target Date</label>
+            <input type="text" class="form-control" name="target_date" id="target_date" required>
+            <small class="text-muted">When do you aim to achieve this objective?</small>
+          </div>
+          
+          <!-- Status Field -->
+          <div class="form-check form-switch mb-3">
+            <input type="checkbox" class="form-check-input" name="status" checked>
+            <label class="form-check-label ms-3">Active</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn bg-gradient-primary">Add Objective</button>
         </div>
       </form>
     </div>
@@ -1267,6 +1297,125 @@ document.addEventListener('DOMContentLoaded', function() {
                     title: 'Error',
                     text: 'An error occurred while updating the client.'
                 });
+            });
+        });
+    }
+});
+</script>
+
+<!-- Add this to your extra_js block -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize flatpickr for target date
+    flatpickr("#target_date", {
+        dateFormat: "Y-m-d",
+        minDate: "today"
+    });
+
+    // Form submission handling
+    const form = document.getElementById('addObjectiveForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: new FormData(this),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: 'Business objective added successfully'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: data.message || 'An error occurred'
+                    });
+                }
+            });
+        });
+    }
+});
+</script>
+
+<!-- Add this JavaScript for delete functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteBtn = document.getElementById('deleteClientBtn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+            const clientId = this.dataset.clientId;
+            const clientName = this.dataset.clientName;
+
+            Swal.fire({
+                title: 'Are you sure?',
+                html: `You are about to delete client: <strong>${clientName}</strong><br>This action cannot be undone!`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Show loading state
+                    Swal.fire({
+                        title: 'Deleting...',
+                        html: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // Make delete request
+                    fetch(`{% url 'seo_manager:delete_client' client.id %}`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}',
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: 'Client has been deleted successfully.',
+                                showConfirmButton: false,
+                                timer: 1500
+                            }).then(() => {
+                                // Redirect to clients list
+                                window.location.href = "{% url 'seo_manager:client_list' %}";
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: data.error || 'An error occurred while deleting the client.'
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'An error occurred while deleting the client.'
+                        });
+                    });
+                }
             });
         });
     }

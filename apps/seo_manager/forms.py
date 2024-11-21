@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from .models import Client, TargetedKeyword, KeywordRankingHistory, SEOProject
 import csv
 import io
+from django.utils import timezone
 
 class ClientForm(forms.ModelForm):
     class Meta:
@@ -40,37 +41,16 @@ class ClientForm(forms.ModelForm):
                 })
 
 class BusinessObjectiveForm(forms.Form):
-    goal = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 3,
-            'placeholder': 'Describe the business objective in detail'
-        }),
-        help_text="What specific outcome do you want to achieve?"
-    )
-    metric = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 2,
-            'placeholder': 'How will you measure success?'
-        }),
-        help_text="Define the key metrics that will track progress"
-    )
-    target_date = forms.DateField(
-        widget=forms.DateInput(attrs={
-            'class': 'form-control flatpickr-date',
-            'data-toggle': 'flatpickr',
-            'placeholder': 'Select target date'
-        }),
-        help_text="When do you aim to achieve this objective?"
-    )
-    status = forms.BooleanField(
-        required=False,
-        initial=True,
-        widget=forms.CheckboxInput(attrs={
-            'class': 'form-check-input'
-        })
-    )
+    goal = forms.CharField(required=True)
+    metric = forms.CharField(required=True)
+    target_date = forms.DateField(required=True)
+    status = forms.BooleanField(required=False, initial=True)
+
+    def clean_target_date(self):
+        target_date = self.cleaned_data.get('target_date')
+        if target_date and target_date < timezone.now().date():
+            raise ValidationError("Target date cannot be in the past")
+        return target_date
 
 class TargetedKeywordForm(forms.ModelForm):
     class Meta:
