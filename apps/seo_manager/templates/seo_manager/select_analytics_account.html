@@ -2,26 +2,21 @@
 
 {% block title %} Select Analytics Account - {{ client.name }} {% endblock %}
 
-{% block stylesheets %}
-{{ block.super }}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-{% endblock stylesheets %}
-
 {% block content %}
 <div class="container-fluid py-4">
   <div class="row">
     <div class="col-12">
-      <div class="card mb-4">
+      <div class="card mb-4" style="overflow: visible !important;">
         <div class="card-header pb-0">
           <h6>Select Google Analytics Account for {{ client.name }}</h6>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="overflow: visible !important;">
           <form method="post">
             {% csrf_token %}
             <div class="form-group mt-3">
               <label for="selected_account">Select an Analytics Account:</label>
-              <select class="js-example-basic-single" name="selected_account" id="selected_account" style="width: 100%" required>
-                <option value="">-- Select an account --</option>
+              <select class="form-control" name="selected_account" id="selected_account" required>
+                <option value="">Select an Analytics Account</option>
                 {% for account in accounts %}
                   <option value="{{ account.property_id }}">
                     {{ account.account_name }} - {{ account.property_name }}
@@ -29,37 +24,66 @@
                 {% endfor %}
               </select>
             </div>
-            <button type="submit" class="btn btn-primary mt-3">Add Selected Account</button>
+            <div class="d-flex justify-content-end mt-3">
+              <button type="submit" class="btn btn-primary mt-3">Add Selected Account</button>
+            </div>
           </form>
         </div>
       </div>
     </div>
   </div>
+  {% include 'includes/footer.html' %}
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 {{ block.super }}
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="/static/assets/js/plugins/choices.min.js"></script>
 <script>
-  $(document).ready(function() {
-    $('#selected_account').select2({
-      placeholder: 'Start typing to search...',
-      allowClear: true,
-      width: '100%',
-      matcher: function(params, data) {
-        if ($.trim(params.term) === '') {
-          return data;
+  document.addEventListener('DOMContentLoaded', function() {
+    var element = document.querySelector('#selected_account');
+var choices = new Choices(element, {
+      searchEnabled: true,
+      searchPlaceholderValue: "Search for an account...",
+      placeholder: true,
+      removeItemButton: true,
+      shouldSort: false,
+      position: 'auto',
+      maxItemCount: -1,
+      renderChoiceLimit: -1,
+      callbackOnCreateTemplates: function(template) {
+            return {
+                dropdown: function(classNames) {
+                    return template(`
+                        <div class="${classNames.list} ${classNames.listDropdown}"  style="position: relative; ">
+                            <div class="${classNames.searchWrapper}">
+                                <input type="search" class="${classNames.input} ${classNames.inputCloned}" autocomplete="off" autocapitalize="off" spellcheck="false"  aria-autocomplete="list">
+                            </div>
+                            <div class="${classNames.list}"></div>
+                        </div>
+                    `);
+                },
+                choice: function(classNames, data) {
+                    return template(`
+                        <div class="${classNames.item} ${classNames.itemChoice} ${data.disabled ? classNames.itemDisabled : classNames.itemSelectable}" 
+                            data-select-text="${data.selectable ? 'Press to select' : ''}"
+                            data-choice ${data.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable'}
+                            data-id="${data.id}"
+                            data-value="${data.value}"
+                            role="option">
+                            ${data.label}
+                        </div>
+                    `);
+                }
+            };
         }
-        if (typeof data.text === 'undefined') {
-          return null;
-        }
-        if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
-          return data;
-        }
-        return null;
-      }
-    });
+    }); 
   });
 </script>
 {% endblock extra_js %}
+
+
+{% block extra_css %}
+{{ block.super }}
+<link href="/static/assets/css/choices.min.css" rel="stylesheet" />
+{% endblock extra_css %}

@@ -2,39 +2,17 @@
 
 {% block title %} Select Search Console Property - {{ client.name }} {% endblock %}
 
-{% block stylesheets %}
-{{ block.super }}
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<style>
-    .select2-container {
-        width: 100% !important;
-    }
-    .select2-selection--single {
-        height: 38px !important;
-        padding: 6px 12px !important;
-        font-size: 1rem !important;
-        line-height: 1.5 !important;
-        border: 1px solid #0a447e !important;
-        border-radius: 0.5rem !important;
-    }
-    .select2-selection__arrow {
-        height: 36px !important;
-    }
-    .select2-results__option {
-        padding: 6px 12px;
-    }
-</style>
-{% endblock stylesheets %}
+
 
 {% block content %}
 <div class="container-fluid py-4">
   <div class="row">
     <div class="col-12">
-      <div class="card mb-4">
+      <div class="card mb-4" style="overflow: visible !important;">
         <div class="card-header pb-0">
           <h6>Select Search Console Property for {{ client.name }}</h6>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="overflow: visible !important;">
           <form method="post">
             {% csrf_token %}
             <div class="form-group mt-3">
@@ -42,7 +20,7 @@
               <select class="form-control" name="selected_property" id="selected_property" required>
                 <option value="">-- Select a property --</option>
                 {% for property in properties %}
-                  <option value="{{ property }}">{{ property }}</option>
+                  <option value="{{ property }}">{{ property.url }} - {{ property.permission_level }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -58,14 +36,53 @@
 {% endblock content %}
 
 {% block extra_js %}
+{{ block.super }}
+<script src="/static/assets/js/plugins/choices.min.js"></script>
 <script>
-  $(document).ready(function() {
-    // Initialize Select2
-    $('#selected_property').select2({
-      placeholder: 'Start typing to search...',
-      allowClear: true,
-      width: '100%'
-    });
+  document.addEventListener('DOMContentLoaded', function() {
+    var element = document.querySelector('#selected_property');
+var choices = new Choices(element, {
+      searchEnabled: true,
+      searchPlaceholderValue: "Search for an account...",
+      placeholder: true,
+      removeItemButton: true,
+      shouldSort: false,
+      position: 'auto',
+      maxItemCount: -1,
+      renderChoiceLimit: -1,
+      callbackOnCreateTemplates: function(template) {
+            return {
+                dropdown: function(classNames) {
+                    return template(`
+                        <div class="${classNames.list} ${classNames.listDropdown}"  style="position: relative; ">
+                            <div class="${classNames.searchWrapper}">
+                                <input type="search" class="${classNames.input} ${classNames.inputCloned}" autocomplete="off" autocapitalize="off" spellcheck="false"  aria-autocomplete="list">
+                            </div>
+                            <div class="${classNames.list}"></div>
+                        </div>
+                    `);
+                },
+                choice: function(classNames, data) {
+                    return template(`
+                        <div class="${classNames.item} ${classNames.itemChoice} ${data.disabled ? classNames.itemDisabled : classNames.itemSelectable}" 
+                            data-select-text="${data.selectable ? 'Press to select' : ''}"
+                            data-choice ${data.disabled ? 'data-choice-disabled aria-disabled="true"' : 'data-choice-selectable'}
+                            data-id="${data.id}"
+                            data-value="${data.value}"
+                            role="option">
+                            ${data.label}
+                        </div>
+                    `);
+                }
+            };
+        }
+    }); 
   });
 </script>
 {% endblock extra_js %}
+
+
+{% block extra_css %}
+{{ block.super }}
+<link href="/static/assets/css/choices.min.css" rel="stylesheet" />
+{% endblock extra_css %}
