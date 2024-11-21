@@ -214,9 +214,15 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Initializing WebSocket connection to:', wsPath);
         
         try {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                console.log('WebSocket already connected');
+                return;
+            }
+            
             if (socket) {
                 console.log('Closing existing socket connection');
                 socket.close();
+                socket = null;
             }
             
             socket = new WebSocket(wsPath);
@@ -239,6 +245,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             socket.onclose = function(event) {
                 console.log('WebSocket connection closed:', event.code, event.reason);
+                if (!socket) {
+                    // Don't reconnect if socket was intentionally closed
+                    return;
+                }
                 updateConnectionStatus('Disconnected - Retrying...', true);
                 sendButton.classList.add('disabled');
                 setTimeout(initializeWebSocket, 5000);
@@ -401,11 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset the message input
         messageInput.value = '';
         
-        // Generate new session ID and reinitialize WebSocket
-        socket.close();
-        initializeWebSocket();
-        
-        // Show success notification using SweetAlert2
+        // Don't close and reopen socket, just clear the chat
         Swal.fire({
             icon: 'success',
             title: 'New Chat Started',
@@ -428,6 +434,51 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error('New chat button not found');
     }
+
+    // Add connection state tracking
+    let isReconnecting = false;
+
+    // Add connection management functions
+    function closeWebSocket() {
+        if (socket) {
+            socket.onclose = null; // Prevent auto-reconnect
+            socket.close();
+            socket = null;
+        }
+    }
+
+    function reconnectWebSocket() {
+        if (!isReconnecting) {
+            isReconnecting = true;
+            closeWebSocket();
+            setTimeout(() => {
+                initializeWebSocket();
+                isReconnecting = false;
+            }, 1000);
+        }
+    }
+
+    // Update the DOMContentLoaded event listener to include connection management
+    document.addEventListener('DOMContentLoaded', function() {
+        // ... existing initialization code ...
+
+        // Add visibility change handler
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                if (!socket || socket.readyState !== WebSocket.OPEN) {
+                    reconnectWebSocket();
+                }
+            }
+        });
+
+        // Add beforeunload handler
+        window.addEventListener('beforeunload', function() {
+            closeWebSocket();
+        });
+
+        // Initialize WebSocket
+        initializeWebSocket();
+    });
 });
 
 // Initialize tooltips

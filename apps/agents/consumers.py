@@ -425,41 +425,44 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if not message or not message.strip():
                     raise ValueError("Empty or invalid input message")
 
-                # Execute the agent using invoke instead of run
+                # Execute the agent with timeout
                 response = await asyncio.wait_for(
                     database_sync_to_async(agent_executor.invoke)(
                         {"input": message},
                         callbacks=[self._create_callback_handler()]
                     ),
-                    timeout=30
+                    timeout=60  # Increased timeout
                 )
                 
                 logger.debug(f"Raw agent response: {response}")
                 
-                # Process the response to extract output
+                # Process the response
                 if isinstance(response, dict):
-                    # Handle dictionary response
                     if response.get('output'):
                         return response['output']
+                    elif response.get('error'):
+                        raise ValueError(response['error'])
                 
                 # If we get here, we didn't get a valid response
                 raise ValueError("Invalid or empty response from agent")
                 
             except asyncio.TimeoutError:
                 logger.error(f"Agent execution timed out on attempt {attempt + 1}")
-                await asyncio.sleep(1)
                 if attempt == max_retries - 1:
-                    return "I apologize, but the request timed out. Please try again with a simpler query."
+                    return "I apologize, but I was unable to complete the analysis in time. Please try a more specific question or break your request into smaller parts."
+                await asyncio.sleep(1)
                 
             except Exception as e:
                 last_error = e
                 logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}", exc_info=True)
-                await asyncio.sleep(1)
-                
                 if attempt == max_retries - 1:
-                    return f"I apologize, but I encountered an error: {str(last_error)}"
+                    # Provide a helpful response even on failure
+                    return ("I encountered some limitations with the data analysis. Try asking the question in a different way.")
+
+                await asyncio.sleep(1)
         
-        return f"I apologize, but I encountered an error: {str(last_error)}"
+        return ("I apologize, but I'm having trouble accessing some of the data. "
+                "Please try rephrasing your question or focusing on specific metrics.")
 
     async def _handle_response(self, response, agent_id, model_name):
         """Handle the agent's response"""
@@ -523,11 +526,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 input_key="input"
             )
 
-            # Get tool names and descriptions for the prompt
+            # Get tool names and descriptions BEFORE using them
             tool_names = [tool.name for tool in tools]
             tool_descriptions = [f"{tool.name}: {tool.description}" for tool in tools]
 
-            # Create prompt with required variables and proper tool format instructions
+            # Create prompt with required variables
             prompt = ChatPromptTemplate.from_messages([
                 ("system", """
 {system_prompt}
@@ -537,61 +540,48 @@ You have access to the following tools:
 
 Tool Names: {tool_names}
 
-IMPORTANT: Before using any tool, ALWAYS check your chat history for relevant information first.
-If the information you need is already in the chat history, use that instead of making a new tool call.
+IMPORTANT INSTRUCTIONS:
+1. If a tool call fails, try a simpler version of the query
+2. If multiple tool calls fail, return a helpful message explaining the limitation
+3. Always provide a clear response even if data is limited
+4. Never give up without providing some useful information
+5. Keep responses focused and concise
 
 To use a tool, respond with:
 {{"action": "tool_name", "action_input": {{"param1": "value1", "param2": "value2"}}}}
 
 For final responses, use:
 {{"action": "Final Answer", "action_input": "your response here"}}
-
-When you receive tool output:
-1. Format the data into a clear, readable response
-2. Use the Final Answer format to return your formatted response
-3. Always convert technical data into human-readable text
-4. Save important data points in your memory for future reference
-
-Remember:
-1. CHECK CHAT HISTORY FIRST before making tool calls
-2. Always use valid JSON format
-3. Tool parameters must match exactly what the tool expects
-4. Don't include code blocks or print statements
-5. Use the exact tool name from the Tool Names list
 """),
                 ("human", "{input}"),
                 ("ai", "{agent_scratchpad}"),
                 ("system", "Previous conversation:\n{chat_history}")
             ])
 
-            # Create the agent with specific output parser
+            # Create the agent with properly defined variables
             agent = create_structured_chat_agent(
                 llm=llm,
                 tools=tools,
                 prompt=prompt.partial(
                     system_prompt=self._create_agent_prompt(agent, client_data),
-                    tools="\n".join(tool_descriptions),
-                    tool_names=", ".join(tool_names)
+                    tools="\n".join(tool_descriptions),  # Now tool_descriptions is defined
+                    tool_names=", ".join(tool_names)     # Now tool_names is defined
                 )
             )
 
-            # Create agent executor with proper configuration for stopping
+            # Create agent executor with proper error handling
             return AgentExecutor(
                 agent=agent,
                 tools=tools,
                 memory=memory,
                 verbose=True,
-                max_iterations=3,
-                early_stopping_method="force",
+                max_iterations=5,
+                max_execution_time=60,
+                early_stopping_method="generate",
                 handle_parsing_errors=True,
                 return_intermediate_steps=False,
-                max_execution_time=None,
                 output_key="output",
-                input_key="input",
-                agent_kwargs={
-                    "handle_parsing_errors": True,
-                    "memory_prompts": ["{chat_history}"]
-                }
+                input_key="input"
             )
             
         except Exception as e:
