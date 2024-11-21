@@ -1,6 +1,6 @@
 import json
 import logging
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Client, GoogleAnalyticsCredentials, SearchConsoleCredentials
@@ -20,26 +20,63 @@ def client_analytics(request, client_id):
     ga_credentials = get_object_or_404(GoogleAnalyticsCredentials, client=client)
     sc_credentials = get_object_or_404(SearchConsoleCredentials, client=client)
     
-    # Set date range to end yesterday
-    end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=29)).strftime('%Y-%m-%d')  # 28 days before end_date
+    # Get separate date ranges for GA and SC
+    ga_range = request.GET.get('ga_range', '30')  # Changed from 'range' to 'ga_range'
+    sc_range = request.GET.get('sc_range', '30')
+    
+    # Calculate GA dates
+    ga_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    if ga_range == 'custom':
+        ga_start_date = request.GET.get('ga_start_date')  # Changed from 'start_date'
+        ga_end_date = request.GET.get('ga_end_date')      # Changed from 'end_date'
+        if not ga_start_date or not ga_end_date:
+            messages.error(request, "Invalid GA date range provided")
+            return redirect('seo_manager:client_analytics', client_id=client_id)
+    else:
+        try:
+            days = int(ga_range)
+            ga_start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        except ValueError:
+            messages.error(request, "Invalid GA date range")
+            return redirect('seo_manager:client_analytics', client_id=client_id)
+
+    # Calculate SC dates
+    sc_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    if sc_range == 'custom':
+        sc_start_date = request.GET.get('sc_start_date')
+        sc_end_date = request.GET.get('sc_end_date')
+        if not sc_start_date or not sc_end_date:
+            messages.error(request, "Invalid SC date range provided")
+            return redirect('seo_manager:client_analytics', client_id=client_id)
+    else:
+        try:
+            days = int(sc_range)
+            sc_start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        except ValueError:
+            messages.error(request, "Invalid SC date range")
+            return redirect('seo_manager:client_analytics', client_id=client_id)
     
     context = {
         'client': client,
         'analytics_data': None,
         'search_console_data': None,
-        'start_date': start_date,
-        'end_date': end_date,
+        'ga_start_date': ga_start_date,
+        'ga_end_date': ga_end_date,
+        'sc_start_date': sc_start_date,
+        'sc_end_date': sc_end_date,
+        'selected_ga_range': ga_range,    # Changed from 'selected_range'
+        'selected_sc_range': sc_range,
     }
 
-    # Try to get Google Analytics data
+    # Update GA data fetch to use GA-specific dates
     try:
         logger.info("Fetching data using GoogleAnalyticsTool")
         ga_tool = GoogleAnalyticsTool()
         
         analytics_data = ga_tool._run(
-            start_date=start_date,
-            end_date=end_date,
+            start_date=ga_start_date,
+            end_date=ga_end_date,
             client_id=client_id
         )
         
@@ -60,19 +97,17 @@ def client_analytics(request, client_id):
         logger.error(f"Error fetching GA data: {str(e)}", exc_info=True)
         messages.warning(request, "Unable to fetch Google Analytics data.")
 
-    # Try to get Search Console data
+    # Update SC data fetch to use SC-specific dates
     try:
         search_console_service = sc_credentials.get_service()
         if search_console_service:
-            # Get properly parsed property URL
             property_url = sc_credentials.get_property_url()
             if property_url:
-                logger.info(f"Using Search Console property URL: {property_url}")
                 search_console_data = get_search_console_data(
                     search_console_service, 
                     property_url,
-                    start_date, 
-                    end_date
+                    sc_start_date,  # Use SC-specific date
+                    sc_end_date     # Use SC-specific date
                 )
                 context['search_console_data'] = search_console_data
             else:
