@@ -4,6 +4,7 @@ from . import views_agents
 from . import views_tasks
 from . import views_tools
 from . import views_crews
+from . import views_kanban
 from .views_chat import ChatView
 
 
@@ -13,6 +14,7 @@ urlpatterns = [
     path('', views.crewai_home, name='crewai_home'),
     path('crews/', views.crew_list, name='crew_list'),
     path('crew/<int:crew_id>/', views.crew_detail, name='crew_detail'),
+    path('crew/<int:crew_id>/kanban/', views_kanban.crew_kanban, name='crew_kanban'),
     path('executions/', views.execution_list, name='execution_list'),
     path('execution/<int:execution_id>/', views.execution_detail, name='execution_detail'),
     path('execution/<int:execution_id>/status/', views.execution_status, name='execution_status'),

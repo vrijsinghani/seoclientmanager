@@ -1,0 +1,299 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %} Crew Kanban {% endblock %}
+
+{% block extra_css %}
+<!-- jKanban styles -->
+<link rel="stylesheet" href="{% static 'assets/css/plugins/jkanban/jkanban.min.css' %}"/>
+<style>
+.kanban-container {
+  padding: 20px;
+  display: flex;
+  overflow-x: auto;
+}
+
+.kanban-board {
+  background: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  margin: 0 15px;
+  min-width: 320px;
+  max-width: 320px;
+}
+
+.kanban-board-header {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  padding: 15px;
+}
+
+.kanban-title-board {
+  color: #fff;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+}
+
+.kanban-drag {
+  min-height: 200px;
+  padding: 20px;
+}
+
+.kanban-item {
+  background: #fff;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  cursor: default;
+}
+
+.kanban-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+/* Board colors */
+.task-start { background: linear-gradient(310deg, #627594, #a8b8d8); }
+.thinking { background: linear-gradient(310deg, #2152ff, #21d4fd); }
+.tool-usage { background: linear-gradient(310deg, #17c1e8, #94e2cd); }
+.tool-results { background: linear-gradient(310deg, #82d616, #98ec2d); }
+.human-input { background: linear-gradient(310deg, #fbcf33, #ffd977); }
+.completion { background: linear-gradient(310deg, #48484a, #82829b); }
+
+.task-header {
+  margin-bottom: 10px;
+}
+
+.task-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+}
+
+.task-content {
+  font-size: 0.8125rem;
+  color: #344767;
+}
+
+.alert {
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+  font-size: 0.75rem;
+}
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <!-- Crew Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header pb-0">
+          <div class="d-flex justify-content-between">
+            <h6 class="mb-0">SEO Research Tasks</h6>
+            <button type="button" class="btn btn-sm bg-gradient-primary" data-bs-toggle="modal" data-bs-target="#startExecutionModal">
+              Start New Execution
+            </button>
+          </div>
+          <p class="text-sm mb-0">
+            <span class="font-weight-bold">Crew:</span> {{ crew.name }}
+            <span class="ms-3 badge bg-gradient-success">Active</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Boards -->
+  <div class="row">
+    <div class="col-12">
+      <div class="kanban-container" id="kanban-tasks">
+        {% for task in tasks %}
+        <!-- Task Board -->
+        <div class="kanban-board">
+          <header class="kanban-board-header {% if task.status == 'completed' %}completion{% else %}task-start{% endif %}">
+            <div class="kanban-title-board">{{ task.name }}</div>
+          </header>
+          <main class="kanban-drag">
+            <!-- Task Start -->
+            {% if task.stages.task_start %}
+            <div class="kanban-item">
+              <div class="task-header">
+                <div class="task-title">
+                  <i class="ni ni-check-bold me-2"></i>
+                  Task Start
+                </div>
+              </div>
+              <div class="task-content">
+                <h6 class="mb-1">{{ task.stages.task_start.title }}</h6>
+                <p class="mb-2">{{ task.stages.task_start.content }}</p>
+                <span class="badge bg-gradient-info">{{ task.stages.task_start.agent }}</span>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Thinking -->
+            {% if task.stages.thinking %}
+            <div class="kanban-item">
+              <div class="task-header">
+                <div class="task-title">
+                  <i class="ni ni-bulb-61 me-2"></i>
+                  Thinking
+                </div>
+              </div>
+              <div class="task-content">
+                <h6 class="mb-1">{{ task.stages.thinking.title }}</h6>
+                <p class="mb-2">{{ task.stages.thinking.content }}</p>
+                <div class="alert alert-info">{{ task.stages.thinking.thought_process }}</div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Tool Usage -->
+            {% if task.stages.tool_usage %}
+            <div class="kanban-item">
+              <div class="task-header">
+                <div class="task-title">
+                  <i class="ni ni-settings me-2"></i>
+                  Tool Usage
+                </div>
+              </div>
+              <div class="task-content">
+                <h6 class="mb-1">{{ task.stages.tool_usage.title }}</h6>
+                <p class="mb-2">Tool: {{ task.stages.tool_usage.tool }}</p>
+                <div class="alert alert-secondary">Input: {{ task.stages.tool_usage.input }}</div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Tool Results -->
+            {% if task.stages.tool_results %}
+            <div class="kanban-item">
+              <div class="task-header">
+                <div class="task-title">
+                  <i class="ni ni-chart-bar-32 me-2"></i>
+                  Tool Results
+                </div>
+              </div>
+              <div class="task-content">
+                <h6 class="mb-1">{{ task.stages.tool_results.title }}</h6>
+                <p class="mb-2">Tool: {{ task.stages.tool_results.tool }}</p>
+                <div class="alert alert-success">{{ task.stages.tool_results.result }}</div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Human Input -->
+            {% if task.stages.human_input %}
+            <div class="kanban-item">
+              <div class="task-header">
+                <div class="task-title">
+                  <i class="ni ni-single-02 me-2"></i>
+                  Human Input
+                </div>
+              </div>
+              <div class="task-content">
+                <h6 class="mb-1">{{ task.stages.human_input.title }}</h6>
+                <p class="mb-2">{{ task.stages.human_input.prompt }}</p>
+                <div class="alert alert-warning">{{ task.stages.human_input.context }}</div>
+                <button class="btn btn-sm btn-outline-primary mt-2" onclick="showInputModal('{{ task.id }}')">
+                  Provide Input
+                </button>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Completion -->
+            {% if task.stages.completion %}
+            <div class="kanban-item">
+              <div class="task-header">
+                <div class="task-title">
+                  <i class="ni ni-trophy me-2"></i>
+                  Completion
+                </div>
+              </div>
+              <div class="task-content">
+                <h6 class="mb-1">{{ task.stages.completion.title }}</h6>
+                <p class="mb-2">{{ task.stages.completion.output }}</p>
+                <div class="alert alert-dark">{{ task.stages.completion.reasoning }}</div>
+              </div>
+            </div>
+            {% endif %}
+          </main>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Start Execution Modal -->
+<div class="modal fade" id="startExecutionModal" tabindex="-1" role="dialog" aria-labelledby="startExecutionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="startExecutionModalLabel">Start New Execution</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to start a new execution?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn bg-gradient-primary" onclick="startExecution()">Start</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Human Input Modal -->
+<div class="modal fade" id="humanInputModal" tabindex="-1" role="dialog" aria-labelledby="humanInputModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="humanInputModalLabel">Provide Input</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <textarea class="form-control" id="humanInputText" rows="4" placeholder="Enter your input here..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn bg-gradient-primary" onclick="submitHumanInput()">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+let activeCardId = null;
+
+function showInputModal(taskId) {
+  activeCardId = taskId;
+  const modal = new bootstrap.Modal(document.getElementById('humanInputModal'));
+  modal.show();
+}
+
+function submitHumanInput() {
+  const response = document.getElementById('humanInputText').value;
+  console.log('Submitting input:', response, 'for task:', activeCardId);
+  const modal = bootstrap.Modal.getInstance(document.getElementById('humanInputModal'));
+  modal.hide();
+}
+
+function startExecution() {
+  console.log('Starting execution');
+  const modal = bootstrap.Modal.getInstance(document.getElementById('startExecutionModal'));
+  modal.hide();
+}
+</script>
+{% endblock extra_js %}

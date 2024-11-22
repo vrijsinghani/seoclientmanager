@@ -289,6 +289,7 @@ def initialize_crew(execution):
     for field in llm_fields:
         value = getattr(execution.crew, field)
         if value:
+            logger.debug(f"Using LLM: {value}")
             crew_llm, _ = get_llm(value)
             crew_params[field] = crew_llm
 
@@ -558,30 +559,45 @@ def detailed_step_callback(event: Union[AgentAction, AgentFinish], execution_id)
         event (Union[AgentAction, AgentFinish]):  Either an AgentAction (if a tool was used) or an AgentFinish (if the agent completed its task).
         execution_id (int): ID of the crew execution
     """
-    execution = CrewExecution.objects.get(id=execution_id)
-    if isinstance(event, AgentAction):
-        logger.info(f"Detailed step callback: Action - {event.tool}, Input - {event.tool_input}, Thought - {event.thought}")
-    elif isinstance(event, AgentFinish):
-        logger.info(f"Detailed step callback: Final Answer - {event.output}, Reasoning - {event.reasoning}")
-    else:
-        logger.info(f"Detailed step callback: Unknown event type - {event}")
+    try:
+        execution = CrewExecution.objects.get(id=execution_id)
+        
+        # Log based on event type
+        if isinstance(event, AgentAction):
+            logger.info(f"Detailed step callback: Action - {event.tool}, Input - {event.tool_input}, Thought - {event.thought}")
+        elif isinstance(event, AgentFinish):
+            logger.info(f"Detailed step callback: Final Answer - {event.output}, Reasoning - {event.reasoning}")
+        else:
+            logger.info(f"Detailed step callback: Unknown event type - {type(event)}")
 
-    # Extract agent role from the event text
-    # Extract agent role safely
-    role_parts = event.text.split("Role:")
-    agent_role = role_parts[1].split("\n")[0].strip() if len(role_parts) > 1 else "Agent"
+        # Default agent role
+        agent_role = "Agent"
+        
+        # Try to extract agent role from event attributes
+        try:
+            if hasattr(event, 'text'):
+                text = str(event.text) if event.text is not None else ""
+                if "Role:" in text:
+                    role_parts = text.split("Role:")
+                    if len(role_parts) > 1:
+                        agent_role = role_parts[1].split("\n")[0].strip()
+        except Exception as e:
+            logger.debug(f"Could not extract role from event: {e}")
 
-    content = f"Agent '{agent_role}' step callback triggered."  # Include agent role
+        # Build content based on event type
+        content = f"Agent '{agent_role}' step callback triggered."
 
-    if isinstance(event, AgentAction):
-        content += f"\n Thought: {event.thought}"
-        content += f"\n Action: {event.tool}"
-        content += f"\n Action Input: {event.tool_input}"
-        content += f"\n Tool Output: {event.result}"
-    elif isinstance(event, AgentFinish):
-        content += f"\n Final Answer: {event.output}"
+        if isinstance(event, AgentAction):
+            content += f"\n Thought: {getattr(event, 'thought', 'No thought provided')}"
+            content += f"\n Action: {getattr(event, 'tool', 'No tool specified')}"
+            content += f"\n Action Input: {getattr(event, 'tool_input', 'No input provided')}"
+            content += f"\n Tool Output: {getattr(event, 'result', 'No result available')}"
+        elif isinstance(event, AgentFinish):
+            content += f"\n Final Answer: {getattr(event, 'output', 'No output provided')}"
 
-    log_crew_message(execution, content, agent='Step Callback')  # Log the complete content
+        log_crew_message(execution, content, agent='Step Callback')
+    except Exception as e:
+        logger.error(f"Error in detailed_step_callback: {e}", exc_info=True)
 
 from crewai.tools.tool_usage_events import ToolUsageError
 from crewai.utilities.events import on
@@ -607,4 +623,3 @@ def tool_error_callback(source, event: ToolUsageError):
     
     log_crew_message(execution, error_message, agent='Tool Error Callback')
     logger.error(error_message)
-
