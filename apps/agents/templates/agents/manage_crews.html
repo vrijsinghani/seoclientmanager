@@ -54,14 +54,14 @@
                 <tr>
                   <td>
                     <div class="d-flex px-2 py-1">
-                      <div>
-                        <img src="{% static 'assets/img/team-2.jpg' %}" class="avatar avatar-sm me-3" alt="user1">
-                      </div>
                       <div class="d-flex flex-column justify-content-center">
-                        <h6 class="mb-0 text-sm">{{ crew.name }}</h6>
+                        <h6 class="mb-0 text-sm">
+                          <a href="{% url 'agents:crew_kanban' crew.id %}{% if selected_client %}?client_id={{ selected_client.id }}{% endif %}" class="text-dark font-weight-bold">
+                            {{ crew.name }}
+                          </a>
+                        </h6>
                         <p class="text-xs text-secondary mb-0">{{ crew.description|truncatechars:50 }}</p>
                       </div>
-                    </div>
                   </td>
                   <td>
                     <p class="text-xs font-weight-bold mb-0">{{ crew.get_process_display }}</p>

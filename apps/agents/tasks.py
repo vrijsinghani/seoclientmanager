@@ -1,5 +1,6 @@
 from celery import shared_task
-from .models import CrewExecution, Tool, CrewMessage, Task, Agent as AgentModel, CrewOutput, CrewTask
+import json
+from .models import CrewExecution, Tool, CrewMessage, Task, Agent as AgentModel, CrewOutput, CrewTask, ExecutionStage
 from apps.seo_manager.models import Client, GoogleAnalyticsCredentials, SearchConsoleCredentials
 from crewai import Crew, Agent, Task as CrewAITask
 from langchain.tools import BaseTool
@@ -32,6 +33,7 @@ from datetime import datetime
 from crewai.agents.parser import AgentAction, AgentFinish
 from crewai.project import callback
 from typing import Union
+import traceback
 
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()   
@@ -62,7 +64,7 @@ def load_tool_in_task(tool_model):
 def custom_input_handler(prompt, execution_id):
     logger.debug(f"Custom input handler called for execution {execution_id} with prompt: {prompt}")
     execution = CrewExecution.objects.get(id=execution_id)
-    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
+    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT', task_id=None)
     log_crew_message(execution, prompt or "Input required", agent='Human Input Requested', human_input_request=prompt or "Input required")
     
     input_key = f'human_input_request_{execution_id}'
@@ -92,7 +94,7 @@ def custom_input_handler(prompt, execution_id):
             cache.delete(response_key)
             
             log_crew_message(execution, f"Received human input: {user_input}", agent='Human')
-            update_execution_status(execution, 'RUNNING')
+            update_execution_status(execution, 'RUNNING', task_id=None)
             
             return user_input
        
@@ -152,73 +154,46 @@ def stdout_monitor(custom_stdout):
 
 @shared_task(bind=True)
 def execute_crew(self, execution_id):
-    logger.debug(f"Attempting to start crew execution for id: {execution_id} (task_id: {self.request.id})")
-    
-    # Try to acquire a lock
-    lock_id = f'crew_execution_lock_{execution_id}'
-    if not cache.add(lock_id, 'locked', timeout=3600):  # 1 hour timeout
-        logger.warning(f"Execution {execution_id} is already in progress. Skipping this task.")
-        return
-    
+    """Execute a crew with the given execution ID"""
     try:
-        logger.debug(f"Starting crew execution for id: {execution_id} (task_id: {self.request.id})")
         execution = CrewExecution.objects.get(id=execution_id)
+        logger.debug(f"Attempting to start crew execution for id: {execution_id} (task_id: {self.request.id})")
         
-        # Store the original input function
-        original_input = builtins.input
+        # Create initial stage
+        ExecutionStage.objects.create(
+            execution=execution,
+            stage_type='task_start',
+            title='Starting Execution',
+            content=f'Starting execution for crew: {execution.crew.name}',
+            status='completed'
+        )
         
-        def custom_input_wrapper(prompt=''):
-            return custom_input_handler(prompt, execution_id)
+        # Update execution status to PENDING
+        update_execution_status(execution, 'PENDING', task_id=self.request.id)
         
-        # Replace the input function with our custom wrapper
-        builtins.input = custom_input_wrapper
+        logger.debug(f"Starting crew execution for id: {execution_id} (task_id: {self.request.id})")
         
-        log_crew_message(execution, f"Starting execution for crew: {execution.crew.name}")
+        # Initialize crew
+        crew = initialize_crew(execution)
+        if not crew:
+            raise ValueError("Failed to initialize crew")
+            
+        # Run crew
+        result = run_crew(self.request.id, crew, execution)
         
-        with capture_stdout(execution_id, send_to_original_stdout=True, send_to_websocket=True) as custom_stdout:
-            # Start the stdout monitor in a separate thread
-            monitor_thread = threading.Thread(target=stdout_monitor, args=(custom_stdout,))
-            monitor_thread.daemon = True
-            monitor_thread.start()
-
-            try:
-                crew = initialize_crew(execution)
-                result = run_crew(self.request.id, crew, execution)
-                if result == "Execution cancelled by user":
-                    update_execution_status(execution, 'CANCELLED')
-                    return execution.id
-                update_execution_status(execution, 'COMPLETED', result)
-                
-                # Convert UsageMetrics to a dictionary
-                token_usage = result.token_usage.dict() if hasattr(result.token_usage, 'dict') else result.token_usage
-
-                CrewOutput.objects.create(
-                    execution=execution,
-                    raw=str(result),
-                    pydantic=result.pydantic.dict() if result.pydantic else None,
-                    json_dict=result.json_dict,
-                    token_usage=token_usage
-                )
-                
-                # Save the result to a file
-                save_result_to_file(execution, result)
-                
-                log_message = f"Crew execution completed successfully. Output: {result}"
-                
-                log_crew_message(execution, log_message, agent="System")
-                log_message = f"Token Usage: {token_usage}"
-                log_crew_message(execution, log_message, agent="System")
-            except Exception as e:
-                handle_execution_error(execution, e)
-            finally:
-                # Restore the original input function
-                builtins.input = original_input
-    finally:
-        # Release the lock
-        cache.delete(lock_id)
-
-    logger.debug(f"Execution completed for CrewExecution id: {execution_id}")
-    return execution.id
+        # Save the result and update execution status to COMPLETED
+        if result:
+            log_crew_message(execution, str(result), agent='System', task_id=self.request.id)
+        update_execution_status(execution, 'COMPLETED', task_id=self.request.id)
+        
+        return execution.id
+        
+    except Exception as e:
+        logger.error(f"Error during crew execution: {str(e)}")
+        if 'execution' in locals():
+            handle_execution_error(execution, e, task_id=getattr(self, 'request', None) and self.request.id)
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise
 
 def save_result_to_file(execution, result):
     timestamp = datetime.now().strftime("%y-%m-%d-%H-%M")
@@ -308,24 +283,36 @@ def initialize_crew(execution):
 
 
 def run_crew(task_id, crew, execution):
-    log_crew_message(execution, f"Running crew")
-    inputs = execution.inputs or {}
-    inputs["execution_id"] = execution.id
-    inputs["current_date"] = datetime.now().strftime("%Y-%m-%d")
-    client = get_object_or_404(Client, id=execution.client_id)
-    # Directly create flattened client inputs
-    inputs["client_id"] = client.id
-    inputs["client_name"] = client.name
-    inputs["client_website_url"] = client.website_url
-    inputs["client_business_objectives"] = client.business_objectives
-    inputs["client_target_audience"] = client.target_audience
-    inputs["client_profile"] = client.client_profile
-
-    logger.info(f"Crew inputs: {inputs}")
-    logger.info(f"Crew process type: {execution.crew.process}")
-    update_execution_status(execution, 'RUNNING')
-
+    """Run a crew and handle execution stages and status updates"""
     try:
+        # Update to running status
+        update_execution_status(execution, 'RUNNING', task_id=task_id)
+        
+        # Create execution stage for running
+        ExecutionStage.objects.create(
+            execution=execution,
+            stage_type='task_running',
+            title='Running Crew',
+            content=f'Executing crew tasks for: {execution.crew.name}',
+            status='running'
+        )
+        
+        # Get crew inputs
+        inputs = {
+            'client_id': execution.client_id,
+            'execution_id': execution.id,
+            'current_date': datetime.now().strftime("%Y-%m-%d"),
+            'client_name': execution.client.name,
+            'client_website_url': execution.client.website_url,
+            'client_business_objectives': execution.client.business_objectives,
+            'client_target_audience': execution.client.target_audience,
+            'client_profile': execution.client.client_profile,
+        }
+        
+        logger.info(f"Crew inputs: {inputs}")
+        logger.info(f"Crew process type: {execution.crew.process}")
+        
+        # Run the crew based on process type
         if execution.crew.process == 'sequential':
             logger.debug("Starting sequential crew execution")
             result = crew.kickoff(inputs=inputs)
@@ -345,10 +332,37 @@ def run_crew(task_id, crew, execution):
             result = crew.kickoff_for_each_async(inputs=inputs_array)
         else:
             raise ValueError(f"Unknown process type: {execution.crew.process}")
-
+        
+        # Create completion stage
+        ExecutionStage.objects.create(
+            execution=execution,
+            stage_type='task_complete',
+            title='Execution Complete',
+            content=str(result),
+            status='completed'
+        )
+        
+        # Create CrewOutput
+        crew_output = CrewOutput.objects.create(
+            raw=str(result),
+            json_dict=result if isinstance(result, dict) else None
+        )
+        
+        # Update execution with output
+        execution.crew_output = crew_output
+        execution.save()
+        
         return result
+        
     except Exception as e:
-        logger.error(f"Error during crew execution: {str(e)}", exc_info=True)
+        # Create error stage
+        ExecutionStage.objects.create(
+            execution=execution,
+            stage_type='task_error',
+            title='Execution Error',
+            content=str(e),
+            status='error'
+        )
         raise
 
 def create_crewai_agents(agent_models, execution_id):
@@ -405,7 +419,7 @@ def create_crewai_agents(agent_models, execution_id):
 
 def human_input_handler(prompt, execution_id):
     execution = CrewExecution.objects.get(id=execution_id)
-    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT')
+    update_execution_status(execution, 'WAITING_FOR_HUMAN_INPUT', task_id=None)
     log_crew_message(execution, f"Human input required: {prompt}", agent='Human Input Requested', human_input_request=prompt)
     
     input_key = f"human_input_{execution_id}_{prompt[:20]}"
@@ -437,6 +451,10 @@ def create_crewai_tasks(task_models, agents, execution):
     for task_model in task_models:
         logger.debug(f"Creating CrewAITask for task: {task_model.id}-{task_model.description}-{task_model.agent_id}-{agents}")
         try:
+            # Associate the Task with the CrewExecution
+            task_model.crew_execution = execution
+            task_model.save()
+
             crewai_agent = next((agent for agent in agents if agent.role == AgentModel.objects.get(id=task_model.agent_id).role), None)
             if not crewai_agent:
                 logger.warning(f"No matching CrewAI agent found for task {task_model.id}")
@@ -455,7 +473,8 @@ def create_crewai_tasks(task_models, agents, execution):
                 'async_execution': task_model.async_execution,
                 'human_input': task_model.human_input,
                 'tools': task_tools,
-                'execution_id': execution.id  # Add this line
+                'execution_id': execution.id,
+                'crewai_task_id': task_model.id  # Use this for kanban board placement
             }
             logger.info(f"Task dict: {task_dict}")
             optional_fields = ['output_json', 'output_pydantic', 'converter_cls']
@@ -487,62 +506,124 @@ def create_crewai_tasks(task_models, agents, execution):
             logger.error(f"Error creating CrewAITask for task {task_model.id}: {str(e)}", exc_info=True)
     return tasks
 
-def step_callback(step_output, execution_id):
-    logger.info(f"Step callback: {step_output}")
-    execution = CrewExecution.objects.get(id=execution_id)
-    log_crew_message(execution, f"Step callback: {step_output}", agent='Interim Step')
-
 def task_callback(task_output: TaskOutput, execution_id):
-    execution = CrewExecution.objects.get(id=execution_id)
-    log_message = f"Task callback:\n{task_output.raw}"
-    agent = task_output.agent
-    if task_output.raw:
-        log_crew_message(execution, log_message, agent=agent)
-
-def update_execution_status(execution, status, result=None):
-    execution.status = status
-    if result:
-        if isinstance(result, dict) and 'final_output' in result:
-            execution.outputs = {
-                'final_output': result['final_output'],
-                'tasks_outputs': result.get('tasks_outputs', [])
-            }
-        else:
-            execution.outputs = {'final_output': str(result)}
-    execution.save()
-
-    async_to_sync(channel_layer.group_send)(
-        f'crew_execution_{execution.id}',
-        {
-            'type': 'crew_execution_update',
-            'status': status,
-            'messages': []
-        }
-    )
-
-def log_crew_message(execution, content, agent=None, human_input_request=None):
-    if content:  # Only create a message if there's content
-        message = CrewMessage.objects.create(execution=execution, content=content, agent=agent)
+    """Handle task output callbacks"""
+    try:
+        execution = CrewExecution.objects.get(id=execution_id)
+        agent = task_output.agent
         
-        async_to_sync(channel_layer.group_send)(
-            f'crew_execution_{execution.id}',
-            {
-                'type': 'crew_execution_update',
+        # Get the CrewAI task ID from the task description
+        task = Task.objects.filter(
+            crew_execution=execution,
+            description=task_output.description
+        ).first()
+        
+        crewai_task_id = task.id if task else None
+        logger.info(f"Task output: {task_output}, CrewAI Task ID: {crewai_task_id}")
+        
+        if task_output.raw:
+            # Format as a proper execution update
+            message = {
+                'type': 'execution_update',
+                'execution_id': execution_id,
                 'status': execution.status,
-                'messages': [{'agent': message.agent or 'System', 'content': message.content}],
-                'human_input_request': human_input_request
+                'crewai_task_id': crewai_task_id,  # Use this for kanban board placement
+                'stage': {
+                    'stage_type': 'task_output',
+                    'title': f'Output from {agent or "System"}',
+                    'content': str(task_output.raw),
+                    'status': 'completed',
+                    'agent': agent
+                }
             }
-        )
-        
-        logger.debug(f"Sent message to WebSocket: {content[:100]}")
-    else:
-        logger.warning("Attempted to log an empty message, skipping.")
+            send_message_to_websocket(message)
+            
+            # Also log to database with CrewAI task ID
+            log_crew_message(execution, str(task_output.raw), agent=agent, task_id=crewai_task_id)
+            
+            # Create execution stage with CrewAI task ID
+            ExecutionStage.objects.create(
+                execution=execution,
+                stage_type='task_output',
+                title=f'Output from {agent or "System"}',
+                content=str(task_output.raw),
+                status='completed',
+                agent=AgentModel.objects.filter(role=agent).first() if agent else None,
+                crewai_task_id=crewai_task_id
+            )
+    except Exception as e:
+        logger.error(f"Error in task callback: {str(e)}")
 
-def handle_execution_error(execution, exception):
+def update_execution_status(execution, status, message=None, task_id=None):
+    """Update execution status and send WebSocket message"""
+    execution.status = status
+    execution.save()
+    
+    # Use the provided task_id if available, otherwise get the current task
+    crewai_task_id = task_id
+    if not crewai_task_id:
+        current_task = Task.objects.filter(crew_execution=execution).first()
+        crewai_task_id = current_task.id if current_task else None
+    
+    # Create properly formatted event
+    event = {
+        'type': 'execution_update',
+        'execution_id': execution.id,
+        'status': status,
+        'message': message,
+        'crewai_task_id': crewai_task_id,  # Use this for kanban board placement
+        'stage': {
+            'stage_type': 'status_update',
+            'title': 'Status Update',
+            'content': message or f'Status changed to {status}',
+            'status': status.lower(),
+            'agent': 'System'
+        }
+    }
+    
+    # Send WebSocket message with proper format
+    send_message_to_websocket(event)
+
+def log_crew_message(execution, content, agent=None, human_input_request=None, task_id=None):
+    try:
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"crew_execution_{execution.id}",
+                    {
+                        "type": "crew_execution_update",
+                        "status": execution.status,
+                        "messages": [{"agent": agent or "System", "content": content}],
+                        "human_input_request": human_input_request,
+                        "task_id": task_id
+                    }
+                )
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Failed to send WebSocket message after {max_retries} attempts: {str(e)}")
+                else:
+                    logger.warning(f"WebSocket send attempt {attempt + 1} failed, retrying in {retry_delay}s: {str(e)}")
+                    time.sleep(retry_delay)
+        
+        # Log message to database
+        if content:  # Only create a message if there's content
+            message = CrewMessage.objects.create(execution=execution, content=content, agent=agent)
+            
+            logger.debug(f"Sent message to WebSocket: {content[:100]}")
+        else:
+            logger.warning("Attempted to log an empty message, skipping.")
+    except Exception as e:
+        logger.error(f"Error in log_crew_message: {str(e)}")
+
+def handle_execution_error(execution, exception, task_id=None):
     logger.error(f"Error during crew execution: {str(exception)}", exc_info=True)
-    update_execution_status(execution, 'FAILED')
+    update_execution_status(execution, 'FAILED', task_id=task_id)
     error_message = f"Crew execution failed: {str(exception)}"
-    log_crew_message(execution, error_message, agent=None)
+    log_crew_message(execution, error_message, agent=None, task_id=task_id)
     execution.error_message = error_message
     execution.save()
 
@@ -551,53 +632,146 @@ def handle_execution_error(execution, exception):
     print("Full traceback:")
     traceback.print_exc()
 
-def detailed_step_callback(event: Union[AgentAction, AgentFinish], execution_id):
-    """
-    This callback is triggered after each step in an agent's execution.
+def detailed_step_callback(event, execution_id):
+    logger.info(f"Received event: {event}")
+    
+    # Extract event type
+    if isinstance(event, dict):
+        event_type = event.get('type')
+        logger.info(f"Event type from dict: {event_type}")
+    else:
+        event_type = getattr(event, 'type', None)
+        logger.info(f"Event type from object: {event_type}")
 
-    Args:
-        event (Union[AgentAction, AgentFinish]):  Either an AgentAction (if a tool was used) or an AgentFinish (if the agent completed its task).
-        execution_id (int): ID of the crew execution
-    """
-    try:
-        execution = CrewExecution.objects.get(id=execution_id)
-        
-        # Log based on event type
-        if isinstance(event, AgentAction):
-            logger.info(f"Detailed step callback: Action - {event.tool}, Input - {event.tool_input}, Thought - {event.thought}")
-        elif isinstance(event, AgentFinish):
-            logger.info(f"Detailed step callback: Final Answer - {event.output}, Reasoning - {event.reasoning}")
+    # Default values
+    stage_type = 'thinking'
+    title = 'Processing'
+    status = 'in_progress'
+    
+    # Extract content for logging
+    content = None
+    if isinstance(event, dict):
+        content = event.get('content', '')
+    else:
+        content = getattr(event, 'content', '')
+    
+    # Ensure content is never None and has meaningful information
+    if not content:
+        if isinstance(event, dict):
+            tool_name = event.get('tool', 'Unknown Tool')
+            tool_input = event.get('tool_input', '')
+            content = f"Tool: {tool_name}\nInput: {tool_input}"
         else:
-            logger.info(f"Detailed step callback: Unknown event type - {type(event)}")
-
-        # Default agent role
-        agent_role = "Agent"
+            tool_name = getattr(event, 'tool', 'Unknown Tool')
+            tool_input = getattr(event, 'tool_input', '')
+            content = f"Tool: {tool_name}\nInput: {tool_input}"
+            
+    logger.info(f"Event content: {content}")
         
-        # Try to extract agent role from event attributes
-        try:
-            if hasattr(event, 'text'):
-                text = str(event.text) if event.text is not None else ""
-                if "Role:" in text:
-                    role_parts = text.split("Role:")
-                    if len(role_parts) > 1:
-                        agent_role = role_parts[1].split("\n")[0].strip()
-        except Exception as e:
-            logger.debug(f"Could not extract role from event: {e}")
-
-        # Build content based on event type
-        content = f"Agent '{agent_role}' step callback triggered."
-
-        if isinstance(event, AgentAction):
-            content += f"\n Thought: {getattr(event, 'thought', 'No thought provided')}"
-            content += f"\n Action: {getattr(event, 'tool', 'No tool specified')}"
-            content += f"\n Action Input: {getattr(event, 'tool_input', 'No input provided')}"
-            content += f"\n Tool Output: {getattr(event, 'result', 'No result available')}"
-        elif isinstance(event, AgentFinish):
-            content += f"\n Final Answer: {getattr(event, 'output', 'No output provided')}"
-
-        log_crew_message(execution, content, agent='Step Callback')
+    # Detect tool usage from both dict and object formats
+    if isinstance(event, dict):
+        if event.get('tool'):
+            event_type = 'AgentAction'
+            logger.info("Detected tool usage from dict, setting event_type to AgentAction")
+    else:
+        if getattr(event, 'tool', None):
+            event_type = 'AgentAction'
+            logger.info("Detected tool usage from object, setting event_type to AgentAction")
+            
+    logger.info(f"Final event type after detection: {event_type}")
+        
+    # Map event types to stage types
+    if event_type == 'AgentStart':
+        stage_type = 'task_start'
+        title = 'Starting Task'
+        logger.info("Mapped event to task_start stage")
+        
+    elif event_type == 'AgentAction':
+        stage_type = 'tool_usage'
+        title = f'Using Tool: {event.get("tool", "Unknown Tool") if isinstance(event, dict) else getattr(event, "tool", "Unknown Tool")}'
+        logger.info("Mapped event to tool_usage stage")
+        
+    elif event_type == 'AgentToolResult':
+        stage_type = 'tool_results'
+        title = 'Tool Results'
+        logger.info("Mapped event to tool_results stage")
+        
+    elif event_type == 'HumanInputRequest':
+        stage_type = 'human_input'
+        title = 'Waiting for Human Input'
+        status = 'pending'
+        logger.info("Mapped event to human_input stage")
+        
+    elif event_type == 'AgentFinish':
+        stage_type = 'completion'
+        title = 'Task Complete'
+        status = 'completed'
+        logger.info("Mapped event to completion stage")
+    else:
+        logger.info(f"Using default thinking stage for event type: {event_type}")
+        
+    logger.info(f"Final stage mapping - Type: {stage_type}, Title: {title}, Status: {status}")
+    
+    try:
+        # Create or update stage
+        stage = ExecutionStage.objects.create(
+            execution_id=execution_id,
+            stage_type=stage_type,
+            title=title,
+            status=status,
+            content=content if content else f"Processing {stage_type} stage - {title}"  # Enhanced default content
+        )
+        logger.info(f"Successfully created stage: {stage.id} - {stage.stage_type}")
+        
+        # Send WebSocket message
+        message = {
+            'type': 'execution_update',  # Changed from 'stage_update' to 'execution_update'
+            'execution_id': execution_id,
+            'stage': {
+                'id': stage.id,
+                'stage_type': stage_type,
+                'title': title,
+                'status': status,
+                'content': content if content else f"Processing {stage_type} stage - {title}",
+                'agent': getattr(event, 'agent', None) if not isinstance(event, dict) else event.get('agent', None)
+            }
+        }
+        send_message_to_websocket(message)
+        logger.info(f"Sent WebSocket message for stage: {stage.id}")
+        
     except Exception as e:
-        logger.error(f"Error in detailed_step_callback: {e}", exc_info=True)
+        logger.error(f"Error creating/updating stage: {str(e)}", exc_info=True)
+
+def send_message_to_websocket(message):
+    """Send message to websocket"""
+    try:
+        # Get execution ID from message
+        execution_id = message.get('execution_id')
+        if not execution_id:
+            logger.error("No execution_id in message")
+            return
+
+        # Get crew ID from execution
+        try:
+            execution = CrewExecution.objects.get(id=execution_id)
+            crew_id = execution.crew.id
+        except CrewExecution.DoesNotExist:
+            logger.error(f"No execution found for ID {execution_id}")
+            return
+
+        # Add status if not present
+        if 'status' not in message:
+            message['status'] = execution.status
+
+        # Send message to websocket group
+        group_name = f'crew_{crew_id}_kanban'
+        async_to_sync(channel_layer.group_send)(
+            group_name,
+            message
+        )
+        logger.debug(f"Sent WebSocket message to group {group_name}: {message}")
+    except Exception as e:
+        logger.error(f"Error sending WebSocket message: {str(e)}")
 
 from crewai.tools.tool_usage_events import ToolUsageError
 from crewai.utilities.events import on
@@ -623,3 +797,29 @@ def tool_error_callback(source, event: ToolUsageError):
     
     log_crew_message(execution, error_message, agent='Tool Error Callback')
     logger.error(error_message)
+    error_message = f"Tool '{event.tool_name}' failed for agent '{agent_role}'."
+    error_message += f"\n Error: {event.error}"
+    error_message += f"\n Tool Arguments: {event.tool_args}"
+    error_message += f"\n Run Attempts: {event.run_attempts}"
+    error_message += f"\n Delegations: {event.delegations}"
+    
+    log_crew_message(execution, error_message, agent='Tool Error Callback')
+    logger.error(error_message)
+
+def step_callback(step_output, execution_id):
+    """Callback for each step of the execution"""
+    # Create event dictionary with proper structure
+    event = {
+        'type': 'execution_update',
+        'execution_id': execution_id,
+        'stage': {
+            'stage_type': step_output.get('type', 'processing'),
+            'title': step_output.get('title', 'Processing...'),
+            'content': step_output.get('content', ''),
+            'status': step_output.get('status', 'in_progress'),
+            'agent': step_output.get('agent', 'System')
+        }
+    }
+    
+    # Call detailed callback with properly formatted event
+    detailed_step_callback(event, execution_id)

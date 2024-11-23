@@ -1,7 +1,7 @@
 import os
 import requests
 from typing import Any, Type, List, Dict
-from pydantic.v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from crewai_tools.tools.base_tool import BaseTool
 import logging
 import pandas as pd
@@ -12,7 +12,11 @@ logger = logging.getLogger(__name__)
 BASE_URL = os.getenv('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com')
 
 class RankedKeywordsInput(BaseModel):
+    """Input model for ranked keywords tool"""
     website_url: str = Field(description="Domain or webpage for keyword ranking analysis")
+    model_config = {
+        "arbitrary_types_allowed": True
+    }
 
     @classmethod
     def get_fqdn(cls, url: str) -> str:

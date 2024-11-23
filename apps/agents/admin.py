@@ -28,13 +28,16 @@ class CrewExecutionAdmin(admin.ModelAdmin):
     list_display = ('crew', 'user', 'client', 'status', 'created_at', 'updated_at')
     list_filter = ('status', 'created_at', 'updated_at')
     search_fields = ('crew__name', 'user__username', 'client__name')
-    readonly_fields = ('created_at', 'updated_at', 'human_input_request', 'human_input_response')
+    readonly_fields = ('created_at', 'updated_at', 'human_input_request', 'human_input_response', 'error_message')
     fieldsets = (
         (None, {
-            'fields': ('crew', 'user', 'client', 'status', 'inputs', 'outputs')
+            'fields': ('crew', 'user', 'client', 'status', 'inputs', 'crew_output')
         }),
         ('Human Input', {
             'fields': ('human_input_request', 'human_input_response')
+        }),
+        ('Error Information', {
+            'fields': ('error_message',)
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at')

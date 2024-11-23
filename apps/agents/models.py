@@ -193,10 +193,6 @@ class Crew(models.Model):
 
 class CrewExecution(models.Model):
     crew = models.ForeignKey(Crew, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    client = models.ForeignKey('seo_manager.Client', on_delete=models.SET_NULL, null=True, blank=True)
-    inputs = models.JSONField()
-    outputs = models.JSONField(null=True, blank=True)
     status = models.CharField(max_length=25, choices=[
         ('PENDING', 'Pending'),
         ('RUNNING', 'Running'),
@@ -204,10 +200,15 @@ class CrewExecution(models.Model):
         ('COMPLETED', 'Completed'),
         ('FAILED', 'Failed')
     ], default='PENDING')
-    human_input_request = models.JSONField(null=True, blank=True)
-    human_input_response = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    inputs = models.JSONField(null=True, blank=True)
+    client = models.ForeignKey('seo_manager.Client', on_delete=models.CASCADE, null=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    crew_output = models.OneToOneField('CrewOutput', on_delete=models.SET_NULL, null=True, blank=True, related_name='crew_execution')
+    task_id = models.CharField(max_length=100, null=True, blank=True)
+    human_input_request = models.JSONField(null=True, blank=True)
+    human_input_response = models.JSONField(null=True, blank=True)
     error_message = models.TextField(blank=True, null=True)
 
     def __str__(self):
@@ -221,10 +222,11 @@ class CrewMessage(models.Model):
     execution = models.ForeignKey(CrewExecution, on_delete=models.CASCADE, related_name='messages')
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
-    agent = models.CharField(max_length=255, null=True, blank=True)  # Add this line
+    agent = models.CharField(max_length=255, null=True, blank=True)
+    crewai_task_id = models.IntegerField(null=True, blank=True)  # For kanban board placement
 
     def __str__(self):
-        return f"Message for execution {self.execution.id} at {self.timestamp}"
+        return f"{self.timestamp}: {self.content[:50]}"
 
 class Pipeline(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -298,7 +300,6 @@ class PipelineRunResult(models.Model):
         return f"Run Result for {self.execution.pipeline.name}"
 
 class CrewOutput(models.Model):
-    execution = models.OneToOneField(CrewExecution, on_delete=models.CASCADE, related_name='crew_output')
     raw = models.TextField()
     pydantic = models.JSONField(null=True, blank=True)
     json_dict = models.JSONField(null=True, blank=True)
@@ -356,3 +357,39 @@ class ChatMessage(models.Model):
 
     class Meta:
         ordering = ['timestamp']
+
+class ExecutionStage(models.Model):
+    STAGE_TYPES = [
+        ('task_start', 'Task Start'),
+        ('thinking', 'Thinking'),
+        ('tool_usage', 'Tool Usage'),
+        ('tool_results', 'Tool Results'),
+        ('human_input', 'Human Input'),
+        ('completion', 'Completion')
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed')
+    ]
+    
+    execution = models.ForeignKey(CrewExecution, on_delete=models.CASCADE, related_name='stages')
+    stage_type = models.CharField(max_length=20, choices=STAGE_TYPES)
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    agent = models.ForeignKey(Agent, on_delete=models.SET_NULL, null=True, blank=True)
+    metadata = models.JSONField(default=dict)
+    crewai_task_id = models.IntegerField(null=True, blank=True)  # For kanban board placement
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Execution Stage'
+        verbose_name_plural = 'Execution Stages'
+    
+    def __str__(self):
+        return f"{self.get_stage_type_display()} - {self.title}"

@@ -1,6 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
+from django.contrib.auth import get_user_model
 from .models import CrewExecution, CrewMessage, ChatMessage, Agent
 from django.core.cache import cache
 from apps.common.utils import format_message, get_llm
@@ -29,7 +30,6 @@ import re
 import time
 
 logger = logging.getLogger(__name__)
-
 
 def count_tokens(text):
     """Count tokens in text using tiktoken"""
