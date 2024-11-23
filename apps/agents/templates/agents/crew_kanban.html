@@ -577,7 +577,9 @@
                         ${md.render(truncatedContent)}
                         ${content.length > 200 ? `
                             <div class="mt-2">
-                                <button class="btn btn-sm btn-primary" onclick="showContentModal('${stageId}', ${JSON.stringify(content)})">
+                                <button class="btn btn-sm btn-primary view-full-content" 
+                                    data-stage-id="${stageId}"
+                                    data-content="${encodeURIComponent(content)}">
                                     View Full Content
                                 </button>
                                 <a href="data:text/markdown;charset=utf-8,${encodeURIComponent(content)}" 
@@ -726,6 +728,15 @@
             alert('Error submitting input');
         });
     }
+
+    // Add event listener for view full content buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.matches('.view-full-content')) {
+            const stageId = e.target.dataset.stageId;
+            const content = decodeURIComponent(e.target.dataset.content);
+            showContentModal(stageId, content);
+        }
+    });
 
     function toggleContent(element) {
         const container = element.closest('p');
