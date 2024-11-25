@@ -13,13 +13,12 @@ from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from googleapiclient.discovery import build
 import google.auth.transport.requests
 from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import Flow
+from django.urls import reverse
+from django.conf import settings
+from .exceptions import AuthError
 
 logger = logging.getLogger(__name__)
-
-# Define AuthError at the module level
-class AuthError(Exception):
-    """Custom exception for authentication errors"""
-    pass
 
 class ClientGroup(models.Model):
     name = models.CharField(max_length=100)
@@ -115,6 +114,101 @@ class AIProvider(models.Model):
     def __str__(self):
         return self.name
 
+class OAuthManager:
+    """Manages OAuth operations for Google services"""
+    
+    @staticmethod
+    def create_oauth_flow(request, state_key=None):
+        """Create OAuth flow for Google services"""
+        logger.info(f"Creating OAuth flow with state key: {state_key}")
+        
+        # Get the current domain and scheme
+        scheme = request.scheme
+        domain = request.get_host()
+        
+        # Use the same redirect URI that's configured in Google Console
+        redirect_uri = f'{scheme}://{domain}/google/login/callback/'
+        
+        logger.info(f"Using redirect URI: {redirect_uri}")
+        
+        try:
+            flow = Flow.from_client_secrets_file(
+                settings.GOOGLE_CLIENT_SECRETS_FILE,
+                scopes=[
+                    'https://www.googleapis.com/auth/analytics.readonly',
+                    'https://www.googleapis.com/auth/webmasters.readonly',
+                    'openid',
+                    'https://www.googleapis.com/auth/userinfo.email',
+                    'https://www.googleapis.com/auth/userinfo.profile'
+                ],
+                state=state_key,
+                redirect_uri=redirect_uri
+            )
+            
+            # Store the redirect URI in session
+            request.session['oauth_redirect_uri'] = redirect_uri
+            request.session.modified = True  # Ensure session is saved
+            
+            logger.info(f"OAuth flow created successfully with redirect URI: {redirect_uri}")
+            return flow
+            
+        except Exception as e:
+            logger.error(f"Error creating OAuth flow: {str(e)}", exc_info=True)
+            raise
+    
+    @staticmethod
+    def handle_oauth_callback(request, code, state):
+        """Handle OAuth callback and return credentials"""
+        try:
+            # Get the stored redirect URI from session
+            redirect_uri = request.session.get('oauth_redirect_uri')
+            if not redirect_uri:
+                raise AuthError("Missing redirect URI in session")
+            
+            flow = OAuthManager.create_oauth_flow(request, state_key=state)
+            
+            # Ensure the redirect URI matches
+            flow.redirect_uri = redirect_uri
+            
+            # Fetch token with explicit redirect URI
+            credentials = flow.fetch_token(
+                code=code,
+                redirect_uri=redirect_uri
+            )
+            
+            # Clean up session
+            request.session.pop('oauth_redirect_uri', None)
+            
+            return credentials
+            
+        except Exception as e:
+            logger.error(f"OAuth callback error: {str(e)}")
+            raise AuthError("Failed to complete OAuth flow")
+    
+    @staticmethod
+    def credentials_to_dict(credentials):
+        """Convert OAuth credentials to dictionary for session storage"""
+        if hasattr(credentials, 'token'):
+            # Handle Google OAuth2Credentials
+            return {
+                'token': credentials.token,
+                'refresh_token': credentials.refresh_token,
+                'token_uri': credentials.token_uri,
+                'client_id': credentials.client_id,
+                'client_secret': credentials.client_secret,
+                'scopes': credentials.scopes
+            }
+        else:
+            # Handle OAuth2Token
+            return {
+                'token': credentials['access_token'],
+                'refresh_token': credentials.get('refresh_token'),
+                'token_uri': 'https://oauth2.googleapis.com/token',  # Standard Google OAuth2 token endpoint
+                'client_id': credentials.get('client_id'),
+                'client_secret': credentials.get('client_secret'),
+                'scopes': credentials.get('scope', '').split(' ') if isinstance(credentials.get('scope'), str) else credentials.get('scope', [])
+            }
+
 class GoogleAnalyticsCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='ga_credentials')
     view_id = models.CharField(max_length=100, blank=True, null=True)
@@ -145,27 +239,37 @@ class GoogleAnalyticsCredentials(models.Model):
                     scopes=['https://www.googleapis.com/auth/analytics.readonly']
                 )
 
-            # Create credentials for GA4
-            credentials = Credentials.from_authorized_user_info(
-                {
-                    "token": self.access_token,
-                    "refresh_token": self.refresh_token,
-                    "token_uri": self.token_uri,
-                    "client_id": self.ga_client_id,
-                    "client_secret": self.client_secret,
-                },
+            # For OAuth, create credentials from stored values
+            if not all([self.refresh_token, self.token_uri, self.ga_client_id, self.client_secret]):
+                logger.error("Missing required OAuth fields")
+                return None
+
+            credentials = Credentials(
+                token=self.access_token,
+                refresh_token=self.refresh_token,
+                token_uri=self.token_uri,
+                client_id=self.ga_client_id,
+                client_secret=self.client_secret,
                 scopes=['https://www.googleapis.com/auth/analytics.readonly']
             )
 
-            if not credentials.valid:
-                credentials.refresh(Request())
+            # Always try to refresh if we have a refresh token
+            if credentials.refresh_token:
+                request = google.auth.transport.requests.Request()
+                credentials.refresh(request)
                 self.access_token = credentials.token
                 self.save(update_fields=['access_token'])
+                logger.info(f"Refreshed access token for {self.client.name}")
 
             return credentials
 
         except Exception as e:
-            logger.error(f"Error getting GA credentials: {str(e)}")
+            logger.error(f"Error getting credentials: {str(e)}")
+            if 'invalid_grant' in str(e):
+                self.access_token = None
+                self.refresh_token = None
+                self.save(update_fields=['access_token', 'refresh_token'])
+                raise AuthError("OAuth credentials expired. Please re-authenticate.")
             return None
 
     def get_property_id(self):
@@ -181,17 +285,134 @@ class GoogleAnalyticsCredentials(models.Model):
             if not credentials:
                 return None
 
-            # Create service with credentials specifically for GA4
-            service = BetaAnalyticsDataClient(
-                credentials=credentials,
-                # Remove client_options and transport which were causing issues
-            )
-            
-            return service
-            
+            return BetaAnalyticsDataClient(credentials=credentials)
+
         except Exception as e:
             logger.error(f"Error creating Analytics service: {str(e)}")
             return None
+
+    def refresh_credentials(self):
+        """Handle token refresh according to OAuth 2.0 spec"""
+        try:
+            if not self.refresh_token:
+                raise AuthError("No refresh token available. Re-authorization required.")
+
+            credentials = Credentials(
+                token=self.access_token,
+                refresh_token=self.refresh_token,
+                token_uri=self.token_uri,
+                client_id=self.ga_client_id,
+                client_secret=self.client_secret,
+                scopes=self.required_scopes
+            )
+
+            request = google.auth.transport.requests.Request()
+            credentials.refresh(request)
+            
+            # Update stored credentials
+            self.access_token = credentials.token
+            self.save(update_fields=['access_token'])
+            
+            return True
+            
+        except Exception as e:
+            if 'invalid_grant' in str(e):
+                # Clear credentials if refresh token is invalid
+                self.access_token = None
+                self.refresh_token = None
+                self.save(update_fields=['access_token', 'refresh_token'])
+                raise AuthError("Refresh token expired or revoked. Re-authorization required.")
+            raise
+
+    def save_oauth_credentials(self, credentials):
+        """Save OAuth credentials from flow"""
+        try:
+            # Log the credentials we're trying to save
+            logger.info(f"""
+            Attempting to save OAuth credentials for {self.client.name}:
+            Token: {'Present' if credentials.token else 'Missing'}
+            Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
+            Token URI: {credentials.token_uri if credentials.token_uri else 'Missing'}
+            Client ID: {'Present' if credentials.client_id else 'Missing'}
+            Client Secret: {'Present' if credentials.client_secret else 'Missing'}
+            """)
+
+            # Save all fields
+            self.access_token = credentials.token
+            self.refresh_token = credentials.refresh_token
+            self.token_uri = credentials.token_uri
+            self.ga_client_id = credentials.client_id
+            self.client_secret = credentials.client_secret
+            self.scopes = credentials.scopes
+            self.use_service_account = False
+            
+            self.save()
+            
+            # Verify saved credentials
+            saved_creds = self.get_credentials()
+            if not saved_creds:
+                raise ValueError("Failed to verify saved credentials")
+
+            logger.info(f"Successfully saved and verified OAuth credentials for {self.client.name}")
+
+        except Exception as e:
+            logger.error(f"Error saving OAuth credentials: {str(e)}")
+            raise
+
+    def validate_credentials(self):
+        """Validate stored credentials"""
+        try:
+            if not self.access_token and not self.refresh_token and not self.service_account_json:
+                raise AuthError("No valid credentials found")
+                
+            credentials = self.get_credentials()
+            if not credentials:
+                raise AuthError("Failed to get valid credentials")
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Credential validation error: {str(e)}")
+            raise AuthError(f"Credential validation failed: {str(e)}")
+
+    def handle_oauth_response(self, credentials_dict):
+        """Handle OAuth response and save credentials"""
+        try:
+            self.access_token = credentials_dict['token']
+            self.refresh_token = credentials_dict['refresh_token']
+            self.token_uri = credentials_dict['token_uri']
+            self.ga_client_id = credentials_dict['client_id']
+            self.client_secret = credentials_dict['client_secret']
+            self.use_service_account = False
+            self.scopes = credentials_dict['scopes']
+            self.save()
+            
+            logger.info(f"Saved GA OAuth credentials for {self.client.name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving GA OAuth credentials: {str(e)}", exc_info=True)
+            raise AuthError(f"Failed to save credentials: {str(e)}")
+
+    def handle_service_account(self, service_account_json):
+        """Handle service account setup"""
+        try:
+            self.service_account_json = service_account_json
+            self.use_service_account = True
+            self.access_token = None
+            self.refresh_token = None
+            self.save()
+            
+            # Validate the service account works
+            credentials = self.get_credentials()
+            if not credentials:
+                raise AuthError("Invalid service account credentials")
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Service account setup error: {str(e)}")
+            raise AuthError(f"Failed to setup service account: {str(e)}")
 
 class SearchConsoleCredentials(models.Model):
     client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='sc_credentials')
@@ -199,9 +420,11 @@ class SearchConsoleCredentials(models.Model):
     access_token = models.TextField(blank=True, null=True)
     refresh_token = models.TextField(blank=True, null=True)
     token_uri = models.URLField(blank=True, null=True)
-    sc_client_id = models.CharField(max_length=100, blank=True, null=True)  # Renamed from client_id
+    sc_client_id = models.CharField(max_length=100, blank=True, null=True)
     client_secret = models.CharField(max_length=100, blank=True, null=True)
     service_account_json = models.TextField(blank=True, null=True)
+    last_validated = models.DateTimeField(auto_now=True)
+    user_email = models.EmailField(blank=True, null=True)
 
     def __str__(self):
         return f"Search Console Credentials for {self.client.name}"
@@ -284,6 +507,49 @@ class SearchConsoleCredentials(models.Model):
         except Exception as e:
             logger.error(f"Error parsing property URL for {self.client.name}: {str(e)}")
             return None
+
+    def save_oauth_credentials(self, credentials):
+        """Save OAuth credentials from flow"""
+        creds_dict = OAuthManager.credentials_to_dict(credentials)
+        self.access_token = creds_dict['token']
+        self.refresh_token = creds_dict['refresh_token']
+        self.token_uri = creds_dict['token_uri']
+        self.sc_client_id = creds_dict['client_id']
+        self.client_secret = creds_dict['client_secret']
+        self.save()
+
+    def validate_credentials(self):
+        """Validate stored credentials"""
+        try:
+            if not self.access_token and not self.refresh_token and not self.service_account_json:
+                raise AuthError("No valid credentials found")
+                
+            credentials = self.get_credentials()
+            if not credentials:
+                raise AuthError("Failed to get valid credentials")
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Search Console credential validation error: {str(e)}")
+            raise AuthError(f"Credential validation failed: {str(e)}")
+
+    def handle_oauth_response(self, credentials_dict):
+        """Handle OAuth response and save credentials"""
+        try:
+            self.access_token = credentials_dict['token']
+            self.refresh_token = credentials_dict['refresh_token']
+            self.token_uri = credentials_dict['token_uri']
+            self.sc_client_id = credentials_dict['client_id']
+            self.client_secret = credentials_dict['client_secret']
+            self.save()
+            
+            logger.info(f"Saved SC OAuth credentials for {self.client.name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving SC OAuth credentials: {str(e)}", exc_info=True)
+            raise AuthError(f"Failed to save credentials: {str(e)}")
 
 class SummarizerUsage(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

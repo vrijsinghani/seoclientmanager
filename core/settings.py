@@ -98,7 +98,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     # Required for debug toolbar
     'debug_toolbar.middleware.DebugToolbarMiddleware',
-
+    'apps.seo_manager.middleware.GoogleAuthMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -286,7 +286,8 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
-GOOGLE_CLIENT_SECRETS_FILE = os.getenv('GOOGLE_CLIENT_SECRETS_FILE', default="/secrets/google_secrets.json")
+GOOGLE_CLIENT_SECRETS_FILE = os.getenv('GOOGLE_CLIENT_SECRETS_FILE')
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', 'http://localhost:8000/seo/google/oauth/callback/')
 SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE', default="/secrets/service-account.json")
 # ### Async Tasks (Celery) Settings ###
 
@@ -395,12 +396,12 @@ LOGGING = {
         'django': {
             'handlers': ['console','file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
         },
         'allauth': {
-            'handlers': ['file'],
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
-            'propagate': True,
+            'propagate': False,
         },
         'apps.crawl_website': {
             'handlers': ['file','console'],

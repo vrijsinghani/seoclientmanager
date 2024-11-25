@@ -10,19 +10,18 @@
         <div class="card-header pb-0">
           <div class="d-lg-flex">
             <div>
-              <h5 class="mb-0">Select Google Search Console Property</h5>
+              <h5 class="mb-0">Select Search Console Property</h5>
               <p class="text-sm mb-0">Choose the Search Console property to connect for {{ client.name }}</p>
             </div>
           </div>
         </div>
         <div class="card-body px-0 pt-0 pb-2">
           <div class="table-responsive p-0">
-            <table class="table align-items-center mb-0" id="search-console-properties-table">
+            <table class="table align-items-center mb-0" id="search-console-table">
               <thead>
                 <tr>
-                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Property URL</th>
+                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Website URL</th>
                   <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Permission Level</th>
-                  <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Owner Verified</th>
                   <th class="text-secondary opacity-7"></th>
                 </tr>
               </thead>
@@ -39,15 +38,12 @@
                   <td>
                     <p class="text-xs font-weight-bold mb-0">{{ property.permission_level }}</p>
                   </td>
-                  <td>
-                    <p class="text-xs text-secondary mb-0">{{ property.owner_verified|yesno:"Yes,No" }}</p>
-                  </td>
                   <td class="align-middle text-center">
                     <form method="post" class="d-inline">
                       {% csrf_token %}
                       <input type="hidden" name="selected_property" value="{{ property.url }}">
                       <button type="submit" class="btn btn-link text-secondary mb-0">
-                        <span class="bg-gradient-primary btn px-3 mb-0 text-white">Select</span>
+                        <span class="bg-gradient-primary btn-sm px-3 mb-0 text-white">Select</span>
                       </button>
                     </form>
                   </td>
@@ -73,13 +69,13 @@
 {{ block.super }}
 <script src="/static/assets/js/plugins/datatables.js"></script>
 <script>
-  if (document.getElementById('search-console-properties-table')) {
-    const dataTableSearch = new simpleDatatables.DataTable("#search-console-properties-table", {
+  if (document.getElementById('search-console-table')) {
+    const dataTableSearch = new simpleDatatables.DataTable("#search-console-table", {
       searchable: true,
       fixedHeight: false,
       perPage: 10,
       columns: [
-        { select: [3], sortable: false }
+        { select: [2], sortable: false }
       ]
     });
   }
@@ -133,4 +129,4 @@
     border-color: #dee2e6;
   }
 </style>
-{% endblock extra_css %}
+{% endblock extra_css %} 

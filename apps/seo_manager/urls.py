@@ -47,22 +47,37 @@ urlpatterns = [
             
             # Credentials URLs
             path('credentials/', include([
-                path('ga/oauth/add/', views.add_ga_credentials_oauth, name='add_ga_credentials_oauth'),
-                path('ga/service-account/add/', views.add_ga_credentials_service_account, name='add_ga_credentials_service_account'),
-                path('sc/service-account/add/', views.add_sc_credentials_service_account, name='add_sc_credentials_service_account'),
-                path('ga/remove/', views.remove_ga_credentials, name='remove_ga_credentials'),
-                path('sc/add/', views.add_sc_credentials, name='add_sc_credentials'),
-                path('sc/remove/', views.remove_sc_credentials, name='remove_sc_credentials'),
+                # Google Analytics URLs
+                path('ga/', include([
+                    path('oauth/add/', 
+                         views.add_ga_credentials_oauth, 
+                         name='add_ga_credentials_oauth'),
+                    path('service-account/add/', 
+                         views.add_ga_credentials_service_account, 
+                         name='add_ga_credentials_service_account'),
+                    path('select-account/', 
+                         views.select_analytics_account, 
+                         name='select_analytics_account'),
+                    path('remove/', 
+                         views.remove_ga_credentials, 
+                         name='remove_ga_credentials'),
+                ])),
+                
+                # Search Console URLs
+                path('sc/add/', 
+                     views.add_sc_credentials, 
+                     name='add_sc_credentials'),
+                path('sc/remove/', 
+                     views.remove_sc_credentials, 
+                     name='remove_sc_credentials'),
             ])),
             
             # Business Objective URLs
-            path('business-objective/', include([
+            path('objectives/', include([
+                path('add/', views.add_business_objective, name='add_business_objective'),
                 path('edit/<int:objective_index>/', views.edit_business_objective, name='edit_business_objective'),
                 path('delete/<int:objective_index>/', views.delete_business_objective, name='delete_business_objective'),
             ])),
-            
-            # Meta Tags URLs
-            path('create-meta-tags-snapshot/', views.create_meta_tags_snapshot, name='create_meta_tags_snapshot'),
             
             # Profile URLs
             path('profile/', include([
@@ -70,7 +85,12 @@ urlpatterns = [
                 path('generate-magic/', client_views.generate_magic_profile, name='generate_magic_profile'),
             ])),
             
-            path('keywords/<int:keyword_id>/debug/', views.debug_keyword_data, name='debug_keyword_data'),
+            # Meta Tags URLs
+            path('meta-tags/', include([
+                path('create-snapshot/', views.create_meta_tags_snapshot, name='create_meta_tags_snapshot'),
+            ])),
+            
+            # Rankings URLs
             path('rankings/', include([
                 path('collect/', views.collect_rankings, name='collect_rankings'),
                 path('report/', views.generate_report, name='generate_report'),
@@ -78,20 +98,30 @@ urlpatterns = [
                 path('manage/', views.ranking_data_management, name='ranking_data_management'),
                 path('export-csv/', views.export_rankings_csv, name='export_rankings_csv'),
             ])),
+            
+            # Search Console URLs
+            path('select-property/', 
+                 views.select_search_console_property, 
+                 name='select_search_console_property'),
+            path('add-service-account/', 
+                 views.add_sc_credentials_service_account, 
+                 name='add_sc_credentials_service_account'),
         ])),
     ])),
     
     # Other URLs
     path('activity-log/', views.activity_log, name='activity_log'),
     path('create-meta-tags-snapshot-url/', views.create_meta_tags_snapshot_url, name='create_meta_tags_snapshot_url'),
-    # Business Objectives URLs
-    path('clients/<int:client_id>/objectives/add/', 
-         views.add_business_objective, 
-         name='add_business_objective'),
-    path('clients/<int:client_id>/objectives/<int:objective_index>/edit/', 
-         views.edit_business_objective, 
-         name='edit_business_objective'),
-    path('clients/<int:client_id>/objectives/<int:objective_index>/delete/', 
-         views.delete_business_objective, 
-         name='delete_business_objective'),
+    
+    # OAuth URLs
+    path('google/', include([
+        path('login/callback/', 
+             views.google_oauth_callback, 
+             name='google_oauth_callback'),
+        path('oauth/', include([
+            path('init/<int:client_id>/<str:service_type>/', 
+                 views.initiate_google_oauth, 
+                 name='initiate_google_oauth'),
+        ])),
+    ])),
 ]

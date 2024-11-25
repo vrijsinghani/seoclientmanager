@@ -2,15 +2,21 @@ import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from ..models import Client, GoogleAnalyticsCredentials
+from django.core.exceptions import ValidationError
+from ..models import Client, GoogleAnalyticsCredentials, OAuthManager, SearchConsoleCredentials
 from ..google_auth import (
-    get_google_auth_flow, 
     get_analytics_accounts_oauth, 
     get_analytics_accounts_service_account,
     get_search_console_properties
 )
 from apps.common.tools.user_activity_tool import user_activity_tool
+from ..exceptions import AuthError
+from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
 import logging
+import google.oauth2.credentials
+from google_auth_oauthlib.flow import Flow
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -24,193 +30,239 @@ def client_dataforseo(request, client_id):
     client = get_object_or_404(Client, id=client_id)
     return render(request, 'seo_manager/client_dataforseo.html', {'client': client})
 
-def google_oauth_callback(request):
-    state = request.GET.get('state')
-    stored_state = request.session.pop('oauth_state', None)
-    
-    if state != stored_state:
-        messages.error(request, "Invalid state parameter. Please try again.")
-        return redirect('seo_manager:client_list')
-    
-    client_id, credential_type = state.split('_')
+@login_required
+def initiate_google_oauth(request, client_id, service_type):
+    """Start OAuth flow for Google services"""
     client = get_object_or_404(Client, id=client_id)
     
-    flow = get_google_auth_flow(request)
-    flow.fetch_token(code=request.GET.get('code'))
-    
-    credentials = flow.credentials
-    
-    logger.info(f"""
-    OAuth Callback received credentials for {client.name}:
-    Token: {'Present' if credentials.token else 'Missing'}
-    Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
-    Token URI: {credentials.token_uri}
-    Client ID: {credentials.client_id}
-    Client Secret: {'Present' if credentials.client_secret else 'Missing'}
-    """)
-    
-    if credential_type == 'ga':
-        accounts = get_analytics_accounts_oauth(credentials)
-        request.session['accounts'] = accounts
-        request.session['access_token'] = credentials.token
-        request.session['refresh_token'] = credentials.refresh_token
-        request.session['token_uri'] = credentials.token_uri
-        request.session['client_id'] = credentials.client_id
-        request.session['client_secret'] = credentials.client_secret
+    try:
+        # Create state key
+        state_key = f"{client_id}_{service_type}"
         
-        logger.info(f"""
-        Storing in session for {client.name}:
-        Access Token: {'Present' if credentials.token else 'Missing'}
-        Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
-        Token URI: {credentials.token_uri}
-        Client ID: {credentials.client_id}
-        Client Secret: {'Present' if credentials.client_secret else 'Missing'}
-        """)
+        # Get the current domain and scheme
+        scheme = request.scheme
+        domain = request.get_host()
+        redirect_uri = f'{scheme}://{domain}/google/login/callback/'
         
-        return redirect('seo_manager:add_ga_credentials_oauth', client_id=client_id)
-    elif credential_type == 'sc':
-        properties = get_search_console_properties(credentials)
-        request.session['properties'] = properties
-        request.session['access_token'] = credentials.token
-        request.session['refresh_token'] = credentials.refresh_token
-        request.session['token_uri'] = credentials.token_uri
-        request.session['client_id'] = credentials.client_id
-        request.session['client_secret'] = credentials.client_secret
-        return redirect('seo_manager:add_sc_credentials', client_id=client_id)
-    else:
-        messages.error(request, "Invalid credential type.")
+        # Create OAuth flow with correct callback URL
+        flow = Flow.from_client_secrets_file(
+            settings.GOOGLE_CLIENT_SECRETS_FILE,
+            scopes=[
+                'https://www.googleapis.com/auth/analytics.readonly',
+                'https://www.googleapis.com/auth/webmasters.readonly',
+                'openid',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile'
+            ],
+            state=state_key,
+            redirect_uri=redirect_uri
+        )
+        
+        # Store both state and redirect URI in session
+        request.session['oauth_state'] = state_key
+        request.session['oauth_redirect_uri'] = redirect_uri
+        request.session['oauth_service_type'] = service_type
+        request.session.modified = True
+        
+        # Get authorization URL with proper parameters
+        authorization_url, _ = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='select_account'
+        )
+        
+        logger.info(f"Initiating OAuth flow for client {client.name} ({service_type})")
+        logger.debug(f"Using redirect URI: {redirect_uri}")
+        
+        return redirect(authorization_url)
+        
+    except Exception as e:
+        logger.error(f"OAuth initiation error: {str(e)}", exc_info=True)
+        messages.error(request, "Failed to start authentication process")
         return redirect('seo_manager:client_detail', client_id=client_id)
 
 @login_required
+def google_oauth_callback(request):
+    """Handle OAuth callback"""
+    try:
+        # Verify state
+        state = request.GET.get('state')
+        stored_state = request.session.get('oauth_state')
+        
+        if not state or state != stored_state:
+            logger.error("Invalid OAuth state")
+            messages.error(request, "Invalid authentication state. Please try again.")
+            return redirect('seo_manager:dashboard')
+        
+        # Extract client_id from state
+        try:
+            client_id = int(state.split('_')[0])
+            service_type = state.split('_')[1]
+        except (IndexError, ValueError):
+            logger.error(f"Invalid state format: {state}")
+            messages.error(request, "Invalid authentication data. Please try again.")
+            return redirect('seo_manager:dashboard')
+        
+        client = get_object_or_404(Client, id=client_id)
+        logger.info(f"Processing OAuth callback for client {client.name} ({service_type})")
+        
+        # Get the current domain and scheme for redirect URI
+        scheme = request.scheme
+        domain = request.get_host()
+        redirect_uri = f'{scheme}://{domain}/google/login/callback/'
+        
+        # Complete OAuth flow
+        try:
+            flow = Flow.from_client_secrets_file(
+                settings.GOOGLE_CLIENT_SECRETS_FILE,
+                scopes=[
+                    'https://www.googleapis.com/auth/analytics.readonly',
+                    'https://www.googleapis.com/auth/webmasters.readonly',
+                    'openid',
+                    'https://www.googleapis.com/auth/userinfo.email',
+                    'https://www.googleapis.com/auth/userinfo.profile'
+                ],
+                state=state,
+                redirect_uri=redirect_uri
+            )
+            
+            # Fetch token
+            token = flow.fetch_token(code=request.GET.get('code'))
+            
+            # Convert token to Google Credentials
+            credentials = google.oauth2.credentials.Credentials(
+                token=token['access_token'],
+                refresh_token=token.get('refresh_token'),
+                token_uri='https://oauth2.googleapis.com/token',
+                client_id=flow.client_config['client_id'],
+                client_secret=flow.client_config['client_secret'],
+                scopes=token.get('scope', '').split(' ') if isinstance(token.get('scope'), str) else token.get('scope', [])
+            )
+            
+            # Store credentials in session
+            request.session['oauth_credentials'] = OAuthManager.credentials_to_dict(credentials)
+            
+            if service_type == 'ga':
+                try:
+                    # Get available accounts using the Google Credentials
+                    accounts = get_analytics_accounts_oauth(credentials)
+                    
+                    if not accounts:
+                        logger.warning(f"No GA4 properties found for client {client.name}")
+                        messages.warning(request, "No Google Analytics 4 properties were found.")
+                        return redirect('seo_manager:client_detail', client_id=client_id)
+                    
+                    request.session['accounts'] = accounts
+                    return redirect('seo_manager:select_analytics_account', client_id=client_id)
+                    
+                except Exception as e:
+                    logger.error(f"Error fetching GA4 properties: {str(e)}", exc_info=True)
+                    messages.error(request, "Failed to fetch Google Analytics properties.")
+                    return redirect('seo_manager:client_detail', client_id=client_id)
+            
+            elif service_type == 'sc':
+                try:
+                    # Get available Search Console properties
+                    properties = get_search_console_properties(credentials)
+                    if not properties:
+                        messages.warning(request, "No Search Console properties found. Please verify your permissions.")
+                        return redirect('seo_manager:client_detail', client_id=client_id)
+                    
+                    request.session['sc_properties'] = properties
+                    return redirect('seo_manager:select_search_console_property', client_id=client_id)
+                    
+                except Exception as e:
+                    logger.error(f"Error fetching Search Console properties: {str(e)}", exc_info=True)
+                    messages.error(request, "Failed to fetch Search Console properties. Please verify your permissions.")
+                    return redirect('seo_manager:client_detail', client_id=client_id)
+            
+        except Exception as e:
+            logger.error(f"OAuth flow error: {str(e)}", exc_info=True)
+            messages.error(request, "Authentication failed. Please try again.")
+            return redirect('seo_manager:client_detail', client_id=client_id)
+            
+    except Exception as e:
+        logger.error(f"OAuth callback error: {str(e)}", exc_info=True)
+        messages.error(request, "Authentication failed. Please try again.")
+        return redirect('seo_manager:dashboard')
+    
+    return redirect('seo_manager:client_detail', client_id=client_id)
+
+@login_required
 def add_ga_credentials_oauth(request, client_id):
+    """Handle Google Analytics OAuth credential addition"""
     client = get_object_or_404(Client, id=client_id)
     
-    # If we don't have accounts in session, start OAuth flow
-    if 'accounts' not in request.session:
-        flow = get_google_auth_flow(request)
-        authorization_url, state = flow.authorization_url(
-            access_type='offline',
-            include_granted_scopes='true',
-            state=f"{client_id}_ga",
-            prompt='consent'
-        )
-        request.session['oauth_state'] = state
-        return redirect(authorization_url)
-    
-    # Handle POST request for account selection
-    if request.method == 'POST':
-        selected_account = request.POST.get('selected_account')
-        if selected_account:
-            accounts = request.session.get('accounts', [])
-            account_data = next((account for account in accounts if account['property_id'] == selected_account), None)
+    if request.method == 'GET':
+        try:
+            # Create state key
+            state_key = f"{client_id}_ga"
             
-            if account_data:
-                logger.info(f"""
-                Retrieving from session for {client.name}:
-                Access Token: {'Present' if request.session.get('access_token') else 'Missing'}
-                Refresh Token: {'Present' if request.session.get('refresh_token') else 'Missing'}
-                Token URI: {request.session.get('token_uri')}
-                Client ID: {request.session.get('client_id')}
-                Client Secret: {'Present' if request.session.get('client_secret') else 'Missing'}
-                """)
-
-                credentials, created = GoogleAnalyticsCredentials.objects.update_or_create(
-                    client=client,
-                    defaults={
-                        'access_token': request.session.get('access_token'),
-                        'refresh_token': request.session.get('refresh_token'),
-                        'token_uri': request.session.get('token_uri'),
-                        'ga_client_id': request.session.get('client_id'),
-                        'client_secret': request.session.get('client_secret'),
-                        'use_service_account': False,
-                        'view_id': account_data['property_id'],
-                        'user_email': request.user.email,
-                        'scopes': [
-                            'https://www.googleapis.com/auth/analytics.readonly',
-                            'https://www.googleapis.com/auth/userinfo.email',
-                            'https://www.googleapis.com/auth/userinfo.profile'
-                        ]
-                    }
-                )
-
-                logger.info(f"""
-                Saved to database for {client.name}:
-                Access Token: {'Present' if credentials.access_token else 'Missing'}
-                Refresh Token: {'Present' if credentials.refresh_token else 'Missing'}
-                Token URI: {credentials.token_uri}
-                Client ID: {credentials.ga_client_id}
-                Client Secret: {'Present' if credentials.client_secret else 'Missing'}
-                View ID: {credentials.view_id}
-                """)
-
-                # Clean up session
-                for key in ['access_token', 'refresh_token', 'token_uri', 'client_id', 'client_secret', 'accounts']:
-                    request.session.pop(key, None)
-
-                user_activity_tool.run(request.user, 'create', f"Added Google Analytics credentials (OAuth) for client: {client.name}", client=client)
-                messages.success(request, "Google Analytics credentials (OAuth) added successfully.")
-                return redirect('seo_manager:client_detail', client_id=client.id)
-            else:
-                messages.error(request, "Selected account not found. Please try again.")
-        else:
-            messages.error(request, "Please select an account.")
+            # Create OAuth flow
+            flow = OAuthManager.create_oauth_flow(
+                request=request, 
+                state_key=state_key
+            )
+            
+            # Get authorization URL with proper parameters
+            authorization_url, _ = flow.authorization_url(
+                access_type='offline',
+                include_granted_scopes='true',
+                prompt='consent'
+            )
+            
+            # Store state in session
+            request.session['oauth_state'] = state_key
+            request.session['oauth_service_type'] = 'ga'
+            request.session['oauth_client_id'] = client_id
+            
+            logger.info(f"Starting GA OAuth flow for client {client.name}")
+            return redirect(authorization_url)
+            
+        except Exception as e:
+            logger.error(f"Error starting GA OAuth flow: {str(e)}")
+            messages.error(request, "Failed to start authentication process")
+            return redirect('seo_manager:client_detail', client_id=client_id)
     
-    # Show account selection page if we have accounts in session
-    return render(request, 'seo_manager/select_analytics_account.html', {
-        'client': client,
-        'accounts': request.session['accounts'],
-    })
+    return redirect('seo_manager:client_detail', client_id=client_id)
 
 @login_required
 def add_ga_credentials_service_account(request, client_id):
+    """Handle Google Analytics service account credential addition"""
     client = get_object_or_404(Client, id=client_id)
     
-    if request.method == 'POST':
-        if 'selected_account' in request.POST:
-            selected_account = request.POST.get('selected_account')
-            if selected_account:
-                accounts = request.session.get('accounts', [])
-                account_data = next((account for account in accounts if account['property_id'] == selected_account), None)
-                if account_data:
-                    GoogleAnalyticsCredentials.objects.update_or_create(
-                        client=client,
-                        defaults={
-                            'service_account_json': request.session.get('service_account_json', ''),
-                            'use_service_account': True,
-                            'view_id': account_data['property_id'],
-                        }
-                    )
-                    user_activity_tool.run(request.user, 'create', f"Added Google Analytics credentials (Service Account) for client: {client.name}", client=client)
-                    messages.success(request, "Google Analytics credentials (Service Account) added successfully.")
-                    return redirect('seo_manager:client_detail', client_id=client.id)
-                else:
-                    messages.error(request, "Selected account not found. Please try again.")
-            else:
-                messages.error(request, "Please select an account.")
-        elif 'service_account_file' in request.FILES:
-            service_account_file = request.FILES['service_account_file']
-            try:
-                service_account_info = json.load(service_account_file)
-                service_account_json = json.dumps(service_account_info)
-                accounts = get_analytics_accounts_service_account(service_account_json)
-                request.session['accounts'] = accounts
-                request.session['service_account_json'] = service_account_json
-                return render(request, 'seo_manager/select_analytics_account.html', {
-                    'client': client,
-                    'accounts': accounts,
-                })
-            except json.JSONDecodeError:
-                messages.error(request, "Invalid JSON file. Please upload a valid service account JSON file.")
-        else:
-            messages.error(request, "No file uploaded. Please select a service account JSON file.")
-    
-    if 'accounts' in request.session:
-        return render(request, 'seo_manager/select_analytics_account.html', {
-            'client': client,
-            'accounts': request.session['accounts'],
+    if request.method == 'GET':
+        return render(request, 'seo_manager/credentials/add_ga_service_account.html', {
+            'client': client
         })
-    
-    return render(request, 'seo_manager/add_ga_credentials_service_account.html', {'client': client})
+        
+    elif request.method == 'POST':
+        try:
+            if 'service_account_file' not in request.FILES:
+                raise AuthError("No service account file provided")
+                
+            service_account_file = request.FILES['service_account_file']
+            service_account_json = json.load(service_account_file)
+            
+            ga_credentials, created = GoogleAnalyticsCredentials.objects.get_or_create(
+                client=client,
+                defaults={'user_email': request.user.email}
+            )
+            
+            ga_credentials.handle_service_account(json.dumps(service_account_json))
+            
+            messages.success(request, "Service account credentials added successfully")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+            
+        except AuthError as e:
+            messages.error(request, str(e))
+        except json.JSONDecodeError:
+            messages.error(request, "Invalid JSON file")
+        except Exception as e:
+            logger.error(f"Error adding service account: {str(e)}")
+            messages.error(request, "Failed to add service account credentials")
+            
+        return redirect('seo_manager:client_detail', client_id=client.id)
 
 @login_required
 def remove_ga_credentials(request, client_id):
@@ -220,3 +272,202 @@ def remove_ga_credentials(request, client_id):
         user_activity_tool.run(request.user, 'delete', f"Removed Google Analytics credentials for client: {client.name}", client=client)
         messages.success(request, "Google Analytics credentials removed successfully.")
     return redirect('seo_manager:client_detail', client_id=client.id)
+
+@login_required
+def client_detail(request, client_id):
+    client = get_object_or_404(Client, id=client_id)
+    
+    try:
+        # Handle GA credentials check
+        ga_credentials = getattr(client, 'ga_credentials', None)
+        if ga_credentials:
+            try:
+                ga_credentials.validate_credentials()
+            except AuthError:
+                messages.warning(request, "Google Analytics credentials need to be re-authenticated.")
+                ga_credentials.delete()
+        
+        # Handle SC credentials check similarly
+        sc_credentials = getattr(client, 'sc_credentials', None)
+        if sc_credentials:
+            try:
+                sc_credentials.validate_credentials()
+            except AuthError:
+                messages.warning(request, "Search Console credentials need to be re-authenticated.")
+                sc_credentials.delete()
+                
+    except Exception as e:
+        logger.error(f"Error checking credentials: {str(e)}")
+        messages.error(request, "Error validating credentials")
+
+    return render(request, 'seo_manager/client_detail.html', {'client': client})
+
+@login_required
+def add_sc_credentials(request, client_id):
+    client = get_object_or_404(Client, id=client_id)
+    
+    # Start OAuth flow
+    try:
+        flow = OAuthManager.create_oauth_flow(
+            request, 
+            state=f"{client_id}_sc"
+        )
+        authorization_url, _ = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+        request.session['oauth_state'] = f"{client_id}_sc"
+        return redirect(authorization_url)
+        
+    except Exception as e:
+        logger.error(f"Error initiating Search Console OAuth: {str(e)}")
+        messages.error(request, "Failed to start authentication process")
+        return redirect('seo_manager:client_detail', client_id=client_id)
+
+@login_required
+def select_analytics_account(request, client_id):
+    """Handle Analytics account selection"""
+    client = get_object_or_404(Client, id=client_id)
+    
+    if request.method == 'POST':
+        try:
+            selected_account = request.POST.get('selected_account')
+            if not selected_account:
+                raise ValidationError("No account selected")
+                
+            credentials_dict = request.session.get('oauth_credentials')
+            if not credentials_dict:
+                raise AuthError("No OAuth credentials found in session")
+            
+            logger.info(f"Creating/updating GA credentials for client {client.name}")
+            logger.debug(f"Credentials dict: {credentials_dict}")
+                
+            ga_credentials, created = GoogleAnalyticsCredentials.objects.get_or_create(
+                client=client,
+                defaults={'user_email': request.user.email}
+            )
+            
+            # Save credentials and account info
+            ga_credentials.handle_oauth_response(credentials_dict)
+            ga_credentials.view_id = selected_account
+            ga_credentials.save()
+            
+            logger.info(f"Successfully saved GA credentials for client {client.name}")
+            
+            # Clean up session
+            for key in ['oauth_credentials', 'accounts', 'oauth_state', 'oauth_service_type', 'oauth_client_id']:
+                request.session.pop(key, None)
+            
+            messages.success(request, "Google Analytics credentials added successfully")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+            
+        except Exception as e:
+            logger.error(f"Error saving GA credentials: {str(e)}", exc_info=True)
+            messages.error(request, f"Failed to save Google Analytics credentials: {str(e)}")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    
+    # Handle GET request
+    accounts = request.session.get('accounts', [])
+    if not accounts:
+        messages.error(request, "No Analytics accounts found in session. Please try authenticating again.")
+        return redirect('seo_manager:client_detail', client_id=client.id)
+        
+    return render(request, 'seo_manager/select_analytics_account.html', {
+        'client': client,
+        'accounts': accounts
+    })
+
+@login_required
+def select_search_console_property(request, client_id):
+    """Handle Search Console property selection"""
+    client = get_object_or_404(Client, id=client_id)
+    
+    if request.method == 'POST':
+        try:
+            selected_property = request.POST.get('selected_property')
+            if not selected_property:
+                raise ValidationError("No property selected")
+                
+            credentials_dict = request.session.get('oauth_credentials')
+            if not credentials_dict:
+                raise AuthError("No OAuth credentials found in session")
+            
+            logger.info(f"Creating/updating SC credentials for client {client.name}")
+            logger.debug(f"Credentials dict: {credentials_dict}")
+                
+            sc_credentials, created = SearchConsoleCredentials.objects.get_or_create(
+                client=client,
+                defaults={}
+            )
+            
+            # Save credentials and property info
+            sc_credentials.handle_oauth_response(credentials_dict)
+            sc_credentials.property_url = selected_property
+            if request.user.email:
+                sc_credentials.user_email = request.user.email
+            sc_credentials.save()
+            
+            logger.info(f"Successfully saved SC credentials for client {client.name}")
+            
+            # Clean up session
+            for key in ['oauth_credentials', 'sc_properties', 'oauth_state']:
+                request.session.pop(key, None)
+            
+            messages.success(request, "Search Console credentials added successfully")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+            
+        except Exception as e:
+            logger.error(f"Error saving SC credentials: {str(e)}", exc_info=True)
+            messages.error(request, f"Failed to save Search Console credentials: {str(e)}")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+    
+    # Handle GET request
+    properties = request.session.get('sc_properties', [])
+    if not properties:
+        messages.error(request, "No Search Console properties found in session. Please try authenticating again.")
+        return redirect('seo_manager:client_detail', client_id=client.id)
+        
+    return render(request, 'seo_manager/select_search_console_property.html', {
+        'client': client,
+        'properties': properties
+    })
+
+@login_required
+def add_sc_credentials_service_account(request, client_id):
+    """Handle Search Console service account credential addition"""
+    client = get_object_or_404(Client, id=client_id)
+    
+    if request.method == 'GET':
+        return render(request, 'seo_manager/credentials/add_sc_service_account.html', {
+            'client': client
+        })
+        
+    elif request.method == 'POST':
+        try:
+            if 'service_account_file' not in request.FILES:
+                raise AuthError("No service account file provided")
+                
+            service_account_file = request.FILES['service_account_file']
+            service_account_json = json.load(service_account_file)
+            
+            sc_credentials, created = SearchConsoleCredentials.objects.get_or_create(
+                client=client,
+                defaults={'user_email': request.user.email}
+            )
+            
+            sc_credentials.handle_service_account(json.dumps(service_account_json))
+            
+            messages.success(request, "Service account credentials added successfully")
+            return redirect('seo_manager:client_detail', client_id=client.id)
+            
+        except AuthError as e:
+            messages.error(request, str(e))
+        except json.JSONDecodeError:
+            messages.error(request, "Invalid JSON file")
+        except Exception as e:
+            logger.error(f"Error adding service account: {str(e)}")
+            messages.error(request, "Failed to add service account credentials")
+            
+        return redirect('seo_manager:client_detail', client_id=client.id)
+
