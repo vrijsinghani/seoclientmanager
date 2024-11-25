@@ -19,9 +19,11 @@ urlpatterns = [
     path('crew/<int:crew_id>/active-executions/', views_kanban.get_active_executions, name='get_active_executions'),
     path('crew/execution/<int:execution_id>/input/', views_kanban.submit_human_input, name='submit_human_input'),
     path('executions/', views.execution_list, name='execution_list'),
-    path('execution/<int:execution_id>/', views.execution_detail, name='execution_detail'),
-    path('execution/<int:execution_id>/status/', views.execution_status, name='execution_status'),
+    path('execution/<int:execution_id>/', views_kanban.execution_detail, name='execution_detail'),
+    path('execution/<int:execution_id>/status/', views_kanban.get_active_executions, name='execution_status'),
     path('execution/<int:execution_id>/submit_human_input/', views.submit_human_input, name='submit_human_input'),
+    path('execution/<int:execution_id>/cancel/', views_kanban.cancel_execution, name='cancel_execution'),
+    path('execution/<int:execution_id>/cancel/', views_kanban.cancel_execution, name='cancel_execution'),
     
     # Admin views
     path('manage/agents/', views_agents.manage_agents, name='manage_agents'),

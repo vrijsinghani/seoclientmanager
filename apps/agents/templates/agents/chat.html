@@ -479,6 +479,38 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize WebSocket
         initializeWebSocket();
     });
+
+    // Keep-alive functionality
+    function setupKeepAlive(socket) {
+        const keepAliveInterval = 25000; // 25 seconds
+        
+        // Send keep-alive message periodically
+        const keepAliveTimer = setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'keep_alive',
+                    timestamp: Date.now()
+                }));
+            }
+        }, keepAliveInterval);
+
+        // Clear interval when socket closes
+        socket.addEventListener('close', () => {
+            clearInterval(keepAliveTimer);
+        });
+    }
+
+    // Modify your existing socket connection code
+    function connectWebSocket() {
+        const socket = new WebSocket(/* your websocket URL */);
+        
+        socket.onopen = function(e) {
+            console.log('WebSocket connection established');
+            setupKeepAlive(socket);
+        };
+
+        // Your existing socket event handlers...
+    }
 });
 
 // Initialize tooltips

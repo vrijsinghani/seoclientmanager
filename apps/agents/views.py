@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt, csrf_protect
-from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent
+from .models import Crew, CrewExecution, CrewMessage, Pipeline, Agent, CrewTask, Task
 from .forms import CrewExecutionForm, HumanInputForm, AgentForm
 from .tasks import execute_crew
 from django.core.exceptions import ValidationError
@@ -131,40 +131,39 @@ def execution_list(request):
 @login_required
 def execution_detail(request, execution_id):
     execution = get_object_or_404(CrewExecution, id=execution_id)
-
-    messages = CrewMessage.objects.filter(execution=execution).order_by('timestamp')
     
-    # Convert markdown to HTML for each message using markdown-it
-    for message in messages:
-        message.content_html = md.render(message.content)  # Use markdown-it for conversion
-
-    # Convert markdown in outputs if they exist
-    if execution.outputs:
-        outputs_html = {}
-        for key, value in execution.outputs.items():
-            if isinstance(value, (str, int, float, bool)):
-                outputs_html[key] = md.render(str(value))  # Use markdown-it for conversion
-            elif value is None:
-                outputs_html[key] = ''
-            else:
-                # For complex types like dicts or lists, format them nicely
-                outputs_html[key] = f'<pre>{json.dumps(value, indent=2)}</pre>'
-        execution.outputs_html = outputs_html
+    # Get all tasks for this crew through CrewTask
+    crew_tasks = CrewTask.objects.filter(crew=execution.crew).select_related('task')
+    kanban_tasks = []
     
-    status_classes = {
-        'PENDING': 'info',
-        'RUNNING': 'primary',
-        'WAITING_FOR_HUMAN_INPUT': 'warning',
-        'COMPLETED': 'success',
-        'FAILED': 'danger'
-    }
-    status_class = status_classes.get(execution.status, 'secondary')
-
+    for crew_task in crew_tasks:
+        task = crew_task.task
+        stages = execution.stages.filter(task=task).order_by('created_at')
+        
+        stage_data = []
+        for stage in stages:
+            stage_data.append({
+                'id': stage.id,
+                'title': stage.title,
+                'content': stage.content,
+                'status': stage.status,
+                'agent': stage.agent.name if stage.agent else None,
+                'created_at': stage.created_at,
+                'metadata': stage.metadata or {}
+            })
+        
+        kanban_tasks.append({
+            'id': task.id,
+            'name': task.description,
+            'stages': stage_data
+        })
+    
     context = {
         'execution': execution,
-        'messages': messages,
-        'status_class': status_class,
+        'crew': execution.crew,
+        'tasks': kanban_tasks
     }
+    
     return render(request, 'agents/execution_detail.html', context)
 
 @login_required

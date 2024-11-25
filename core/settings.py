@@ -98,6 +98,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     # Required for debug toolbar
     'debug_toolbar.middleware.DebugToolbarMiddleware',
+
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -388,11 +389,11 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO',
+        'level': 'DEBUG',
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
+            'handlers': ['console','file'],
             'level': 'INFO',
             'propagate': True,
         },
@@ -402,12 +403,12 @@ LOGGING = {
             'propagate': True,
         },
         'apps.crawl_website': {
-            'handlers': ['file'],
+            'handlers': ['file','console'],
             'level': 'DEBUG',
             'propagate': True,
         },
         'apps.common': {
-            'handlers': ['file'],
+            'handlers': ['console','file'],
             'level': 'DEBUG',
             'propagate': True,
         },
@@ -422,7 +423,7 @@ LOGGING = {
             'propagate': False,
         },
         'channels': {
-            'handlers': ['file'],
+            'handlers': ['console','file'],
             'level': 'DEBUG',
             'propagate': True,
         },
@@ -431,6 +432,7 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+
     },
 }
 

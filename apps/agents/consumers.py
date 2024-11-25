@@ -297,7 +297,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.group_name = f"chat_{self.session_id}"
         self._agent_executor = None
         self._callback_handler = None
-        self.is_connected = False  # Add connection state tracking
+        self.is_connected = False
+        self.last_activity = time.time()  # Add timestamp tracking
+        self.ACTIVITY_TIMEOUT = 3600  # 1 hour timeout
+        self.PING_INTERVAL = 30  # Send ping every 30 seconds
 
     async def _get_or_create_agent_executor(self, agent, model_name, client_data):
         """Get existing agent executor or create a new one"""
@@ -354,12 +357,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.error(f"Error in disconnect: {str(e)}", exc_info=True)
 
     async def _check_connection(self):
-        """Periodic connection health check"""
+        """Periodic connection health check with activity monitoring"""
         while self.is_connected:
             try:
+                current_time = time.time()
+                # Check if there's been no activity for too long
+                if current_time - self.last_activity > self.ACTIVITY_TIMEOUT:
+                    logger.warning(f"Session {self.session_id} timed out due to inactivity")
+                    await self.close()
+                    break
+                
                 # Send ping frame
                 await self.send(bytes_data=b'ping')
-                await asyncio.sleep(30)  # Check every 30 seconds
+                await asyncio.sleep(self.PING_INTERVAL)
+                
             except Exception as e:
                 logger.error(f"Connection check failed: {str(e)}")
                 self.is_connected = False
@@ -368,6 +379,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         """Handle incoming messages with better error handling"""
         try:
+            # Update last activity timestamp
+            self.last_activity = time.time()
+
             # Handle ping/pong
             if bytes_data == b'ping':
                 await self.send(bytes_data=b'pong')
@@ -385,6 +399,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 return
 
             data = json.loads(text_data)
+            
+            # Handle keep-alive messages
+            if data.get('type') == 'keep_alive':
+                await self.send(text_data=json.dumps({
+                    'type': 'keep_alive_response',
+                    'timestamp': time.time()
+                }))
+                return
+
             message = data['message']
             agent_id = data['agent_id']
             model_name = data['model']
@@ -407,7 +430,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Handle the response and stop if it's a final answer
             if response:
                 await self._handle_response(response, agent_id, model_name)
-                return  # Add this to stop processing after final answer
+                return  # Keep this return to stop processing after final answer
             
         except json.JSONDecodeError:
             logger.error("Invalid JSON received")
@@ -415,6 +438,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error in receive: {str(e)}", exc_info=True)
             await self._handle_error(str(e))
+            return  # Keep this return for error handling
 
     async def _execute_agent_with_retry(self, agent_executor, message, max_retries=3):
         """Execute agent with retry logic and proper response formatting"""
@@ -425,83 +449,67 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if not message or not message.strip():
                     raise ValueError("Empty or invalid input message")
 
-                # Execute the agent with timeout
+                # Execute the agent with a longer timeout
                 response = await asyncio.wait_for(
                     database_sync_to_async(agent_executor.invoke)(
                         {"input": message},
                         callbacks=[self._create_callback_handler()]
                     ),
-                    timeout=60  # Increased timeout
+                    timeout=300
                 )
                 
+                logger.debug(f"Raw agent response type: {type(response)}")
                 logger.debug(f"Raw agent response: {response}")
                 
-                # Process the response
                 if isinstance(response, dict):
-                    if response.get('output'):
+                    logger.debug(f"Response keys: {response.keys()}")
+                    if 'output' in response:
                         return response['output']
-                    elif response.get('error'):
+                    elif 'error' in response:
                         raise ValueError(response['error'])
+                    elif 'action' in response and 'action_input' in response:
+                        # Handle structured output from agent
+                        if response['action'] == 'Final Answer':
+                            return response['action_input']
+                        else:
+                            # Handle tool actions if needed
+                            logger.debug(f"Tool action received: {response['action']}")
+                            return response['action_input']
                 
-                # If we get here, we didn't get a valid response
-                raise ValueError("Invalid or empty response from agent")
+                return str(response)
                 
             except asyncio.TimeoutError:
                 logger.error(f"Agent execution timed out on attempt {attempt + 1}")
                 if attempt == max_retries - 1:
                     return "I apologize, but I was unable to complete the analysis in time. Please try a more specific question or break your request into smaller parts."
                 await asyncio.sleep(1)
-                
             except Exception as e:
                 last_error = e
                 logger.error(f"Agent execution attempt {attempt + 1} failed: {str(e)}", exc_info=True)
                 if attempt == max_retries - 1:
-                    # Provide a helpful response even on failure
-                    return ("I encountered some limitations with the data analysis. Try asking the question in a different way.")
-
+                    return "I encountered some limitations with the data analysis. Try asking the question in a different way."
                 await asyncio.sleep(1)
-        
-        return ("I apologize, but I'm having trouble accessing some of the data. "
-                "Please try rephrasing your question or focusing on specific metrics.")
 
     async def _handle_response(self, response, agent_id, model_name):
-        """Handle the agent's response"""
+        """Process and send the response to the websocket"""
         try:
-            # Ensure response is properly formatted
-            if not isinstance(response, str):
-                response = str(response)
+            # Format the response if needed
+            formatted_response = format_message(response) if response else ""
             
-            response = response.strip()
-            
-            # Extract the actual response from Final Answer format if present
-            try:
-                if '"action": "Final Answer"' in response:
-                    json_match = re.search(r'\{.*\}', response, re.DOTALL)
-                    if json_match:
-                        json_response = json.loads(json_match.group())
-                        if json_response.get('action') == 'Final Answer':
-                            response = json_response.get('action_input', response)
-            except (json.JSONDecodeError, AttributeError):
-                pass
-            
-            # Save message to database
-            await self.save_message(response, agent_id, True, model_name)
-            
-            # Send response to websocket
+            # Send the formatted response
             await self.send(text_data=json.dumps({
-                'message': response,
-                'is_agent': True,
-                'timestamp': datetime.datetime.now().isoformat()
+                'message': formatted_response,
+                'agent_id': agent_id,
+                'model': model_name,
+                'type': 'agent_response'
             }))
+            
+            # Log the response for debugging
+            logger.debug(f"Sent response: {formatted_response[:100]}...")
             
         except Exception as e:
-            error_msg = f"Error handling response: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            await self.send(text_data=json.dumps({
-                'message': error_msg,
-                'is_agent': True,
-                'error': True
-            }))
+            logger.error(f"Error handling response: {str(e)}", exc_info=True)
+            await self._handle_error("Error processing response")
 
     def _initialize_agent(self, agent, model_name, client_data):
         """Initialize the agent with tools and memory"""
@@ -577,7 +585,7 @@ For final responses, use:
                 verbose=True,
                 max_iterations=5,
                 max_execution_time=60,
-                early_stopping_method="generate",
+                early_stopping_method="force",
                 handle_parsing_errors=True,
                 return_intermediate_steps=False,
                 output_key="output",

@@ -18,11 +18,18 @@
   min-width: 320px;
   max-width: 640px;
   margin: 0 0.9375rem;
+  background-color: #f8f9fa;  /* Light gray background */
+}
+
+.kanban-board header {
+  background: linear-gradient(87deg, #11cdef, #1171ef) !important;
 }
 
 .kanban-drag {
   min-height: 200px;
   padding: 1.25rem;
+  background-color: #edf0f5;  /* Slightly darker background for contrast */
+  border-radius: 0 0 0.5rem 0.5rem;
 }
 
 .kanban-item {
@@ -48,37 +55,6 @@
 }
 
 /* Stage status indicators */
-.stage-status {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-right: 5px;
-}
-
-.stage-status.pending { background-color: var(--bs-gray); }
-.stage-status.in-progress { background-color: var(--bs-primary); }
-.stage-status.completed { background-color: var(--bs-success); }
-.stage-status.failed { background-color: var(--bs-danger); }
-
-.toggle-content {
-  color: var(--bs-primary);
-  text-decoration: none;
-  margin-left: 0.5rem;
-}
-
-.toggle-content:hover {
-  color: var(--bs-primary-darker);
-}
-
-.toggle-content i {
-  transition: transform 0.2s;
-}
-
-.toggle-content.expanded i {
-  transform: rotate(180deg);
-}
-
 .stage-item {
   border: 1px solid #e9ecef;
   border-radius: 0.5rem;
@@ -88,44 +64,111 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   transition: all 0.3s ease;
 }
-
-.stage-item.completed {
-  border-left: 4px solid #2dce89;
+.stage-item:hover {
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
 }
-
-.stage-item.in-progress {
-  border-left: 4px solid #11cdef;
+.stage-content {
+  margin-top: 1rem;
 }
-
+.stage-metadata {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
 .stage-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-transform: lowercase;
+    white-space: nowrap;
+}
+
+.status-pending { 
+    background-color: #6c757d;  /* gray */
+    color: white;
+}
+
+.status-in_progress,
+.status-running { 
+    background-color: #0d6efd;  /* blue */
+    color: white;
+}
+
+.status-completed { 
+    background-color: #198754;  /* green */
+    color: white;
+}
+
+.status-error { 
+    background-color: #dc3545;  /* red */
+    color: white;
+}
+/* Time stamp styling */
+.time-stamp {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+/* Title styling */
+.stage-title {
+  color: #344767;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.75rem 0;
+}
+
+/* Content styling */
+.stage-content {
+  color: #67748e;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Agent info styling */
+.stage-agent {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 1rem;
+  color: #67748e;
+  font-size: 0.75rem;
+}
+
+.stage-agent i {
+  margin-right: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Show more button styling */
+.toggle-content {
+  color: #0d6efd;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 0.5rem;
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 8px;
 }
 
-.stage-status.completed {
-  background-color: #2dce89;
+.toggle-content:hover {
+  color: #0a58ca;
 }
 
-.stage-status.in_progress, .stage-status.running {
-  background-color: #11cdef;
+.btn-group .btn-link {
+    color: #6c757d;
+    text-decoration: none;
+    transition: color 0.2s;
 }
 
-.stage-status.pending {
-  background-color: #fb6340;
+.btn-group .btn-link:hover {
+    color: #344767;
 }
 
-.stage-status.error {
-  background-color: #f5365c;
-}
-
-.stages-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 0.5rem;
+.gap-2 {
+    gap: 0.5rem;
 }
 </style>
 {% endblock extrastyle %}
@@ -156,35 +199,55 @@
 {% block content %}
 {% csrf_token %}
 <div class="container-fluid py-4">
-  <!-- Crew Header -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header pb-0">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <h6>{{ crew.name }}</h6>
-              <p class="text-sm mb-0">{{ client.name }} - {{ client.website_url }}</p>
+    <!-- Header Card -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <!-- Left side with crew info -->
+                        <div class="d-flex">
+                            <div class="me-3">
+                                <div class="avatar avatar-xl position-relative">
+                                    <img src="{% static 'assets/img/team-1.jpg' %}" alt="profile_image" class="w-100 border-radius-lg shadow-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">{{ crew.name }}</h5>
+                                <p class="mb-0 font-weight-bold text-sm">Execution #{{ execution.id }}</p>
+                                <p class="mb-0 text-sm">Started: {{ execution.created_at|date:"Y-m-d H:i:s" }}</p>
+                                <p class="mb-0 text-sm">Client: {{client.name}} - {{client.website_url}}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Right side with buttons -->
+                        <div class="d-flex gap-2">
+                            <button id="cancelExecutionBtn" class="btn btn-danger" style="visibility: visible;">
+                                <i class="fas fa-stop-circle me-2"></i>Cancel Execution
+                            </button>
+                            <button class="btn btn-primary" onclick="showStartExecutionModal()">
+                                <i class="fas fa-play me-2"></i>Start Crew Execution
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <button class="btn btn-primary" onclick="showStartExecutionModal()">
-              <i class="fas fa-play me-2"></i>Start Crew Execution
-            </button>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
-
-  <!-- Kanban Board -->
-  <div class="row">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header pb-0">
-          <h6>Tasks <span id="execution-number"></span></h6>
-        </div>
-        <div class="card-body">
-          <div class="kanban-container" id="kanban-tasks">
-            {% for task in tasks %}
+  
+    <!-- Tasks Section -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header pb-0">
+            <div class="d-flex align-items-center">
+              <h6 class="mb-0">Tasks</h6>
+              <span id="execution-number" class="text-sm ms-2"></span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="kanban-container" id="kanban-tasks">
+              {% for task in tasks %}
             <!-- Task Board -->
             <div class="kanban-board" data-task-id="{{ task.id }}">
               <header class="kanban-board-header bg-gradient-primary rounded-top p-3">
@@ -254,20 +317,46 @@
   </div>
 </div>
 <!-- Modal for expanded content -->
-<div class="modal fade" id="contentModal" tabindex="-1" role="dialog" aria-labelledby="contentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="contentModalLabel">Content Details</h5>
+                <h5 class="modal-title" id="detailsModalLabel">Stage Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="modalContent"></div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <dl class="row">
+                            <dt class="col-sm-4">Status</dt>
+                            <dd class="col-sm-8" id="modalStatus"></dd>
+                            <dt class="col-sm-4">Stage Type</dt>
+                            <dd class="col-sm-8" id="modalStageType"></dd>
+                            <dt class="col-sm-4">Agent</dt>
+                            <dd class="col-sm-8" id="modalAgent"></dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Metadata</h6>
+                        <pre class="bg-light p-2 rounded" id="modalMetadata"></pre>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Content</h6>
+                        <div id="modalContent"></div>
+                    </div>
+                </div>
+            </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
+
 {% endblock content %}
 
 {% block extra_js %}
@@ -534,7 +623,8 @@
         addUpdateToBoard(taskBoard, data);
 
         // Update all cards in this task board if status is COMPLETED
-        if (data.status === 'COMPLETED') {
+        const status = data.status?.toUpperCase();
+        if (status === 'COMPLETED') {
             const cards = taskBoard.querySelectorAll('.kanban-item');
             cards.forEach(card => {
                 const header = card.querySelector('.card-header');
@@ -543,58 +633,80 @@
                 }
             });
         }
+
+        // Update cancel button visibility based on status
+        console.log('Current status:', data.status);  // Debug log
+        if (data.status === 'RUNNING' || data.status === 'IN_PROGRESS' || data.status === 'PENDING') {
+            console.log('Showing cancel button');  // Debug log
+            updateCancelButton(true, data.execution_id);
+        } else {
+            console.log('Hiding cancel button');  // Debug log
+            updateCancelButton(false);
+        }
     }
 
-    function addUpdateToBoard(taskBoard, data) {
-        const kanbanDrag = taskBoard.querySelector('.kanban-drag');
-        if (!kanbanDrag) return;
 
-        // Create a unique ID for this stage update
+    function addUpdateToBoard(taskBoard, data) {
+    const kanbanDrag = taskBoard.querySelector('.kanban-drag');
+    if (!kanbanDrag) return;
+
         const stageId = `${data.stage?.stage_type || 'status'}-${Date.now()}`;
-        
-        // Get the content and create truncated version
         const content = data.stage?.content || '';
         const truncatedContent = content.length > 200 ? content.substring(0, 200) + '...' : content;
         
-        // Create the card HTML
         const stageHtml = `
-            <div class="kanban-item card" data-execution-id="${data.execution_id}" data-stage-id="${stageId}">
-                <div class="card-header bg-gradient-${data.status === 'COMPLETED' ? 'success' : 'info'} text-white p-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0">
-                            <span class="stage-status ${data.stage?.status || data.status.toLowerCase()}"></span>
-                            ${data.stage?.title || 'Status Update'}
-                        </h6>
-                        ${data.stage?.stage_type === 'human_input' && !data.stage?.completed ? `
-                            <button class="btn btn-sm btn-primary" onclick="showInputModal('${data.execution_id}')">
-                                Provide Input
+            <div class="stage-item" data-execution-id="${data.execution_id}" data-stage-id="${stageId}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="stage-status status-${(data.stage?.status || data.status)?.toLowerCase()}">
+                            ${data.stage?.status || data.status}
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-link btn-sm p-0 text-muted" 
+                                onclick="showDetailsModal('${stageId}', ${JSON.stringify(data).replace(/"/g, '&quot;')})">
+                            <i class="fas fa-info-circle"></i>
+                        </button>
+                        ${data.stage?.artifacts ? `
+                            <button class="btn btn-link btn-sm p-0 text-muted" 
+                                    onclick="downloadArtifacts('${data.execution_id}', '${stageId}')">
+                                <i class="fas fa-download"></i>
                             </button>
                         ` : ''}
+                        <span class="time-stamp">${new Date().toLocaleTimeString()}</span>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="content">
-                        ${md.render(truncatedContent)}
-                        ${content.length > 200 ? `
-                            <div class="mt-2">
-                                <button class="btn btn-sm btn-primary view-full-content" 
-                                    data-stage-id="${stageId}"
-                                    data-content="${encodeURIComponent(content)}">
-                                    View Full Content
-                                </button>
-                                <a href="data:text/markdown;charset=utf-8,${encodeURIComponent(content)}" 
-                                  download="content-${stageId}.md" 
-                                  class="btn btn-sm btn-secondary">
-                                    Download
-                                </a>
+                
+                <h6 class="stage-title">${data.stage?.title || 'Status Update'}</h6>
+                
+                <div class="stage-content">
+                    ${md.render(truncatedContent)}
+                    ${content.length > 200 ? `
+                        <button class="toggle-content" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#content-${stageId}" 
+                                aria-expanded="false">
+                            SHOW MORE
+                        </button>
+                        <div class="collapse" id="content-${stageId}">
+                            <div class="pt-2">
+                                ${md.render(content)}
                             </div>
-                        ` : ''}
-                    </div>
+                        </div>
+                    ` : ''}
                 </div>
+                
+                ${data.stage?.agent ? `
+                    <div class="stage-agent">
+                        <i class="fas fa-${data.stage.type === 'message' ? 'comment' : 'robot'}"></i>
+                        ${data.stage.agent}
+                    </div>
+                ` : ''}
             </div>`;
 
         kanbanDrag.insertAdjacentHTML('beforeend', stageHtml);
     }
+
 
     function updateAgentProgress(data) {
         console.log('Updating agent progress:', data);
@@ -663,6 +775,21 @@
         if (!clientId) {
             alert('Error: No client selected. Please select a client first.');
             return;
+        }
+
+        // Clear all kanban boards
+        const kanbanBoards = document.querySelectorAll('.kanban-board');
+        kanbanBoards.forEach(board => {
+            const kanbanDrag = board.querySelector('.kanban-drag');
+            if (kanbanDrag) {
+                kanbanDrag.innerHTML = '';
+            }
+        });
+
+        // Reset execution number
+        const executionSpan = document.getElementById('execution-number');
+        if (executionSpan) {
+            executionSpan.textContent = '';
         }
 
         fetch(`/agents/crew/${crewId}/start-execution/`, {
@@ -754,6 +881,77 @@
             expandedContent.classList.remove('d-none');
             element.classList.add('expanded');
         }
+    }
+
+    // Function to show/hide cancel button based on execution status
+    function updateCancelButton(hasActiveExecution, executionId) {
+        console.log('updateCancelButton:', { hasActiveExecution, executionId });  // Debug log
+        const cancelBtn = document.getElementById('cancelExecutionBtn');
+        if (!cancelBtn) {
+            console.error('Cancel button not found');  // Debug log
+            return;
+        }
+        cancelBtn.style.visibility = hasActiveExecution ? 'visible' : 'hidden';
+        if (hasActiveExecution) {
+            cancelBtn.setAttribute('data-execution-id', executionId);
+        } else {
+            cancelBtn.removeAttribute('data-execution-id');
+        }
+    }
+
+    // Add cancel execution functionality
+    async function cancelExecution(executionId) {
+        try {
+            const response = await fetch(`/agents/execution/${executionId}/cancel/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrfToken(),
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to cancel execution');
+            }
+            
+            updateCancelButton(false);
+        } catch (error) {
+            console.error('Error cancelling execution:', error);
+            alert('Failed to cancel execution. Please try again.');
+        }
+    }
+
+    // Add click handler for cancel button
+    document.getElementById('cancelExecutionBtn').addEventListener('click', function() {
+        const executionId = this.getAttribute('data-execution-id');
+        if (executionId) {
+            if (confirm('Are you sure you want to cancel this execution?')) {
+                cancelExecution(executionId);
+            }
+        }
+    });
+
+    // Update WebSocket message handling to handle cancellation
+    if (socket) {
+        const originalOnMessage = socket.onmessage;
+        socket.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                console.log('WebSocket message received:', data);
+                
+                // Handle cancellation status
+                if (data.type === 'status_update' && data.status?.toUpperCase() === 'CANCELLED') {
+                    updateCancelButton(false);
+                }
+                
+                // Call original message handler
+                if (originalOnMessage) {
+                    originalOnMessage.call(socket, e);
+                }
+            } catch (error) {
+                console.error('Error processing WebSocket message:', error);
+            }
+        };
     }
 </script>
 {% endblock extra_js %}

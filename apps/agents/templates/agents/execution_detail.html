@@ -1,276 +1,326 @@
-{% extends "agents/base_agents.html" %}
+{% extends "layouts/base.html" %}
 {% load static %}
-{% load agent_tags %}  <!-- Add this line -->
+
+{% block title %} Execution Detail {% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<!-- jKanban styles -->
+<!-- <link rel="stylesheet" href="{% static 'assets/css/plugins/jkanban/jkanban.min.css' %}"/> -->
+<style>
+.kanban-container {
+  padding: 1.25rem;
+  display: flex;
+  overflow-x: auto;
+}
+
+.kanban-board {
+  min-width: 320px;
+  max-width: 640px;
+  margin: 0 0.9375rem;
+}
+
+.kanban-drag {
+  min-height: 200px;
+  padding: 1.25rem;
+}
+
+.kanban-item {
+  margin-bottom: 0.9375rem;
+}
+
+/* Custom scrollbar for better visibility */
+.kanban-container::-webkit-scrollbar {
+  height: 0.5rem;
+}
+
+.kanban-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.kanban-container::-webkit-scrollbar-thumb {
+  background: var(--bs-primary);
+  border-radius: 0.25rem;
+}
+
+.kanban-container::-webkit-scrollbar-thumb:hover {
+  background: var(--bs-primary-darker);
+}
+
+/* Stage status indicators */
+.stage-status {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.status-completed { background-color: #28a745; color: white; }
+.status-in_progress { background-color: #007bff; color: white; }
+.status-pending { background-color: #6c757d; color: white; }
+.status-error { background-color: #dc3545; color: white; }
+
+.stage-item {
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.stage-item:hover {
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.stage-content {
+  margin-top: 1rem;
+}
+
+.stage-metadata {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.stage-agent {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #495057;
+}
+
+.stage-agent i {
+  margin-right: 0.25rem;
+}
+
+/* Progress bar styles */
+.progress-wrapper {
+  margin-top: 1rem;
+}
+
+.progress {
+  height: 8px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  background-color: #e9ecef;
+  border-radius: 0.25rem;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: var(--bs-primary);
+  transition: width .6s ease;
+}
+
+.progress-percentage {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-align: right;
+}
+
+/* Task description styles */
+.task-description {
+  cursor: pointer;
+  position: relative;
+  padding-right: 1.5rem;
+}
+
+.task-description:after {
+  content: '\f107';
+  font-family: 'Font Awesome 5 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: transform .2s;
+}
+
+.task-description[aria-expanded="true"]:after {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* Modal styles */
+.modal-content {
+  border: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+  border-bottom: 1px solid #e9ecef;
+  padding: 1.25rem;
+}
+
+.modal-body {
+  padding: 1.25rem;
+}
+
+.modal-footer {
+  border-top: 1px solid #e9ecef;
+  padding: 1.25rem;
+}
+
+/* Button styles */
+.btn-icon {
+  padding: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: all .15s ease-in-out;
+}
+
+.btn-icon i {
+  font-size: 1rem;
+}
+
+.btn-icon:hover {
+  transform: translateY(-1px);
+}
+
+/* Utility classes */
+.text-xs {
+  font-size: 0.75rem !important;
+}
+
+.text-sm {
+  font-size: 0.875rem !important;
+}
+
+.font-weight-bold {
+  font-weight: 600 !important;
+}
+
+.text-truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>
+{% endblock extrastyle %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="card card-body blur shadow-blur mx-4 overflow-hidden">
-        <div class="row gx-4">
+  <!-- Execution Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="row align-items-center">
             <div class="col-auto">
-                <div class="avatar avatar-xxl position-relative">
-                    {% if execution.crew.avatar %}
-                        <img src="{% static 'assets/img/'|add:execution.crew.avatar %}" alt="{{ execution.crew.name }}" class="w-100 border-radius-lg shadow-sm">
-                    {% else %}
-                        <div class="avatar avatar-xxl bg-gradient-primary border-radius-lg shadow-sm">
-                            <span class="text-white" style="font-size: 5.0rem;">{{ execution.crew.name|make_list|first|upper }}</span>
-                        </div>
-                    {% endif %}
-                </div>
+              <div class="avatar avatar-xl position-relative">
+                <img src="{% static 'assets/img/team-1.jpg' %}" alt="profile_image" class="w-100 border-radius-lg shadow-sm">
+              </div>
             </div>
-            <div class="col-auto my-auto">
-                <div class="h-100">
-                    <h5 class="mb-1">{{ execution.crew.name }}</h5>
-                    <p class="mb-0 font-weight-bold text-sm">
-                        Status: <span class="badge bg-gradient-{{ status_class }}">{{ execution.get_status_display }}</span>
-                    </p>
-                </div>
+            <div class="col">
+              <div class="h-100">
+                <h5 class="mb-1">{{ crew.name }}</h5>
+                <p class="mb-0 font-weight-bold text-sm">Execution #{{ execution.id }}</p>
+                <p class="mb-0 text-sm">Started: {{ execution.created_at|date:"Y-m-d H:i:s" }}</p>
+                <p class="mb-0 text-sm">Client: {{client.name}} - {{client.website_url}}</p>
+              </div>
             </div>
-            <div class="col-lg-4 col-md-6 my-sm-auto ms-sm-auto me-sm-0 mx-auto mt-3">
-                <div class="nav-wrapper position-relative end-0">
-                    <div class="avatar-group">
-                        {% for agent in execution.crew.agents.all|slice:":8" %}
-                            <a href="javascript:;" class="avatar avatar-lg rounded-circle" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ agent.name }}">
-                                <img src="{% static 'assets/img/'|add:agent.avatar %}" alt="{{ agent.name }}">
-                            </a>
-                        {% endfor %}
-                        {% if execution.crew.agents.count > 8 %}
-                            <a href="javascript:;" class="avatar avatar-lg rounded-circle" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ execution.crew.agents.count|add:'-3' }} more">
-                                <span class="avatar-text bg-gradient-primary">+{{ execution.crew.agents.count|add:'-8' }}</span>
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card h-100">
-                <div class="card-header pb-0">
-                    <h6>Execution Messages</h6>
-                    <p class="text-sm">
-                        <i class="fa fa-clock me-1"></i>
-                        Last updated: {{ execution.updated_at|date:"SHORT_DATETIME_FORMAT" }}
-                    </p>
-                </div>
-                <div class="card-body p-3">
-                    <div class="messages-container" style="width: 100%; padding-left: 45px; position: relative;">
-                        <!-- Timeline vertical line -->
-                        <div style="position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; background-color: #dee2e6;"></div>
-                        
-                        {% for message in messages %}
-                        <div class="message-block" style="position: relative; margin-bottom: 1.5rem; width: 100%;">
-                            <!-- Timeline step -->
-                            <span style="position: absolute; left: -29px; width: 26px; height: 26px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; border: 2px solid #dee2e6;">
-                                {% if message.agent %}
-                                    <i class="ni ni-spaceship text-primary text-gradient"></i>
-                                {% else %}
-                                    <i class="ni ni-bell-55 text-success text-gradient"></i>
-                                {% endif %}
-                            </span>
-                            
-                            <!-- Message content -->
-                            <div style="width: 100%;">
-                                <div class="d-flex justify-content-between">
-                                    <h6 class="text-dark text-sm font-weight-bold mb-0">
-                                        {% if message.agent %}
-                                            {{ message.agent }}
-                                        {% else %}
-                                            System Message
-                                        {% endif %}
-                                    </h6>
-                                    <p class="text-secondary font-weight-bold text-xs mt-1 mb-0">
-                                        {{ message.timestamp|date:"d M H:i" }}
-                                    </p>
-                                </div>
-                                <div class="message-content">
-                                    <div class="text-sm mt-2 mb-0 message-preview">
-                                        {{ message.content|truncatechars:150 }}
-                                    </div>
-                                    <div class="message-full collapse">
-                                        <div class="text-sm mt-2 mb-0">
-                                            <!-- Add debug output -->
-                                            <!-- Original: {{ message.content }} -->
-                                            <!-- HTML: {{ message.content_html|safe }} -->
-                                            {{ message.content_html|safe }}
-                                        </div>
-                                    </div>
-                                    {% if message.content|length > 150 %}
-                                        <a href="javascript:;" class="text-xs text-primary toggle-message">Show more</a>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% empty %}
-                        <p class="text-sm mb-0">No messages yet.</p>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
+  <!-- Kanban Board -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header pb-0">
+          <h6>Tasks</h6>
         </div>
-
-        {% if execution.outputs %}
-        <div class="col-12 mt-4">
-            <div class="card">
-                <div class="card-header pb-0">
-                    <h6>Execution Outputs</h6>
+        <div class="card-body px-0 pt-0 pb-2">
+          <div class="kanban-container">
+            {% for column in columns %}
+            <div class="kanban-board card">
+              <header class="kanban-board-header bg-gradient-primary p-3">
+                <div class="d-flex align-items-center">
+                  <h6 class="text-white mb-0">{{ column.name }}</h6>
                 </div>
-                <div class="card-body p-3">
-                    <div class="messages-container" style="width: 100%; padding-left: 45px; position: relative;">
-                        <!-- Timeline vertical line -->
-                        <div style="position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; background-color: #dee2e6;"></div>
-                        
-                        {% for key, value in execution.outputs.items %}
-                        <div class="message-block" style="position: relative; margin-bottom: 1.5rem; width: 100%;">
-                            <!-- Timeline step -->
-                            <span style="position: absolute; left: -29px; width: 26px; height: 26px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; border: 2px solid #dee2e6;">
-                                <i class="ni ni-key-25 text-warning text-gradient"></i>
-                            </span>
-                            
-                            <!-- Output content -->
-                            <div style="width: 100%;">
-                                <div class="d-flex justify-content-between">
-                                    <h6 class="text-dark text-sm font-weight-bold mb-0">{{ key }}</h6>
-                                </div>
-                                <div class="message-content">
-                                    <div class="text-sm mt-2 mb-0 message-preview">
-                                        {% if value|stringformat:"s"|length > 150 %}
-                                            {{ value|stringformat:"s"|truncatechars:150 }}
-                                        {% else %}
-                                            {{ value|stringformat:"s" }}
-                                        {% endif %}
-                                    </div>
-                                    <div class="message-full collapse">
-                                        <div class="text-sm mt-2 mb-0">
-                                            {{ execution.outputs_html|get_item:key|safe }}
-                                        </div>
-                                    </div>
-                                    {% if value|stringformat:"s"|length > 150 %}
-                                        <a href="javascript:;" class="text-xs text-primary toggle-message">Show more</a>
-                                    {% endif %}
-                                </div>
+              </header>
+              <div class="kanban-drag p-3">
+                {% for stage in column.stages %}
+                <div class="stage-item">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="stage-status status-{{ stage.status|lower }}">{{ stage.status }}</span>
+                    <small class="text-muted">{{ stage.created_at|date:"H:i:s" }}</small>
+                  </div>
+                  <h6 class="mt-2 mb-1">{{ stage.title }}</h6>
+                  <div class="stage-content">
+                    <div class="content-preview">
+                      <p class="text-sm mb-2">{{ stage.content|truncatechars:150 }}</p>
+                      {% if stage.content|length > 150 %}
+                      <button class="btn btn-link btn-sm p-0 toggle-content" 
+                              data-bs-toggle="collapse" 
+                              data-bs-target="#content-{{ stage.id }}" 
+                              aria-expanded="false">
+                        Show More
+                      </button>
+                      <div class="collapse" id="content-{{ stage.id }}">
+                        <div class="pt-2">
+                          {{ stage.content|linebreaks }}
+                          {% if stage.metadata %}
+                          <div class="stage-metadata">
+                            <h6 class="text-sm font-weight-bold">Metadata:</h6>
+                            {% if stage.type == 'output' and stage.metadata.json_output %}
+                            <pre class="text-sm">{{ stage.metadata.json_output|pprint }}</pre>
+                            {% if stage.metadata.token_usage %}
+                            <div class="mt-2">
+                              <h6 class="text-sm font-weight-bold">Token Usage:</h6>
+                              <pre class="text-sm">{{ stage.metadata.token_usage|pprint }}</pre>
                             </div>
+                            {% endif %}
+                            {% else %}
+                            <pre class="text-sm">{{ stage.metadata|pprint }}</pre>
+                            {% endif %}
+                          </div>
+                          {% endif %}
                         </div>
-                        {% endfor %}
+                      </div>
+                      {% endif %}
                     </div>
+                  </div>
+                  {% if stage.agent %}
+                  <div class="stage-agent">
+                    <i class="fas fa-{% if stage.type == 'message' %}comment{% else %}robot{% endif %}"></i>
+                    {{ stage.agent }}
+                  </div>
+                  {% endif %}
                 </div>
+                {% endfor %}
+              </div>
             </div>
+            {% endfor %}
+          </div>
         </div>
-        {% endif %}
+      </div>
     </div>
-
-    {% include 'includes/footer.html' %}
+  </div>
 </div>
 {% endblock content %}
 
-{% block extra_css %}
-<style>
-    /* Override the media query that's limiting width */
-    @media (min-width: 992px) {
-        .timeline-one-side .timeline-content {
-            max-width: none !important;
-            width: auto !important;
-        }
-    }
-
-    /* Base timeline overrides */
-    .timeline-one-side:before {
-        left: 1rem !important;
-    }
-
-    .timeline-one-side .timeline-step {
-        left: 1rem !important;
-    }
-
-    .timeline-content {
-        margin-left: 45px !important;
-        width: auto !important;
-        float: none !important;
-    }
-
-    /* Keep other styles */
-    .message-preview {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    
-    .message-full {
-        margin-top: 0.5rem;
-    }
-
-    /* Add markdown styling */
-    .message-content pre {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        overflow-x: auto;
-        margin: 1rem 0;
-    }
-    
-    .message-content code {
-        background-color: #f8f9fa;
-        padding: 0.2rem 0.4rem;
-        border-radius: 0.25rem;
-        color: #e83e8c;
-        font-size: 0.875em;
-    }
-    
-    .message-content pre code {
-        color: inherit;
-        padding: 0;
-        background-color: transparent;
-    }
-    
-    .message-content p {
-        margin-bottom: 1rem;
-    }
-    
-    .message-content ul, 
-    .message-content ol {
-        margin-bottom: 1rem;
-        padding-left: 2rem;
-    }
-    
-    .message-content blockquote {
-        border-left: 4px solid #dee2e6;
-        padding-left: 1rem;
-        margin-left: 0;
-        color: #6c757d;
-    }
-</style>
-{% endblock extra_css %}
-
 {% block extra_js %}
-{{ block.super }}
 <script>
-    $(document).ready(function() {
-        // Initialize tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
-        });
-
-        // Initialize message toggle handlers
-        $('.toggle-message').on('click', function(e) {
-            e.preventDefault();
-            const messageContent = $(this).closest('.message-content');
-            const preview = messageContent.find('.message-preview');
-            const full = messageContent.find('.message-full');
-            
-            if (full.hasClass('show')) {
-                full.collapse('hide');
-                preview.show();
-                $(this).text('Show more');
-            } else {
-                full.collapse('show');
-                preview.hide();
-                $(this).text('Show less');
-            }
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for content toggling
+    document.querySelectorAll('.toggle-content').forEach(button => {
+        button.addEventListener('click', function() {
+            const expanded = this.getAttribute('aria-expanded') === 'true';
+            this.textContent = expanded ? 'Show More' : 'Show Less';
         });
     });
+});
 </script>
 {% endblock extra_js %}

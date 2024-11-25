@@ -10,6 +10,7 @@ import json
 
 from .models import Crew, CrewExecution, ExecutionStage, Task, Agent, CrewTask
 from apps.seo_manager.models import Client
+from django.core.cache import cache
 
 @login_required
 def crew_kanban(request, crew_id):
@@ -256,3 +257,105 @@ def submit_human_input(request, execution_id):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+@login_required
+@require_http_methods(["POST"])
+def cancel_execution(request, execution_id):
+    execution = get_object_or_404(CrewExecution, id=execution_id)
+    
+    if execution.task_id:
+        # Revoke the Celery task
+        from celery.task.control import revoke
+        revoke(execution.task_id, terminate=True)
+        
+        # Update execution status
+        execution.status = 'cancelled'
+        execution.save()
+        
+        return JsonResponse({'status': 'success'})
+    
+    return JsonResponse({'status': 'error', 'message': 'No task ID found'}, status=404)
+
+@login_required
+def execution_detail(request, execution_id):
+    execution = get_object_or_404(CrewExecution.objects.select_related('crew', 'crew_output'), id=execution_id)
+    crew = execution.crew
+    
+    # Define the columns we want to show
+    columns = [
+        {'id': 'task_start', 'name': 'Task Start'},
+        {'id': 'thinking', 'name': 'Thinking'},
+        {'id': 'tool_usage', 'name': 'Tool Usage'},
+        {'id': 'tool_results', 'name': 'Tool Results'},
+        {'id': 'human_input', 'name': 'Human Input'},
+        {'id': 'completion', 'name': 'Completion'}
+    ]
+    
+    # Get all stages for this execution
+    stages = execution.stages.all().select_related('agent').order_by('created_at')
+    
+    # Get all messages for this execution
+    messages = execution.messages.all().order_by('timestamp')
+    
+    # Organize stages by stage_type
+    kanban_columns = []
+    for column in columns:
+        column_stages = []
+        
+        # Add stages for this column
+        for stage in stages:
+            if stage.stage_type == column['id']:
+                stage_data = {
+                    'id': stage.id,
+                    'title': stage.title,
+                    'content': stage.content,
+                    'status': stage.status,
+                    'agent': stage.agent.name if stage.agent else None,
+                    'created_at': stage.created_at,
+                    'metadata': stage.metadata or {},
+                    'type': 'stage'
+                }
+                column_stages.append(stage_data)
+        
+        # Add messages that might be related to this stage type
+        if column['id'] == 'thinking':
+            for message in messages:
+                column_stages.append({
+                    'id': f'msg_{message.id}',
+                    'title': f'Message from {message.agent}',
+                    'content': message.content,
+                    'status': 'completed',
+                    'agent': message.agent,
+                    'created_at': message.timestamp,
+                    'type': 'message'
+                })
+        
+        # Add crew output to completion column
+        if column['id'] == 'completion' and execution.crew_output:
+            output_data = {
+                'id': 'output',
+                'title': 'Final Output',
+                'content': execution.crew_output.raw,
+                'status': 'completed',
+                'created_at': execution.updated_at,
+                'type': 'output',
+                'metadata': {
+                    'json_output': execution.crew_output.json_dict,
+                    'token_usage': execution.crew_output.token_usage
+                }
+            }
+            column_stages.append(output_data)
+        
+        kanban_columns.append({
+            'id': column['id'],
+            'name': column['name'],
+            'stages': sorted(column_stages, key=lambda x: x['created_at'])
+        })
+    
+    context = {
+        'execution': execution,
+        'crew': crew,
+        'columns': kanban_columns
+    }
+    
+    return render(request, 'agents/execution_detail.html', context)
