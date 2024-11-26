@@ -13,7 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ChatService:
-    def __init__(self, agent, model_name, client_data, callback_handler):
+    def __init__(self, agent, model_name, client_data, callback_handler, session_id=None):
         self.agent = agent
         self.model_name = model_name
         self.client_data = client_data
@@ -22,7 +22,7 @@ class ChatService:
         self.token_counter = None
         self.agent_executor = None
         self.processing = False
-        self.session_id = f"{agent.id}_{client_data['client_id']}"
+        self.session_id = session_id or f"{agent.id}_{client_data['client_id'] if client_data else 'no_client'}"
 
     async def initialize(self):
         """Initialize the chat service with LLM and agent"""
@@ -127,12 +127,6 @@ For final responses, use:
         try:
             self.processing = True
             
-            # First, echo back the user's message
-            await self.callback_handler.on_llm_new_token(
-                message,
-                is_agent=False  # This is a user message
-            )
-            
             # Format input as expected by the agent
             input_data = {
                 "input": message,
@@ -175,7 +169,7 @@ For final responses, use:
                     await self.callback_handler.on_llm_new_token(f"Error processing response: {str(chunk_error)}")
                     continue
                     
-            return "Response complete"
+            return None  # Return None instead of "Response complete"
 
         except Exception as e:
             error_msg = f"Error processing message: {str(e)}"
@@ -299,11 +293,32 @@ Example:
     @database_sync_to_async
     def _create_agent_prompt(self):
         """Create the system prompt for the agent"""
+        client_context = ""
+        if self.client_data:
+            client_context = f"""Current Context:
+- Client ID: {self.client_data.get('client_id', 'N/A')}
+- Current Date: {self.client_data.get('current_date', 'N/A')}"""
+
         return f"""You are {self.agent.name}, an AI assistant.
 Role: {self.agent.role}
 
-Current Context:
-- Client ID: {self.client_data['client_id']}
-- Current Date: {self.client_data['current_date']}
+{client_context}
 
-{self.agent.use_system_prompt if self.agent.use_system_prompt else ''}"""
+{self.agent.use_system_prompt if self.agent.use_system_prompt else ''}
+
+RESPONSE FORMAT INSTRUCTIONS:
+1. You MUST ALWAYS respond in one of these two JSON formats:
+
+For using a tool:
+{{"action": "tool_name", "action_input": {{"param1": "value1", "param2": "value2"}}}}
+
+For final answers:
+{{"action": "Final Answer", "action_input": "your response here"}}
+
+2. Never respond with plain text or any other format
+3. Always ensure your response is valid JSON
+4. If you want to have a conversation, use the Final Answer format
+5. Make sure to escape any quotes or special characters in your responses
+
+Example conversational response:
+{{"action": "Final Answer", "action_input": "Hello! How can I help you today?"}}"""

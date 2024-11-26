@@ -5,6 +5,7 @@ from . import views_tasks
 from . import views_tools
 from . import views_crews
 from . import views_kanban
+from . import views_chat
 from .views_chat import ChatView
 
 
@@ -56,4 +57,6 @@ urlpatterns = [
     
     path('connection-test/', views.connection_test, name='connection_test'),
     path('chat/', ChatView.as_view(), name='chat'),
+    path('chat/<uuid:session_id>/', ChatView.as_view(), name='chat'),
+    path('chat/<uuid:session_id>/delete/', views_chat.delete_conversation, name='delete_conversation'),
 ]

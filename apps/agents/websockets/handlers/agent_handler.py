@@ -30,7 +30,8 @@ class AgentHandler:
                     agent=agent,
                     model_name=model_name,
                     client_data=client_data,
-                    callback_handler=callback_handler
+                    callback_handler=callback_handler,
+                    session_id=self.consumer.session_id
                 )
                 await self.chat_service.initialize()
 

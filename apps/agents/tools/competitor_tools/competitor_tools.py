@@ -1,7 +1,7 @@
 import os
 import requests
-from typing import Any, Type, List, Dict
-from pydantic.v1 import BaseModel, Field
+from typing import Any, Type, List, Dict, Optional
+from pydantic import BaseModel, Field, ConfigDict
 from crewai_tools.tools.base_tool import BaseTool
 import logging
 import pandas as pd
@@ -12,9 +12,14 @@ logger = logging.getLogger(__name__)
 BASE_URL = os.getenv('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com')
 
 class CompetitorsDomainInput(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed=True
+    )
+    
     website_url: str = Field(description="Fully qualified domain name (FQDN) for competitor analysis")
-    location_code: int = Field(default=2840, description="Location code for the analysis", exclude=True)
-    language_code: str = Field(default="en", description="Language code for the analysis", exclude=True)
+    location_code: int = Field(default=2840, description="Location code for the analysis")
+    language_code: str = Field(default="en", description="Language code for the analysis")
 
     @classmethod
     def get_fqdn(cls, url: str) -> str:
@@ -22,6 +27,11 @@ class CompetitorsDomainInput(BaseModel):
         return parsed_url.netloc or parsed_url.path
 
 class CompetitorsDomainTool(BaseTool):
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed=True
+    )
+    
     name: str = "Competitors Domain"
     description: str = "Provides a list of competitor domains with various metrics"
     args_schema: Type[BaseModel] = CompetitorsDomainInput

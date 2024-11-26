@@ -393,3 +393,19 @@ class ExecutionStage(models.Model):
     
     def __str__(self):
         return f"{self.get_stage_type_display()} - {self.title}"
+
+class Conversation(models.Model):
+    session_id = models.UUIDField(unique=True)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    agent = models.ForeignKey('Agent', on_delete=models.SET_NULL, null=True)
+    client = models.ForeignKey('seo_manager.Client', on_delete=models.SET_NULL, null=True)
+    title = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"{self.title} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"

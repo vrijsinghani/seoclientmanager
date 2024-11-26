@@ -1,14 +1,24 @@
-from typing import Any, Type
-from pydantic.v1 import BaseModel, Field
+from typing import Any, Type, Optional
+from pydantic import BaseModel, Field, ConfigDict
 from crewai_tools.tools.base_tool import BaseTool
 import requests
 import xml.etree.ElementTree as ET
 
 class GoogleSuggestionsInput(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed=True
+    )
+    
     keyword: str = Field(description="The keyword to get suggestions for")
     country_code: str = Field(default="us", description="The country code for localized suggestions")
 
 class GoogleSuggestionsTool(BaseTool):
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed=True
+    )
+    
     name: str = "Google Suggestions Fetcher"
     description: str = "Retrieves Google search suggestions for a given keyword."
     args_schema: Type[BaseModel] = GoogleSuggestionsInput

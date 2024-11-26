@@ -23,50 +23,25 @@
 
 /* Message styling */
 .message-content {
+    max-width: 75%;
     padding: 1rem 1.5rem;
     border-radius: 1rem;
     position: relative;
     box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
-    margin-bottom: 0.5rem;
 }
 
 .user-message .message-content {
     background: var(--primary-gradient);
     color: #ffffff;
+    margin-left: auto;
     border-bottom-right-radius: 0.25rem;
 }
 
 .agent-message .message-content {
     background: #ffffff;
     color: var(--heading-color);
+    margin-right: auto;
     border-bottom-left-radius: 0.25rem;
-}
-
-/* Ensure proper spacing between messages */
-.d-flex.justify-content-start,
-.d-flex.justify-content-end {
-    margin-bottom: 1rem;
-}
-
-/* Add some breathing room for the messages */
-.d-flex.justify-content-start {
-    padding-right: 20%;
-}
-
-.d-flex.justify-content-end {
-    padding-left: 20%;
-}
-
-/* Style user message text */
-.user-message .message-content {
-    font-size: 0.875rem;
-    line-height: 1.5;
-}
-
-/* Style agent message text */
-.agent-message .message-content {
-    font-size: 0.875rem;
-    line-height: 1.5;
 }
 
 /* Tool output styling */
@@ -142,59 +117,35 @@
     }
 }
 
-/* Tool usage styling */
-.tool-usage {
-    background: #f8f9fa !important;
-    border-left: 4px solid #17c1e8 !important;
-    padding: 1rem !important;
-    margin-bottom: 1rem !important;
-    border-radius: 0.5rem !important;
+/* JSON formatting */
+.json-output {
+    background: #212529;
+    color: #e9ecef;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    font-family: var(--bs-font-monospace);
+    white-space: pre-wrap;
+    margin: 0.5rem 0;
+    box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
 }
 
-.tool-usage .tool-title {
-    color: #344767;
+/* Tool usage indicator */
+.tool-usage {
+    display: flex;
+    align-items: flex-start;
+    color: #8392AB;
     font-size: 0.875rem;
-    font-weight: 600;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
 }
 
 .tool-usage i {
-    color: #17c1e8;
-    font-size: 1rem;
-}
-
-.tool-usage .btn-link {
-    color: #8392AB;
-    padding: 0;
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.tool-usage .btn-link:hover {
-    color: #344767;
-}
-
-.tool-usage .collapse {
-    transition: all 0.2s ease;
-}
-
-.tool-usage .collapse.show {
-    margin-top: 1rem;
-}
-
-/* JSON output styling */
-.json-output {
-    background: #ffffff;
-    color: #344767;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    font-family: var(--bs-font-monospace);
-    font-size: 0.75rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    margin: 0;
-    border: 1px solid rgba(0,0,0,0.1);
-    max-height: 300px;
-    overflow-y: auto;
+    margin-right: 1rem;
+    color: #cb0c9f;
+    font-size: 1.25rem;
 }
 
 /* Connection status */
@@ -296,66 +247,4 @@
     color: #344767;
     max-height: 300px;
     overflow-y: auto;
-}
-
-.agent-message {
-    background-color: #f8f9fa;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin: 0.5rem 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.tool-usage {
-    border-left: 4px solid #5e72e4;
-}
-
-.tool-title {
-    font-weight: 600;
-    color: #344767;
-}
-
-.json-output {
-    background: #ffffff;
-    border-radius: 0.25rem;
-    padding: 0.75rem;
-    margin: 0;
-    font-size: 0.875rem;
-    color: #344767;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.message-content table {
-    background: white;
-    margin: 1rem 0;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.message-content table thead {
-    background: #f8f9fa;
-}
-
-.message-content table th {
-    font-weight: 600;
-    color: #344767;
-    border-bottom: 2px solid #dee2e6;
-}
-
-.message-content table td {
-    vertical-align: middle;
-}
-
-.btn-link {
-    color: #344767;
-    text-decoration: none;
-    padding: 0.25rem 0.5rem;
-}
-
-.btn-link:hover {
-    color: #5e72e4;
-    background: rgba(94, 114, 228, 0.1);
-    border-radius: 0.25rem;
 }

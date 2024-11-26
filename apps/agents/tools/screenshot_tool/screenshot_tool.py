@@ -2,7 +2,7 @@ import os
 import requests
 import json
 from typing import Any, Type
-from pydantic.v1 import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from crewai_tools.tools.base_tool import BaseTool
 from django.conf import settings
 from urllib.parse import urlparse
@@ -15,9 +15,19 @@ You can use the ScreenshotTool by
 
 class ScreenshotToolSchema(BaseModel):
     """Input schema for ScreenshotTool."""
-    url: str = Field(..., description="The URL of the website to capture a screenshot.")
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed=True
+    )
+    
+    url: str = Field(description="The URL of the website to capture a screenshot.")
 
 class ScreenshotTool(BaseTool):
+    model_config = ConfigDict(
+        extra='forbid',
+        arbitrary_types_allowed=True
+    )
+    
     name: str = "Capture Website Screenshot"
     description: str = "Captures a screenshot of a given website URL."
     args_schema: Type[BaseModel] = ScreenshotToolSchema
