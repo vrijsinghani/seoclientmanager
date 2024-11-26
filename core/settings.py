@@ -376,64 +376,63 @@ LOGGING = {
         'standard': {
             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
         },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+    },
+    'filters': {
+        'exclude_httpx_debug': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda record: not (
+                record.name.startswith('httpx') or 
+                record.name.startswith('httpcore') or
+                'openai._base_client' in record.name
+            )
+        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'standard',
+            'filters': ['exclude_httpx_debug'],
         },
         'file': {
             'class': 'logging.FileHandler',
-            'filename': 'debug.log',
+            'filename': 'logs/django.log',
             'formatter': 'standard',
+            'filters': ['exclude_httpx_debug'],
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps.agents': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'httpx': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'httpcore': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'openai': {
+            'handlers': ['file'],
+            'level': 'WARNING',
+            'propagate': False,
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console','file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'allauth': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.crawl_website': {
-            'handlers': ['file','console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'apps.common': {
-            'handlers': ['console','file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'apps.seo_manager': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'apps.agents': {
-            'handlers': ['console','file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'channels': {
-            'handlers': ['console','file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-        'websockets': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
-
+        'level': 'INFO',
     },
 }
 
