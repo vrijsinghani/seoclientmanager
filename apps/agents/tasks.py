@@ -449,15 +449,41 @@ def human_input_handler(prompt, execution_id):
 def create_crewai_tasks(task_models, agents, execution):
     tasks = []
     for task_model in task_models:
-        logger.debug(f"Creating CrewAITask for task: {task_model.id}-{task_model.description}-{task_model.agent_id}-{agents}")
         try:
+            # Log the task details
+            logger.info(f"""
+Task details:
+- ID: {task_model.id}
+- Description: {task_model.description}
+- Agent ID: {task_model.agent_id}
+""")
+            
+            # Get and log the agent model details
+            agent_model = AgentModel.objects.get(id=task_model.agent_id)
+            logger.info(f"""
+Agent Model details:
+- ID: {agent_model.id}
+- Role: {agent_model.role}
+""")
+            
+            # Log available CrewAI agents
+            logger.info("Available CrewAI agents:")
+            for agent in agents:
+                logger.info(f"- Agent Role: {agent.role}")
+
             # Associate the Task with the CrewExecution
             task_model.crew_execution = execution
             task_model.save()
 
-            crewai_agent = next((agent for agent in agents if agent.role == AgentModel.objects.get(id=task_model.agent_id).role), None)
+            # Try to find matching agent
+            crewai_agent = next((agent for agent in agents if agent.role == agent_model.role), None)
+            
             if not crewai_agent:
-                logger.warning(f"No matching CrewAI agent found for task {task_model.id}")
+                logger.warning(f"""
+No matching CrewAI agent found for task {task_model.id}
+Looking for role: {agent_model.role}
+Available roles: {[agent.role for agent in agents]}
+""")
                 continue
 
             task_tools = []

@@ -1,0 +1,250 @@
+/* Base colors and variables from Soft UI */
+:root {
+    --soft-bg: #fbfbfb;
+    --font-color: #202d47;
+    --heading-color: #344767;
+    
+    /* Primary gradient */
+    --primary-gradient: linear-gradient(310deg, #7928CA 0%, #FF0080 100%);
+    --secondary-gradient: linear-gradient(310deg, #627594 0%, #A8B8D8 100%);
+    --info-gradient: linear-gradient(310deg, #2152ff 0%, #21d4fd 100%);
+}
+
+/* Chat container styling */
+#chat-messages {
+    height: 70vh;
+    min-height: 500px;
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    padding: 1.5rem;
+    background: var(--soft-bg);
+}
+
+/* Message styling */
+.message-content {
+    max-width: 75%;
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    position: relative;
+    box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
+}
+
+.user-message .message-content {
+    background: var(--primary-gradient);
+    color: #ffffff;
+    margin-left: auto;
+    border-bottom-right-radius: 0.25rem;
+}
+
+.agent-message .message-content {
+    background: #ffffff;
+    color: var(--heading-color);
+    margin-right: auto;
+    border-bottom-left-radius: 0.25rem;
+}
+
+/* Tool output styling */
+.tool-output {
+    background: #f8f9fa;
+    border-left: 4px solid #cb0c9f;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: 1rem;
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Table styling */
+.message-content table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.message-content table.table {
+    margin-bottom: 0;  /* Override Bootstrap margin */
+}
+
+.message-content table.table-sm td,
+.message-content table.table-sm th {
+    padding: 0.5rem 1rem;  /* Slightly more compact padding */
+}
+
+.message-content th {
+    background: var(--info-gradient);
+    color: #ffffff;
+    padding: 0.75rem 1.5rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.875rem;
+    white-space: nowrap;  /* Prevent header text wrapping */
+}
+
+.message-content td {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    color: var(--heading-color);
+    font-size: 0.875rem;
+    background: #ffffff;  /* Ensure cell background is white */
+}
+
+.message-content tr:last-child td {
+    border-bottom: none;  /* Remove border for last row */
+}
+
+.message-content tr:nth-child(even) td {
+    background: #f8f9fa;  /* Subtle striping */
+}
+
+.message-content tr:hover td {
+    background: #f0f2f5;  /* Hover effect */
+}
+
+/* Ensure table is scrollable on mobile */
+@media (max-width: 768px) {
+    .message-content {
+        max-width: 100%;  /* Allow full width on mobile */
+        overflow-x: auto;  /* Enable horizontal scrolling */
+    }
+    
+    .message-content table {
+        min-width: 500px;  /* Ensure minimum width for readability */
+    }
+}
+
+/* JSON formatting */
+.json-output {
+    background: #212529;
+    color: #e9ecef;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    font-family: var(--bs-font-monospace);
+    white-space: pre-wrap;
+    margin: 0.5rem 0;
+    box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Tool usage indicator */
+.tool-usage {
+    display: flex;
+    align-items: flex-start;
+    color: #8392AB;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
+}
+
+.tool-usage i {
+    margin-right: 1rem;
+    color: #cb0c9f;
+    font-size: 1.25rem;
+}
+
+/* Connection status */
+.connection-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    position: relative;
+    background-color: #ea0606;
+}
+
+.connection-dot.connected {
+    background-color: #82d616;
+}
+
+.connection-dot.connecting {
+    background-color: #fbcf33;
+}
+
+/* Typing indicator */
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 20px 27px 0 rgba(0, 0, 0, 0.05);
+}
+
+.typing-indicator span {
+    height: 8px;
+    width: 8px;
+    background: #17c1e8;
+    border-radius: 50%;
+    margin: 0 2px;
+    display: inline-block;
+    animation: bounce 1.3s linear infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .message-content {
+        max-width: 85%;
+    }
+    
+    #chat-messages {
+        height: 60vh;
+        padding: 1rem;
+    }
+}
+
+/* Intermediate message styling */
+.intermediate-message {
+    background: #f8f9fa !important;
+    border-left: 4px solid #17c1e8 !important;
+}
+
+.intermediate-header {
+    padding: 0.5rem;
+    color: #344767;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.intermediate-header i {
+    color: #17c1e8;
+}
+
+.intermediate-header .btn-link {
+    color: #8392AB;
+    padding: 0;
+    text-decoration: none;
+}
+
+.intermediate-header .btn-link:hover {
+    color: #344767;
+}
+
+.intermediate-content {
+    padding: 0.5rem;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    display: none;
+}
+
+.intermediate-content.show {
+    display: block;
+}
+
+.intermediate-content .json-output {
+    margin: 0;
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: #344767;
+    max-height: 300px;
+    overflow-y: auto;
+}

@@ -373,66 +373,27 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'standard': {
-            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        },
-        'simple': {
-            'format': '%(levelname)s %(message)s'
-        },
-    },
-    'filters': {
-        'exclude_httpx_debug': {
-            '()': 'django.utils.log.CallbackFilter',
-            'callback': lambda record: not (
-                record.name.startswith('httpx') or 
-                record.name.startswith('httpcore') or
-                'openai._base_client' in record.name
-            )
+        'clean': {
+            'format': '%(asctime)s [%(levelname)s] %(message)s',
+            'datefmt': '%H:%M:%S'
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'standard',
-            'filters': ['exclude_httpx_debug'],
-        },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': 'logs/django.log',
-            'formatter': 'standard',
-            'filters': ['exclude_httpx_debug'],
+            'formatter': 'clean',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
             'level': 'INFO',
-            'propagate': False,
         },
         'apps.agents': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
+            'handlers': ['console'],
+            'level': 'DEBUG',
             'propagate': False,
         },
-        'httpx': {
-            'handlers': ['file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'httpcore': {
-            'handlers': ['file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'openai': {
-            'handlers': ['file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
     },
 }
 

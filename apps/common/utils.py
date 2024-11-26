@@ -89,21 +89,30 @@ def get_models():
         logging.error(f"Unexpected error in get_models: {str(e)}")
         return []
 
-def get_llm(model_name:str, temperature=0.0):
-    tokenizer=tiktoken.get_encoding("cl100k_base")
-    token_counter_callback = TokenCounterCallback(tokenizer)
-     
-    callback_manager = CallbackManager([token_counter_callback])  
-
-    llm = ChatOpenAI(model=model_name, 
-                     base_url=settings.API_BASE_URL, 
-                     api_key=settings.LITELLM_MASTER_KEY, 
-                     temperature=temperature, 
-                     callbacks=callback_manager)
-
-    token_counter_callback.llm = llm
-    return llm, token_counter_callback
-
+def get_llm(model_name: str, temperature: float = 0.7, streaming: bool = False):
+    """Get LLM instance and token counter based on model name"""
+    try:
+        from langchain_openai import ChatOpenAI
+        
+        # Initialize ChatOpenAI with LiteLLM proxy configuration
+        llm = ChatOpenAI(
+            model=model_name,
+            base_url=settings.API_BASE_URL,
+            api_key=settings.LITELLM_MASTER_KEY,
+            temperature=temperature,
+            streaming=streaming,  # Enable streaming support
+            callbacks=[] if not streaming else None  # Allow callbacks for streaming
+        )
+        
+        # Use the existing token counter
+        tokenizer = tiktoken.get_encoding("cl100k_base")
+        token_counter = TokenCounterCallback(tokenizer)
+        
+        return llm, token_counter
+        
+    except Exception as e:
+        logger.error(f"Error initializing LLM: {str(e)}")
+        raise
 
 def is_pdf_url(url: str) -> bool:
     """Determine if the given URL points to a PDF document."""
