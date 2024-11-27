@@ -8,6 +8,8 @@ from crewai_tools.tools.base_tool import BaseTool
 from google.analytics.data_v1beta.types import DateRange, Metric, Dimension, RunReportRequest, OrderBy, RunReportResponse
 from datetime import datetime
 from crewai_tools.tools.base_tool import BaseTool
+from google.analytics.data_v1beta import BetaAnalyticsDataClient
+from google.analytics.data_v1beta.types import CheckCompatibilityRequest
 
 # Import Django models (assuming this is your setup)
 from django.core.exceptions import ObjectDoesNotExist
@@ -123,14 +125,80 @@ class GenericGoogleAnalyticsTool(BaseTool):
     def _initialize_dimensions_metrics(self):
         """Initialize the available dimensions and metrics"""
         self._available_metrics = [
-            "totalUsers", "sessions", "averageSessionDuration", "screenPageViews",
-            "screenPageViewsPerSession", "newUsers", "bounceRate", "engagedSessions",
-            "activeUsers", "eventCount", "conversions", "userEngagementDuration"
+            "totalUsers",
+            "sessions",
+            "averageSessionDuration",
+            "screenPageViews",
+            "screenPageViewsPerSession",
+            "newUsers",
+            "bounceRate",
+            "engagedSessions",
+            "engagementRate",
+            "activeUsers",
+            "eventCount",
+            "conversions",
+            "userEngagementDuration"
         ]
         self._available_dimensions = [
-            "date", "country", "city", "deviceCategory", "landingPage", "pagePath",
-            "browser", "operatingSystem", "platform", "source", "medium", "campaign"
+            "date",
+            "deviceCategory",
+            "platform",
+            "sessionSource",
+            "sessionMedium",
+            "sessionCampaignName",
+            "sessionDefaultChannelGroup",
+            "country",
+            "city",
+            "landingPage",
+            "pagePath",
+            "browser",
+            "operatingSystem"
         ]
+
+    def _check_compatibility(self, service, property_id: str, metrics: List[str], dimensions: List[str]) -> tuple[bool, str]:
+        """
+        Check if the requested metrics and dimensions are compatible.
+        Returns a tuple of (is_compatible: bool, error_message: str)
+        """
+        try:
+            # Create separate metric and dimension objects
+            metric_objects = [Metric(name=m.strip()) for m in metrics]
+            dimension_objects = [Dimension(name=d.strip()) for d in dimensions]
+
+            request = CheckCompatibilityRequest(
+                property=f"properties/{property_id}",
+                metrics=metric_objects,
+                dimensions=dimension_objects
+            )
+            
+            response = service.check_compatibility(request=request)
+
+            # Check for dimension errors
+            if response.dimension_compatibilities:
+                for dim_compat in response.dimension_compatibilities:
+                    dim_name = getattr(dim_compat.dimension_metadata, 'api_name', 'unknown')
+                    if dim_name in dimensions:
+                        if dim_compat.compatibility == 'INCOMPATIBLE':
+                            error_msg = f"Incompatible dimension: {dim_name}"
+                            logger.error(error_msg)
+                            return False, error_msg
+            
+            # Check for metric errors
+            if response.metric_compatibilities:
+                for metric_compat in response.metric_compatibilities:
+                    metric_name = getattr(metric_compat.metric_metadata, 'api_name', 'unknown')
+                    if metric_name in metrics:
+                        if metric_compat.compatibility == 'INCOMPATIBLE':
+                            error_msg = f"Incompatible metric: {metric_name}"
+                            logger.error(error_msg)
+                            return False, error_msg
+            
+            return True, "Compatible"
+
+        except Exception as e:
+            logger.error(f"Error checking compatibility: {str(e)}", exc_info=True)
+            # Return a more graceful fallback - assume compatible if check fails
+            return True, "Compatibility check failed, proceeding with request"
 
     def _run(self, 
              client_id: int,
@@ -158,6 +226,41 @@ class GenericGoogleAnalyticsTool(BaseTool):
             property_id = ga_credentials.get_property_id()
             if not property_id:
                 raise ValueError("Missing or invalid Google Analytics property ID")
+
+            # Check compatibility before running the report
+            metrics_list = [m.strip() for m in metrics.split(',')]
+            dimensions_list = [d.strip() for d in dimensions.split(',')]
+            
+            # Validate metrics and dimensions against available lists
+            for metric in metrics_list:
+                if metric not in self._available_metrics:
+                    return {
+                        'success': False,
+                        'error': f"Invalid metric: {metric}. Available metrics: {', '.join(self._available_metrics)}",
+                        'analytics_data': []
+                    }
+            
+            for dimension in dimensions_list:
+                if dimension not in self._available_dimensions:
+                    return {
+                        'success': False,
+                        'error': f"Invalid dimension: {dimension}. Available dimensions: {', '.join(self._available_dimensions)}",
+                        'analytics_data': []
+                    }
+            
+            is_compatible, error_message = self._check_compatibility(
+                service, 
+                property_id, 
+                metrics_list, 
+                dimensions_list
+            )
+            
+            if not is_compatible:
+                return {
+                    'success': False,
+                    'error': error_message,
+                    'analytics_data': []
+                }
 
             # Create the RunReportRequest
             request = RunReportRequest({

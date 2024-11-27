@@ -208,6 +208,15 @@ class ChatConsumer(BaseWebSocketConsumer):
                 client_id if client_id else None
             )
 
+            # Handle error responses
+            if isinstance(response, str) and response.startswith('Error:'):
+                await self.send_json({
+                    'type': 'error',
+                    'message': response,
+                    'timestamp': datetime.now().isoformat()
+                })
+                return
+
             logger.debug("📤 Sending agent response")
             await self.send_json({
                 'type': 'agent_message',

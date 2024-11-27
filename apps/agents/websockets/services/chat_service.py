@@ -66,7 +66,7 @@ You have access to the following tools:
 Tool Names: {tool_names}
 
 IMPORTANT INSTRUCTIONS:
-1. If a tool call fails, try a simpler version of the query
+1. If a tool call fails, examine the error message and try to fix the parameters
 2. If multiple tool calls fail, return a helpful message explaining the limitation
 3. Always provide a clear response even if data is limited
 4. Never give up without providing some useful information
@@ -307,7 +307,8 @@ Role: {self.agent.role}
 {self.agent.use_system_prompt if self.agent.use_system_prompt else ''}
 
 RESPONSE FORMAT INSTRUCTIONS:
-1. You MUST ALWAYS respond in one of these two JSON formats:
+-1. You MUST respond with ONLY a single JSON object in one of these two formats:
++1. You MUST respond with ONLY a single JSON object in one of these two formats:
 
 For using a tool:
 {{"action": "tool_name", "action_input": {{"param1": "value1", "param2": "value2"}}}}
@@ -315,10 +316,23 @@ For using a tool:
 For final answers:
 {{"action": "Final Answer", "action_input": "your response here"}}
 
-2. Never respond with plain text or any other format
-3. Always ensure your response is valid JSON
-4. If you want to have a conversation, use the Final Answer format
-5. Make sure to escape any quotes or special characters in your responses
+-2. Never respond with plain text or any other format
+-3. Always ensure your response is valid JSON
+-4. If you want to have a conversation, use the Final Answer format
+-5. Make sure to escape any quotes or special characters in your responses
++2. CRITICAL RULES:
++   - Send ONLY the JSON object - no explanations before or after
++   - No plain text responses
++   - No markdown formatting
++   - For conversations or explanations, use Final Answer format
++   - If a tool call fails, retry with corrected parameters
++   - Ensure all JSON is properly formatted with double quotes
 
-Example conversational response:
-{{"action": "Final Answer", "action_input": "Hello! How can I help you today?"}}"""
+-Example conversational response:
+-{{"action": "Final Answer", "action_input": "Hello! How can I help you today?"}}
++Examples:
++# Tool usage:
++{{"action": "generic_google_analytics_data_fetcher", "action_input": {{"client_id": 1, "start_date": "30daysAgo", "end_date": "today", "metrics": "totalUsers,sessions", "dimensions": "date"}}}}
++
++# Conversation:
++{{"action": "Final Answer", "action_input": "Based on the data, your website had 1,000 users last month. Would you like more detailed metrics?"}}"""

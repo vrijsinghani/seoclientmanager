@@ -37,6 +37,13 @@ class AgentHandler:
 
             # Process message
             response = await self.chat_service.process_message(message)
+            
+            # Generic error handling for any tool response
+            if isinstance(response, dict) and not response.get('success', True):
+                error_msg = response.get('error', 'Unknown error occurred')
+                logger.error(f"Tool Error: {error_msg}")
+                return f"Error: {error_msg}. Please check your input and try again."
+
             return response
 
         except Exception as e:

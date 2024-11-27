@@ -32,7 +32,7 @@ class GoogleOverviewToolInput(BaseModel):
 
 class GoogleOverviewTool(BaseTool):
     name: str = "Google Analytics and Search Console Overview Tool"
-    description: str = "Fetches comprehensive overview reports from Google Analytics and Search Console"
+    description: str = "Fetches comprehensive overview reports from Google Analytics and Search Console for agents."
     args_schema: Type[BaseModel] = GoogleOverviewToolInput
 
     def _run(self, client_id: int, days_ago: int = 90) -> str:
@@ -58,63 +58,87 @@ class GoogleOverviewTool(BaseTool):
             if not all([analytics_service, search_console_service, property_id, property_url]):
                 raise ValueError("Failed to initialize required services")
 
-            # 1. User Overview Report
-            user_overview = self._fetch_analytics_report(
+            # 1. Device & Engagement Analysis
+            device_engagement = self._fetch_analytics_report(
                 analytics_service,
                 property_id,
                 start_date,
                 end_date,
-                ["date", "country"],
-                ["activeUsers", "newUsers", "totalUsers"]
+                ["deviceCategory"],
+                ["sessions", "bounceRate", "engagementRate", "averageSessionDuration"]
             )
 
-            # 2. Session Analysis Report
-            session_data = self._fetch_analytics_report(
+            # 2. Traffic Sources Analysis
+            traffic_sources = self._fetch_analytics_report(
                 analytics_service,
                 property_id,
                 start_date,
                 end_date,
                 ["sessionSource", "sessionMedium"],
-                ["totalUsers", "sessions", "bounceRate", "averageSessionDuration"]
+                ["sessions", "newUsers", "engagementRate"]
             )
 
-            # 3. Page Performance Report
+            # 3. Page Performance Analysis
             page_performance = self._fetch_analytics_report(
                 analytics_service,
                 property_id,
                 start_date,
                 end_date,
-                ["date", "pagePath"],
-                ["screenPageViews", "screenPageViewsPerSession", "engagementRate"]
+                ["pagePath"],
+                ["screenPageViews", "averageSessionDuration", "bounceRate"]
             )
 
-            # 4. Event Engagement Report
-            event_engagement = self._fetch_analytics_report(
+            # 4. Geographic Performance
+            geo_performance = self._fetch_analytics_report(
                 analytics_service,
                 property_id,
                 start_date,
                 end_date,
-                ["date", "country"],
-                ["eventCount", "eventCountPerUser"]
+                ["country"],
+                ["sessions", "newUsers", "engagementRate", "averageSessionDuration"]
             )
 
-            # Format analytics data for template compatibility
-            analytics_data = []
-            
-            # Format session data like google_report_tool
-            for row in session_data:
-                analytics_data.append({
-                    'source_medium': f"{row['sessionSource']} / {row['sessionMedium']}",
-                    'total_users': int(row['totalUsers']),
-                    'sessions': int(row['sessions']),
-                    'bounce_rate': float(row['bounceRate']),
-                    'avg_session_duration': float(row['averageSessionDuration'])
-                })
+            # 5. Daily Trend Analysis
+            daily_trends = self._fetch_analytics_report(
+                analytics_service,
+                property_id,
+                start_date,
+                end_date,
+                ["date"],
+                ["sessions", "newUsers", "activeUsers", "engagementRate"]
+            )
 
-            # Sort by total users
-            analytics_data.sort(key=lambda x: x['total_users'], reverse=True)
+            # 6. Landing Page Performance
+            landing_performance = self._fetch_analytics_report(
+                analytics_service,
+                property_id,
+                start_date,
+                end_date,
+                ["landingPage"],
+                ["sessions", "bounceRate", "engagementRate", "screenPageViews"]
+            )
 
-            # 5. Search Console Overview Report
+            # 7. Browser & Platform Analysis
+            tech_analysis = self._fetch_analytics_report(
+                analytics_service,
+                property_id,
+                start_date,
+                end_date,
+                ["browser", "operatingSystem"],
+                ["sessions", "screenPageViews", "bounceRate"]
+            )
+
+            # 8. Channel Performance
+            channel_performance = self._fetch_analytics_report(
+                analytics_service,
+                property_id,
+                start_date,
+                end_date,
+                ["sessionDefaultChannelGroup"],
+                ["sessions", "newUsers", "engagementRate", "averageSessionDuration"]
+            )
+
+            # 9. Search Console Overview Report
             keyword_data = self._fetch_search_console_report(
                 search_console_service,
                 property_url,
@@ -124,7 +148,7 @@ class GoogleOverviewTool(BaseTool):
                 row_limit=50
             )
 
-            # 6. Search Performance by Page Report
+            # 10. Search Performance by Page Report
             landing_page_data = self._fetch_search_console_report(
                 search_console_service,
                 property_url,
@@ -133,8 +157,8 @@ class GoogleOverviewTool(BaseTool):
                 ["page"]
             )
 
-            # 7. Search Performance by Device Report
-            device_performance = self._fetch_search_console_report(
+            # 11. Search Performance by Device Report
+            device_performance_sc = self._fetch_search_console_report(
                 search_console_service,
                 property_url,
                 start_date,
@@ -142,16 +166,20 @@ class GoogleOverviewTool(BaseTool):
                 ["device"]
             )
 
-            # Return all data in a format compatible with the template
+            # Return all data in a structured format
             return json.dumps({
                 'success': True,
-                'analytics_data': analytics_data,
-                'user_overview': user_overview,
+                'device_engagement': device_engagement,
+                'traffic_sources': traffic_sources,
                 'page_performance': page_performance,
-                'event_engagement': event_engagement,
+                'geo_performance': geo_performance,
+                'daily_trends': daily_trends,
+                'landing_performance': landing_performance,
+                'tech_analysis': tech_analysis,
+                'channel_performance': channel_performance,
                 'keyword_data': keyword_data,
                 'landing_page_data': landing_page_data,
-                'device_performance': device_performance,
+                'device_performance_sc': device_performance_sc,
                 'start_date': start_date,
                 'end_date': end_date,
                 'client_id': client_id
@@ -164,9 +192,7 @@ class GoogleOverviewTool(BaseTool):
             return json.dumps({
                 'success': False,
                 'error': str(e),
-                'analytics_data': [],
-                'keyword_data': [],
-                'landing_page_data': []
+                'analytics_data': []
             })
 
     def _fetch_analytics_report(self, service, property_id: str, start_date: str, end_date: str, 

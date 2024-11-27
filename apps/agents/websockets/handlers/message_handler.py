@@ -52,11 +52,7 @@ class MessageHandler:
                             html.append('</tr>')
                 
                 html.append('</tbody></table>')
-                
-                # Log the formatted HTML
-                formatted = '\n'.join(html)
-                logger.debug(f"Formatted table HTML: {formatted}")
-                return formatted
+                return '\n'.join(html)
                 
             return content
             
@@ -89,20 +85,21 @@ class MessageHandler:
     async def handle_message(self, message, is_agent=True, error=False, is_stream=False):
         """Format and send a message"""
         try:
-            # Format the message content
             content = str(message)
             
             if is_agent:
-                # Log before formatting
-                logger.debug(f"Before formatting: {content[:200]}")
-                
-                # Apply different formatting based on content type
+                # Handle invalid/incomplete response errors
+                if isinstance(message, dict) and 'steps' in message:
+                    step = message['steps'][0]
+                    if step.action.tool == '_Exception' and 'Could not parse LLM output' in step.log:
+                        logger.warning(f"LLM parsing error: {step.log}")
+                        error = True
+                        content = "I encountered an error processing your request. Let me try again with a simpler query."
+
+                # Apply formatting only for agent messages
                 content = self.format_table(content)
                 content = self.format_tool_usage(content)
                 content = self.format_tool_output(content)
-                
-                # Log after formatting
-                logger.debug(f"After formatting: {content[:200]}")
             
             response_data = {
                 'type': 'agent_message' if is_agent else 'user_message',
@@ -113,13 +110,13 @@ class MessageHandler:
                 'timestamp': datetime.now().isoformat()
             }
             
-            # Log final response data
-            logger.debug(f"Sending response: {response_data}")
+            # Single log entry for the message handling
+            logger.debug(f"📤 Sending {'agent' if is_agent else 'user'} message")
             
             await self.consumer.send_json(response_data)
             
         except Exception as e:
-            logger.error(f"Error in message handler: {str(e)}", exc_info=True)
+            logger.error(f"Error in message handler: {str(e)}")
             await self.consumer.send_json({
                 'type': 'error',
                 'error': True,
