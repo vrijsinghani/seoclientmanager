@@ -62,8 +62,7 @@ Available roles: {[agent.role for agent in agents]}
                 'async_execution': task_model.async_execution,
                 'human_input': task_model.human_input,
                 'tools': task_tools,
-                'execution_id': execution.id,
-                'crewai_task_id': task_model.id  # Use this for kanban board placement
+                'execution_id': execution.id
             }
             logger.info(f"Task dict: {task_dict}")
             optional_fields = ['output_json', 'output_pydantic', 'converter_cls']

@@ -8,7 +8,7 @@ from ..handlers.websocket import send_message_to_websocket
 logger = logging.getLogger(__name__)
 channel_layer = get_channel_layer()
 
-def log_crew_message(execution, content, agent=None, human_input_request=None, task_id=None):
+def log_crew_message(execution, content, agent=None, human_input_request=None, crewai_task_id=None):
     try:
         max_retries = 3
         retry_delay = 1  # seconds
@@ -22,7 +22,7 @@ def log_crew_message(execution, content, agent=None, human_input_request=None, t
                         "status": execution.status,
                         "messages": [{"agent": agent or "System", "content": content}],
                         "human_input_request": human_input_request,
-                        "task_id": task_id
+                        "crewai_task_id": crewai_task_id
                     }
                 )
                 break
@@ -35,23 +35,22 @@ def log_crew_message(execution, content, agent=None, human_input_request=None, t
         
         # Log message to database
         if content:  # Only create a message if there's content
-            message = CrewMessage.objects.create(execution=execution, content=content, agent=agent)
+            message = CrewMessage.objects.create(
+                execution=execution, 
+                content=content, 
+                agent=agent,
+                crewai_task_id=crewai_task_id
+            )
             logger.debug(f"Sent message to WebSocket: {content[:100]}")
         else:
             logger.warning("Attempted to log an empty message, skipping.")
     except Exception as e:
         logger.error(f"Error in log_crew_message: {str(e)}")
 
-def update_execution_status(execution, status, message=None, task_id=None):
+def update_execution_status(execution, status, message=None):
     """Update execution status and send WebSocket message"""
     execution.status = status
     execution.save()
-    
-    # Use the provided task_id if available, otherwise get the current task
-    crewai_task_id = task_id
-    if not crewai_task_id:
-        current_task = Task.objects.filter(crew_execution=execution).first()
-        crewai_task_id = current_task.id if current_task else None
     
     # Create properly formatted event
     event = {
@@ -59,7 +58,6 @@ def update_execution_status(execution, status, message=None, task_id=None):
         'execution_id': execution.id,
         'status': status,
         'message': message,
-        'crewai_task_id': crewai_task_id,
         'stage': {
             'stage_type': 'status_update',
             'title': 'Status Update',

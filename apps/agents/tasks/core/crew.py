@@ -98,7 +98,7 @@ def run_crew(task_id, crew, execution):
     """Run a crew and handle execution stages and status updates"""
     try:
         # Update to running status
-        update_execution_status(execution, 'RUNNING', task_id=task_id)
+        update_execution_status(execution, 'RUNNING')
         
         # Create execution stage for running
         ExecutionStage.objects.create(
@@ -124,9 +124,72 @@ def run_crew(task_id, crew, execution):
         logger.info(f"Crew inputs: {inputs}")
         logger.info(f"Crew process type: {execution.crew.process}")
         
-        # Set up callbacks for task ID tracking
-        crew.step_callback = StepCallback(execution.id)
-        crew.task_callback = TaskCallback(execution.id)
+        # Create callback instances
+        step_callback = StepCallback(execution.id)
+        task_callback = TaskCallback(execution.id)
+        
+        # Monkey patch the crew's _execute_tasks method to track current task
+        original_execute_tasks = crew._execute_tasks
+        
+        def execute_tasks_with_tracking(*args, **kwargs):
+            task_outputs = []
+            futures = []
+            last_sync_output = None
+            
+            for task_index, task in enumerate(crew.tasks):
+                logger.debug(f"Starting task {task_index}")
+                
+                # Get the agent and continue with original logic
+                agent_to_use = crew._get_agent_to_use(task)
+                if not agent_to_use:
+                    raise ValueError(f"No agent available for task: {task.description}")
+                
+                # Set current task index in callbacks BEFORE execution
+                step_callback.current_task_index = task_index
+                task_callback.current_task_index = task_index
+                step_callback.current_agent_role = agent_to_use.role
+                task_callback.current_agent_role = agent_to_use.role
+                
+                # Update callbacks on existing agent executor
+                if not agent_to_use.agent_executor:
+                    agent_to_use.create_agent_executor(tools=task.tools)
+                agent_to_use.agent_executor.callbacks = [step_callback]
+                
+                logger.debug(f"Set task index to {task_index} before executing task with description: {task.description}")
+                
+                # Execute task
+                try:
+                    if task.async_execution:
+                        context = crew._get_context(task, [last_sync_output] if last_sync_output else [])
+                        future = task.execute_async(agent=agent_to_use, context=context)
+                        futures.append((task, future, task_index))
+                    else:
+                        if futures:
+                            task_outputs = crew._process_async_tasks(futures)
+                            futures.clear()
+                        
+                        context = crew._get_context(task, task_outputs)
+                        logger.debug(f"Executing task {task_index} with agent {agent_to_use.role}")
+                        task_output = task.execute_sync(agent=agent_to_use, context=context)
+                        task_outputs = [task_output]
+                        last_sync_output = task_output
+                        
+                        logger.debug(f"Completed task {task_index}")
+                except Exception as e:
+                    logger.error(f"Error executing task {task_index}: {str(e)}")
+                    raise
+            
+            if futures:
+                task_outputs = crew._process_async_tasks(futures)
+            
+            return crew._create_crew_output(task_outputs)
+            
+        # Replace the original _execute_tasks method
+        crew._execute_tasks = execute_tasks_with_tracking
+        
+        # Set callbacks on crew
+        crew.step_callback = step_callback
+        crew.task_callback = task_callback
         
         # Run the crew based on process type
         if execution.crew.process == 'sequential':
@@ -184,9 +247,9 @@ def run_crew(task_id, crew, execution):
 
 def handle_execution_error(execution, exception, task_id=None):
     logger.error(f"Error during crew execution: {str(exception)}", exc_info=True)
-    update_execution_status(execution, 'FAILED', task_id=task_id)
+    update_execution_status(execution, 'FAILED')
     error_message = f"Crew execution failed: {str(exception)}"
-    log_crew_message(execution, error_message, agent=None, task_id=task_id)
+    log_crew_message(execution, error_message, agent=None)
     execution.error_message = error_message
     execution.save()
 
@@ -237,7 +300,7 @@ def execute_crew(self, execution_id):
         )
         
         # Update execution status to PENDING
-        update_execution_status(execution, 'PENDING', task_id=self.request.id)
+        update_execution_status(execution, 'PENDING')
         
         logger.debug(f"Starting crew execution for id: {execution_id} (task_id: {self.request.id})")
         
@@ -251,8 +314,8 @@ def execute_crew(self, execution_id):
         
         # Save the result and update execution status to COMPLETED
         if result:
-            log_crew_message(execution, str(result), agent='System', task_id=self.request.id)
-        update_execution_status(execution, 'COMPLETED', task_id=self.request.id)
+            log_crew_message(execution, str(result), agent='System')
+        update_execution_status(execution, 'COMPLETED')
         
         return execution.id
         

@@ -62,27 +62,59 @@ class MessageHandler:
 
     def format_tool_output(self, content):
         """Format tool output with proper styling"""
-        if isinstance(content, dict):
-            return f'<div class="json-output">{json.dumps(content, indent=2)}</div>'
-        return content
+        try:
+            if isinstance(content, dict):
+                return f'<div class="json-output">{json.dumps(content, indent=2)}</div>'
+            elif isinstance(content, str):
+                # Try to parse as JSON first
+                try:
+                    json_content = json.loads(content)
+                    return f'<div class="json-output">{json.dumps(json_content, indent=2)}</div>'
+                except json.JSONDecodeError:
+                    pass
+                
+                # Format as table if possible
+                content = self.format_table(content)
+            
+            return f'<div class="tool-output">{content}</div>'
+        except Exception as e:
+            logger.error(f"Error formatting tool output: {str(e)}")
+            return content
 
-    def format_tool_usage(self, content):
+    def format_tool_usage(self, content, message_type=None):
         """Format tool usage messages"""
-        if content.startswith('Using tool:'):
+        if message_type == "tool_start" and content.startswith('Using tool:'):
             tool_info = content.split('\n')
             formatted = f'''
             <div class="tool-usage">
                 <i class="fas fa-tools"></i>
                 <div>
                     <strong>{tool_info[0]}</strong>
-                    <div class="tool-output">{tool_info[1] if len(tool_info) > 1 else ''}</div>
+                    <div class="tool-input">{tool_info[1] if len(tool_info) > 1 else ''}</div>
                 </div>
             </div>
             '''
             return formatted
+        elif message_type == "tool_error":
+            return f'''
+            <div class="tool-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>{content}</div>
+            </div>
+            '''
         return content
 
-    async def handle_message(self, message, is_agent=True, error=False, is_stream=False):
+    def format_final_answer(self, content):
+        """Format the final agent response"""
+        try:
+            # Format as table if possible
+            content = self.format_table(content)
+            return f'<div class="agent-response">{content}</div>'
+        except Exception as e:
+            logger.error(f"Error formatting final answer: {str(e)}")
+            return content
+
+    async def handle_message(self, message, is_agent=True, error=False, is_stream=False, message_type=None):
         """Format and send a message"""
         try:
             content = str(message)
@@ -96,10 +128,16 @@ class MessageHandler:
                         error = True
                         content = "I encountered an error processing your request. Let me try again with a simpler query."
 
-                # Apply formatting only for agent messages
-                content = self.format_table(content)
-                content = self.format_tool_usage(content)
-                content = self.format_tool_output(content)
+                # Apply formatting based on message type
+                if message_type == "tool_output":
+                    content = self.format_tool_output(content)
+                elif message_type in ["tool_start", "tool_error"]:
+                    content = self.format_tool_usage(content, message_type)
+                elif message_type == "final_answer":
+                    content = self.format_final_answer(content)
+                else:
+                    # Default formatting for other types
+                    content = self.format_table(content)
             
             response_data = {
                 'type': 'agent_message' if is_agent else 'user_message',
@@ -107,11 +145,11 @@ class MessageHandler:
                 'is_agent': bool(is_agent),
                 'error': bool(error),
                 'is_stream': bool(is_stream),
+                'message_type': message_type,
                 'timestamp': datetime.now().isoformat()
             }
             
-            # Single log entry for the message handling
-            logger.debug(f"📤 Sending {'agent' if is_agent else 'user'} message")
+            logger.debug(f"📤 Sending {'agent' if is_agent else 'user'} message type: {message_type}")
             
             await self.consumer.send_json(response_data)
             
