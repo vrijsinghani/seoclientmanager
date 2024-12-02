@@ -6,6 +6,8 @@ import logging
 import crewai_tools
 from typing import Optional
 from django.core.cache import cache
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -152,3 +154,104 @@ def get_tool_info(tool_model):
         'module_path': full_module_path,
         'class_name': tool_model.tool_subclass
     }
+
+class URLDeduplicator:
+    def __init__(self):
+        # Common CMS page identifiers
+        self.cms_patterns = {
+            'wordpress': [
+                r'(?:page_id|p|post)=\d+',
+                r'\d{4}/\d{2}/\d{2}',  # Date-based permalinks
+                r'(?:category|tag)/[\w-]+',
+            ],
+            'woocommerce': [
+                r'product=\d+',
+                r'product-category/[\w-]+',
+            ],
+        }
+        
+        # Patterns that indicate filter/sort URLs
+        self.filter_patterns = [
+            # E-commerce filters
+            r'product_type=\d+',
+            r'prefilter=',
+            r'filter\[.*?\]=',
+            r'sort(?:by)?=',
+            r'order=',
+            r'view=',
+            r'display=',
+            # Pagination
+            r'page=\d+',
+            r'per_page=\d+',
+            # Common parameters
+            r'utm_.*?=',
+        ]
+        
+        # Initialize sets for tracking seen URLs and content hashes
+        self._seen_urls = set()
+        self._seen_hashes = set()
+        self._content_hashes = {}
+        
+    def should_process_url(self, url: str) -> bool:
+        parsed = urlparse(url)
+        query_params = parse_qs(parsed.query)
+        
+        # First check if it's a CMS page
+        if self._is_cms_page(parsed.query):
+            return True
+            
+        # Then check for filter patterns
+        if self._is_filter_url(parsed.query):
+            return False
+            
+        # If unclear, normalize and check if we've seen it
+        normalized = self._normalize_url(url)
+        return normalized not in self._seen_urls
+        
+    def _is_cms_page(self, query: str) -> bool:
+        return any(
+            re.search(pattern, query)
+            for patterns in self.cms_patterns.values()
+            for pattern in patterns
+        )
+        
+    def _is_filter_url(self, query: str) -> bool:
+        return any(
+            re.search(pattern, query)
+            for pattern in self.filter_patterns
+        )
+        
+    def _normalize_url(self, url: str) -> str:
+        parsed = urlparse(url)
+        # Keep only essential query parameters
+        query_params = parse_qs(parsed.query)
+        essential_params = {
+            k: v for k, v in query_params.items()
+            if not any(re.search(pattern, f"{k}={v[0]}") 
+                      for pattern in self.filter_patterns)
+        }
+        query = urlencode(essential_params, doseq=True) if essential_params else ''
+        
+        return urlunparse((
+            parsed.scheme,
+            parsed.netloc.lower(),
+            parsed.path.rstrip('/'),
+            '',
+            query,
+            ''
+        ))
+        
+    def _hash_main_content(self, content: str) -> int:
+        """Hash the main content, ignoring common dynamic elements"""
+        # TODO: Implement content cleaning/normalization if needed
+        return hash(content)
+        
+    def fallback_content_check(self, url: str, content: str) -> bool:
+        """Use content hash as fallback for ambiguous cases"""
+        if url not in self._content_hashes:
+            content_hash = self._hash_main_content(content)
+            if content_hash in self._seen_hashes:
+                return False
+            self._content_hashes[url] = content_hash
+            self._seen_hashes.add(content_hash)
+        return True

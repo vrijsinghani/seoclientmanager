@@ -60,10 +60,8 @@ class AsyncCrawlWebsiteTool(BaseTool):
         website.with_tld(False)  # Don't crawl top-level domain
         website.with_delay(1)  # Be respectful with a 1-second delay between requests
 
-        pages_queue = asyncio.Queue()
-        total_links = 0
         links_visited = set()
-        content = ""
+        content = []
         
         # Use scrape() instead of crawl() for consistency with sync version
         with ThreadPoolExecutor() as executor:
@@ -73,37 +71,47 @@ class AsyncCrawlWebsiteTool(BaseTool):
         pages = website.get_pages()
         total_links = len(pages)
         
-        # Limit pages to max_pages
+        # Convert iterator to list and limit to max_pages
         pages = list(pages)[:self.max_pages]
         logger.info(f"Limited pages to {len(pages)} out of {total_links} total links")
         
-        # Process pages concurrently
-        async def process_page(page: Page):
-            try:
-                logger.info(f"Processing page: {page.url}")
-                page_content = await self._extract_content(page)
-                if page_content:  # Only add to visited if we got content
-                    links_visited.add(page.url)
-                    return page_content
-                return ""
-            except Exception as e:
-                logger.error(f"Error processing page {page.url}: {e}")
-                return ""
+        # Process pages in batches of 10
+        batch_size = 10
+        for i in range(0, len(pages), batch_size):
+            batch = pages[i:i + batch_size]
+            
+            # Process batch concurrently
+            async def process_page(page: Page):
+                try:
+                    logger.info(f"Processing page: {page.url}")
+                    if not page.content:
+                        logger.warning(f"Empty content received for {page.url}")
+                        return ""
+                        
+                    page_content = await self._extract_content(page)
+                    if page_content:  # Only add to visited if we got content
+                        links_visited.add(page.url)
+                        return page_content
+                    return ""
+                except Exception as e:
+                    logger.error(f"Error processing page {page.url}: {e}")
+                    return ""
 
-        # Process all pages concurrently with semaphore
-        semaphore = asyncio.Semaphore(10)
-        async def bounded_process_page(page: Page):
-            async with semaphore:
-                return await process_page(page)
+            # Process batch with semaphore
+            semaphore = asyncio.Semaphore(batch_size)
+            async def bounded_process_page(page: Page):
+                async with semaphore:
+                    return await process_page(page)
 
-        # Process all pages
-        results = await asyncio.gather(*[bounded_process_page(page) for page in pages])
-        content = "".join(results)
+            # Process batch
+            batch_results = await asyncio.gather(*[bounded_process_page(page) for page in batch])
+            content.extend(result for result in batch_results if result)
 
+        final_content = "".join(content)
         logger.info(f"Crawl finished. Total links: {total_links}, Links visited: {len(links_visited)}")
 
         return {
-            "content": content,
+            "content": final_content,
             "links_visited": list(links_visited),
             "total_links": total_links,
             "links_to_visit": list(set(page.url for page in pages) - links_visited)
@@ -112,9 +120,17 @@ class AsyncCrawlWebsiteTool(BaseTool):
     async def _extract_content(self, page: Page) -> str:
         try:
             html_content = page.content
+            if not html_content or not html_content.strip():
+                logger.warning(f"Empty HTML content for {page.url}")
+                return ""
+                
             extracted_content = extract(html_content)
-            logger.info(f"Extracted content length for {page.url}: {len(extracted_content) if extracted_content else 0}")
-            return f"---link: {page.url}\n{extracted_content}\n---page-end---\n" if extracted_content else ""
+            if not extracted_content:
+                logger.warning(f"No content could be extracted from {page.url}")
+                return ""
+                
+            logger.info(f"Extracted content length for {page.url}: {len(extracted_content)}")
+            return f"---link: {page.url}\n{extracted_content}\n---page-end---\n"
         except Exception as e:
             logger.error(f"Error extracting content from {page.url}: {e}")
             return ""

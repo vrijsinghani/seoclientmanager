@@ -185,6 +185,8 @@
         var toolDescriptionInput = document.getElementById('tool_description');
         var submitButton = document.getElementById('submitButton');
         var errorMessageDiv = document.getElementById('errorMessage');
+        var outputTableContainer = document.getElementById('outputTableContainer');
+        var outputTables = [];
 
         function setLoading(isLoading) {
             if (isLoading) {
@@ -267,8 +269,6 @@
         const toolOutput = document.getElementById('toolOutput');
         const copyOutputBtn = document.getElementById('copyOutputBtn');
         const tokenCountSpan = document.getElementById('tokenCount');
-        const outputTableContainer = document.getElementById('outputTableContainer');
-        let outputTables = [];
 
         // Function to fetch tool schema and create input fields
         function fetchToolSchema() {
@@ -331,8 +331,14 @@
         }
 
         function createTable(data, tableName) {
+            if (!Array.isArray(data) || data.length === 0) return null;
+            
             const tableContainer = document.createElement('div');
             tableContainer.className = 'col-12 mt-4';
+            
+            // Get all unique keys from all objects
+            const keys = [...new Set(data.flatMap(obj => Object.keys(obj)))];
+            
             tableContainer.innerHTML = `
                 <div class="card mb-4">
                     <div class="card-header pb-0">
@@ -343,13 +349,24 @@
                             <table class="table align-items-center mb-0" id="${tableName.replace(/\s+/g, '-').toLowerCase()}">
                                 <thead>
                                     <tr>
-                                        ${Object.keys(data[0]).map(key => `<th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">${key}</th>`).join('')}
+                                        ${keys.map(key => `<th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">${key}</th>`).join('')}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${data.map(row => `
                                         <tr>
-                                            ${Object.values(row).map(value => `<td class="text-sm font-weight-normal">${value}</td>`).join('')}
+                                            ${keys.map(key => {
+                                                const value = row[key];
+                                                let displayValue = '';
+                                                if (value === undefined || value === null) {
+                                                    displayValue = '';
+                                                } else if (typeof value === 'object') {
+                                                    displayValue = JSON.stringify(value, null, 2);
+                                                } else {
+                                                    displayValue = value.toString();
+                                                }
+                                                return `<td class="text-sm font-weight-normal"><pre style="white-space: pre-wrap;">${displayValue}</pre></td>`;
+                                            }).join('')}
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -361,26 +378,73 @@
             return tableContainer;
         }
 
+        function flattenObject(obj, prefix = '') {
+            let tables = {};
+            for (const [key, value] of Object.entries(obj)) {
+                const newKey = prefix ? `${prefix}.${key}` : key;
+                if (Array.isArray(value)) {
+                    if (value.length > 0) {
+                        if (typeof value[0] === 'object') {
+                            // Handle array of objects that have nested arrays
+                            const flattenedData = value.map(item => {
+                                const flattened = {};
+                                for (const [k, v] of Object.entries(item)) {
+                                    if (Array.isArray(v)) {
+                                        if (v.length > 0 && typeof v[0] === 'object') {
+                                            flattened[k] = v.map(obj => JSON.stringify(obj, null, 2)).join('\n');
+                                        } else {
+                                            flattened[k] = v.join(', ');
+                                        }
+                                    } else {
+                                        flattened[k] = v;
+                                    }
+                                }
+                                return flattened;
+                            });
+                            tables[newKey] = flattenedData;
+                        }
+                    }
+                } else if (typeof value === 'object' && value !== null) {
+                    Object.assign(tables, flattenObject(value, newKey));
+                }
+            }
+            return tables;
+        }
+
         function displayMultipleTables(data) {
             console.log('Displaying multiple tables. Data:', data);
             if (!outputTableContainer) {
-                console.error('Output table container not found');
-                return;
+                outputTableContainer = document.getElementById('outputTableContainer');
+                if (!outputTableContainer) {
+                    console.error('Output table container not found');
+                    return;
+                }
             }
             outputTableContainer.innerHTML = '';
 
-            for (const [key, value] of Object.entries(data)) {
+            // Get all possible tables from the nested structure
+            const tables = flattenObject(data);
+            
+            for (const [key, value] of Object.entries(tables)) {
                 if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
                     const table = createTable(value, key);
-                    outputTableContainer.appendChild(table);
+                    if (table) {
+                        outputTableContainer.appendChild(table);
 
-                    outputTables.push(new simpleDatatables.DataTable(`#${key.replace(/\s+/g, '-').toLowerCase()}`, {
-                        searchable: true,
-                        fixedHeight: false,
-                        perPage: 10
-                    }));
-                } else {
-                    console.warn(`Skipping table for key "${key}" due to invalid data structure`);
+                        const tableId = `#${key.replace(/\s+/g, '-').toLowerCase()}`;
+                        try {
+                            const tableElement = document.querySelector(tableId);
+                            if (tableElement) {
+                                outputTables.push(new simpleDatatables.DataTable(tableId, {
+                                    searchable: true,
+                                    fixedHeight: false,
+                                    perPage: 10
+                                }));
+                            }
+                        } catch (error) {
+                            console.warn(`Failed to initialize DataTable for ${tableId}:`, error);
+                        }
+                    }
                 }
             }
 
@@ -480,9 +544,25 @@
                             } else if (statusData.status === 'SUCCESS') {
                                 // Task completed successfully
                                 const result = statusData.result;
+                                
+                                // Clear any previous output
+                                toolOutput.innerHTML = '';
+                                
+                                // Handle different types of output
                                 if (typeof result === 'string') {
-                                    toolOutput.textContent = result;
+                                    if (isJSON(result)) {
+                                        const jsonData = parseJSON(result);
+                                        displayMultipleTables(jsonData);
+                                        toolOutput.textContent = result;
+                                    } else if (isCSV(result)) {
+                                        const csvData = parseCSV(result);
+                                        displayTable(csvData);
+                                        toolOutput.textContent = result;
+                                    } else {
+                                        toolOutput.textContent = result;
+                                    }
                                 } else if (result && typeof result === 'object') {
+                                    displayMultipleTables(result);
                                     toolOutput.textContent = JSON.stringify(result, null, 2);
                                 } else {
                                     toolOutput.textContent = 'Task completed successfully';

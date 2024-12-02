@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Type, Set
+from typing import Any, Type, Set, Dict
 import logging
 import re
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -231,3 +231,17 @@ class BrowserTool(BaseTool):
           logger.error(f"Response status code: {getattr(response, 'status_code', 'N/A')}")
           logger.error(f"Response content: {getattr(response, 'text', 'N/A')}")
           return set()
+
+  def check_url_status(self, url: str) -> Dict[str, Any]:
+      """Check if a URL is accessible and return its status."""
+      try:
+          response = self._run(url, output_type="status")
+          return {
+              'status_code': response.get('status_code', 500),
+              'error': None
+          }
+      except Exception as e:
+          return {
+              'status_code': 500,
+              'error': str(e)
+          }
