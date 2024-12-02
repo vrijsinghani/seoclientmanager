@@ -1,7 +1,7 @@
 import json
 import os
 from typing import Dict, List, Any, Optional, Type, Set
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import asyncio
 import aiohttp
@@ -12,6 +12,7 @@ from urllib.parse import urlparse, urljoin, urlunparse
 from pydantic import BaseModel, Field
 from crewai_tools import BaseTool
 import dotenv
+from django.core.cache import cache
 from apps.agents.tools.browser_tool.browser_tool import BrowserTool
 from apps.agents.tools.async_crawl_website_tool.async_crawl_website_tool import AsyncCrawlWebsiteTool
 from apps.agents.tools.seo_crawler_tool.seo_crawler_tool import SEOCrawlerTool
@@ -126,7 +127,7 @@ class SEOAuditTool(BaseTool):
         all_links = set()  # Track all unique links for broken link checking
         base_domain = urlparse(website).netloc
 
-        logger.info("Processing pages for SEO analysis...")
+        #logger.info("Processing pages for SEO analysis...")
         # Process crawler results for SEO analysis
         for page in crawler_results.get("pages", []):
             # Create a clean version of the page data for analysis
@@ -328,7 +329,7 @@ class SEOAuditTool(BaseTool):
                 audit_results["sitemap_present"] = False
 
     async def _check_broken_links(self, links: Set[tuple], audit_results: Dict[str, Any]):
-        """Check for broken internal links using HEAD requests."""
+        """Check for broken internal links using HEAD requests with caching."""
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -340,8 +341,24 @@ class SEOAuditTool(BaseTool):
             semaphore = asyncio.Semaphore(5)  # Allow more concurrent requests since HEAD is lightweight
             
             async def check_link(source_url: str, target_url: str):
-                """Check if a link is broken using HEAD request."""
+                """Check if a link is broken using HEAD request with caching."""
                 async with semaphore:
+                    # Generate cache key
+                    cache_key = f"link_status:{target_url}"
+                    cached_result = cache.get(cache_key)
+                    
+                    if cached_result is not None:
+                        # If link was broken in cache, add to audit results
+                        if cached_result.get('is_broken', False):
+                            audit_results["broken_links"].append({
+                                "source_url": source_url,
+                                "target_url": target_url,
+                                "status_code": cached_result.get('status_code'),
+                                "error": cached_result.get('error'),
+                                "timestamp": datetime.now().isoformat()
+                            })
+                        return
+                    
                     max_retries = 3
                     retry_count = 0
                     
@@ -350,39 +367,67 @@ class SEOAuditTool(BaseTool):
                             # Try HEAD first
                             try:
                                 async with session.head(target_url, allow_redirects=True, timeout=5) as response:
-                                    if response.status >= 400:
-                                        # If HEAD fails, try GET as some servers might not support HEAD
-                                        async with session.get(target_url, allow_redirects=True, timeout=5) as get_response:
-                                            if get_response.status >= 400:
-                                                audit_results["broken_links"].append({
-                                                    "source_url": source_url,
-                                                    "target_url": target_url,
-                                                    "status_code": get_response.status,
-                                                    "error": f"HTTP {get_response.status}",
-                                                    "timestamp": datetime.now().isoformat()
-                                                })
-                                            return
-                                    return
-                            except aiohttp.ClientError as client_err:
-                                # If HEAD fails with client error, try GET
-                                try:
-                                    async with session.get(target_url, allow_redirects=True, timeout=5) as response:
-                                        if response.status >= 400:
+                                    # If HEAD request is successful (status < 400), cache and return
+                                    if response.status < 400:
+                                        cache.set(cache_key, {
+                                            'is_broken': False,
+                                            'status_code': response.status,
+                                            'checked_at': datetime.now().isoformat()
+                                        }, timeout=86400)
+                                        return
+                                        
+                                    # If HEAD fails, try GET
+                                    async with session.get(target_url, allow_redirects=True, timeout=5) as get_response:
+                                        result = {
+                                            'is_broken': get_response.status >= 400,
+                                            'status_code': get_response.status,
+                                            'error': f"HTTP {get_response.status}" if get_response.status >= 400 else None,
+                                            'checked_at': datetime.now().isoformat()
+                                        }
+                                        cache.set(cache_key, result, timeout=86400)
+                                        
+                                        if result['is_broken']:
                                             audit_results["broken_links"].append({
                                                 "source_url": source_url,
                                                 "target_url": target_url,
-                                                "status_code": response.status,
-                                                "error": f"HTTP {response.status}",
+                                                "status_code": get_response.status,
+                                                "error": f"HTTP {get_response.status}",
                                                 "timestamp": datetime.now().isoformat()
                                             })
                                         return
-                                except aiohttp.ClientError as get_err:
-                                    raise get_err
-                            return  # Success, exit retry loop
+                                        
+                            except aiohttp.ClientError:
+                                # If HEAD fails with client error, try GET
+                                async with session.get(target_url, allow_redirects=True, timeout=5) as response:
+                                    result = {
+                                        'is_broken': response.status >= 400,
+                                        'status_code': response.status,
+                                        'error': f"HTTP {response.status}" if response.status >= 400 else None,
+                                        'checked_at': datetime.now().isoformat()
+                                    }
+                                    cache.set(cache_key, result, timeout=86400)
+                                    
+                                    if result['is_broken']:
+                                        audit_results["broken_links"].append({
+                                            "source_url": source_url,
+                                            "target_url": target_url,
+                                            "status_code": response.status,
+                                            "error": f"HTTP {response.status}",
+                                            "timestamp": datetime.now().isoformat()
+                                        })
+                                    return
                             
                         except asyncio.TimeoutError:
                             retry_count += 1
                             if retry_count == max_retries:
+                                result = {
+                                    'is_broken': True,
+                                    'status_code': None,
+                                    'error': f"Timeout after {max_retries} retries",
+                                    'checked_at': datetime.now().isoformat()
+                                }
+                                cache.set(cache_key, result, timeout=86400)
+                                
                                 audit_results["broken_links"].append({
                                     "source_url": source_url,
                                     "target_url": target_url,
@@ -395,6 +440,14 @@ class SEOAuditTool(BaseTool):
                                 continue
                                 
                         except Exception as e:
+                            result = {
+                                'is_broken': True,
+                                'status_code': None,
+                                'error': str(e),
+                                'checked_at': datetime.now().isoformat()
+                            }
+                            cache.set(cache_key, result, timeout=86400)
+                            
                             audit_results["broken_links"].append({
                                 "source_url": source_url,
                                 "target_url": target_url,
@@ -403,13 +456,20 @@ class SEOAuditTool(BaseTool):
                                 "timestamp": datetime.now().isoformat()
                             })
                             return
-            tasks = []
-            for source_url, target_url in links:
-                tasks.append(asyncio.create_task(check_link(source_url, target_url)))
             
-            # Wait for all checks to complete
-            if tasks:
-                await asyncio.gather(*tasks)
+            # Process links in smaller batches
+            batch_size = 50
+            all_links = list(links)
+            for i in range(0, len(all_links), batch_size):
+                batch = all_links[i:i + batch_size]
+                tasks = []
+                for source_url, target_url in batch:
+                    tasks.append(asyncio.create_task(check_link(source_url, target_url)))
+                
+                if tasks:
+                    await asyncio.gather(*tasks)
+                    # Add a small delay between batches to prevent overwhelming
+                    await asyncio.sleep(1)
 
     def _generate_report(self, audit_results: Dict[str, Any]) -> Dict[str, Any]:
         """Format the audit results into a detailed report."""

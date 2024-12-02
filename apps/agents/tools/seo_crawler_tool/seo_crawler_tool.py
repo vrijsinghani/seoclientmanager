@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 from crewai_tools import BaseTool
 from celery import shared_task
 from celery.contrib.abortable import AbortableTask
+import aiohttp
+import os
 
 from apps.agents.tools.browser_tool.browser_tool import BrowserTool
 from apps.crawl_website.models import CrawlResult
@@ -151,7 +153,7 @@ class SEOCrawlerTool(BaseModel):
             tasks = []
             for url in batch_urls:
                 if url not in self.visited_urls:
-                    tasks.append(self._process_page(url))
+                    tasks.append(self._process_url(url))
             
             if tasks:
                 await asyncio.gather(*tasks)
@@ -171,79 +173,99 @@ class SEOCrawlerTool(BaseModel):
             "timestamp": datetime.now().isoformat()  # Add timestamp for consistency
         }
 
-    async def _process_page(self, url: str) -> None:
-        """Process a single page."""
-        async with self.semaphore:
+    async def _process_url(self, url: str, parent_url: Optional[str] = None) -> Optional[SEOPage]:
+        """Process a single URL and return a SEOPage object."""
+        if not url or not self.url_deduplicator.should_process_url(url):
+            return None
+            
+        # Check if URL points to an image or media file
+        if self._is_media_url(url):
+            # For media URLs, just verify they're accessible but don't create a page
             try:
-                # Check if we should process this URL
-                if not self.url_deduplicator.should_process_url(url):
-                    return
-                
-                normalized_url = self.url_deduplicator._normalize_url(url)
-                if normalized_url in self.visited_urls:
-                    return
-                
-                logger.info(f"Processing page: {normalized_url}")
-                self.visited_urls.add(normalized_url)
-                
-                # Get page content using BrowserTool
-                raw_html = await asyncio.to_thread(
-                    self.browser_tool._run,
-                    normalized_url,
-                    output_type="raw"
-                )
-                
-                if not raw_html:
-                    logger.warning(f"No content received for {normalized_url}")
-                    return
-                
-                # Parse the page
-                soup = BeautifulSoup(raw_html, 'lxml')
-                
-                # Extract text content
-                text_content = await asyncio.to_thread(
-                    self.browser_tool._run,
-                    normalized_url,
-                    output_type="text"
-                )
-                
-                # Extract links before creating the page object
-                base_domain = urlparse(normalized_url).netloc
-                extracted_links = self._extract_links(normalized_url, raw_html)
-                
-                # Filter links to only include same-domain URLs that haven't been visited
-                new_links = {
-                    link for link in extracted_links
-                    if urlparse(link).netloc == base_domain
-                    and link not in self.visited_urls
-                    and self.url_deduplicator.should_process_url(link)
-                }
-                
-                # Add new links to found_links
-                self.found_links.update(new_links)
-                logger.info(f"Found {len(new_links)} new links on {normalized_url}")
-                
-                # Extract SEO relevant data
-                page = SEOPage(
-                    url=normalized_url,
-                    html=raw_html,
-                    text_content=text_content,
-                    title=soup.title.string if soup.title else "",
-                    meta_description=self._get_meta_content(soup, "description"),
-                    meta_keywords=self._get_meta_content(soup, "keywords").split(",") if self._get_meta_content(soup, "keywords") else [],
-                    h1_tags=[h1.get_text(strip=True) for h1 in soup.find_all("h1")],
-                    links=extracted_links,
-                    status_code=200,  # BrowserTool would have raised an error if not 200
-                    content_type=self.browser_tool.detect_content_type(normalized_url, raw_html),
-                    crawl_timestamp=datetime.now().isoformat()
-                )
-                
-                # Store the page
-                self.pages.append(page)
-                logger.info(f"Successfully processed {normalized_url}")
-                
+                async with aiohttp.ClientSession() as session:
+                    async with session.head(url, allow_redirects=True) as response:
+                        if response.status < 400:
+                            return None
+                        # If HEAD fails, try GET as some servers don't support HEAD for media
+                        async with session.get(url, allow_redirects=True) as get_response:
+                            if get_response.status < 400:
+                                return None
             except Exception as e:
-                logger.error(f"Error processing {url}: {str(e)}")
+                logger.warning(f"Failed to verify media URL {url}: {str(e)}")
+            return None
+
+        normalized_url = self.url_deduplicator._normalize_url(url)
+        if normalized_url in self.visited_urls:
+            return None
+
+        self.visited_urls.add(normalized_url)
+        
+        # Get page content using BrowserTool
+        raw_html = await asyncio.to_thread(
+            self.browser_tool._run,
+            normalized_url,
+            output_type="raw"
+        )
+        
+        if not raw_html:
+            logger.warning(f"No content received for {normalized_url}")
+            return None
+        
+        # Parse the page
+        soup = BeautifulSoup(raw_html, 'lxml')
+        
+        # Extract text content
+        text_content = await asyncio.to_thread(
+            self.browser_tool._run,
+            normalized_url,
+            output_type="text"
+        )
+        
+        # Extract links before creating the page object
+        base_domain = urlparse(normalized_url).netloc
+        extracted_links = self._extract_links(normalized_url, raw_html)
+        
+        # Filter links to only include same-domain URLs that haven't been visited
+        new_links = {
+            link for link in extracted_links
+            if urlparse(link).netloc == base_domain
+            and link not in self.visited_urls
+            and self.url_deduplicator.should_process_url(link)
+        }
+        
+        # Add new links to found_links
+        self.found_links.update(new_links)
+        logger.info(f"Found {len(new_links)} new links on {normalized_url}")
+        
+        # Extract SEO relevant data
+        page = SEOPage(
+            url=normalized_url,
+            html=raw_html,
+            text_content=text_content,
+            title=soup.title.string if soup.title else "",
+            meta_description=self._get_meta_content(soup, "description"),
+            meta_keywords=self._get_meta_content(soup, "keywords").split(",") if self._get_meta_content(soup, "keywords") else [],
+            h1_tags=[h1.get_text(strip=True) for h1 in soup.find_all("h1")],
+            links=extracted_links,
+            status_code=200,  # BrowserTool would have raised an error if not 200
+            content_type=self.browser_tool.detect_content_type(normalized_url, raw_html),
+            crawl_timestamp=datetime.now().isoformat()
+        )
+        
+        # Store the page
+        self.pages.append(page)
+        logger.info(f"Successfully processed {normalized_url}")
+        
+        return page
+
+    def _is_media_url(self, url: str) -> bool:
+        """Check if a URL points to an image or media file."""
+        parsed_url = urlparse(url)
+        path = parsed_url.path.lower()
+        return any(path.endswith(ext) for ext in [
+            '.jpg', '.jpeg', '.png', '.gif', '.svg', 
+            '.webp', '.ico', '.pdf', '.mp4', '.webm'
+        ])
 
     def _get_meta_content(self, soup: BeautifulSoup, name: str) -> str:
         """Extract content from a meta tag."""
