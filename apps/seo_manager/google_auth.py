@@ -41,7 +41,7 @@ def get_analytics_accounts_oauth(credentials):
             for account in accounts_request.get('accounts', []):
                 account_id = account['name']  # Format: "accounts/1234567"
                 account_name = account.get('displayName', 'Unknown Account')
-                logger.info(f"Fetching properties for account: {account_name}")
+                #logger.info(f"Fetching properties for account: {account_name}")
                 
                 try:
                     # Initialize pagination variables
@@ -78,7 +78,7 @@ def get_analytics_accounts_oauth(credentials):
                             
                         page_num += 1
                     
-                    logger.info(f"Found {properties_count} properties in account: {account_name}")
+                    # logger.info(f"Found {properties_count} properties in account: {account_name}")
                         
                 except Exception as e:
                     logger.error(f"Error listing properties for account {account_id}: {str(e)}", exc_info=True)
@@ -166,7 +166,7 @@ def get_search_console_properties(credentials_or_json):
         properties = []
         if 'siteEntry' in sites:
             for site in sites['siteEntry']:
-                logger.info(f"Found Search Console site: {site}")
+                # logger.info(f"Found Search Console site: {site}")
                 properties.append({
                     'url': site['siteUrl'],
                     'permission_level': site.get('permissionLevel', '')
