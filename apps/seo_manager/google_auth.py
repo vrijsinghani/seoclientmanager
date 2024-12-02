@@ -41,25 +41,50 @@ def get_analytics_accounts_oauth(credentials):
             for account in accounts_request.get('accounts', []):
                 account_id = account['name']  # Format: "accounts/1234567"
                 account_name = account.get('displayName', 'Unknown Account')
+                logger.info(f"Fetching properties for account: {account_name}")
                 
                 try:
-                    # List properties for this account - fix the filter format
-                    properties_request = analytics.properties().list(
-                        filter=f'parent:{account_id}'  # Removed extra quotes
-                    ).execute()
+                    # Initialize pagination variables
+                    page_token = None
+                    page_num = 1
+                    properties_count = 0
                     
-                    for property in properties_request.get('properties', []):
-                        accounts.append({
-                            'property_id': property['name'],  # Format: "properties/1234567"
-                            'property_name': property.get('displayName', 'Unknown Property'),
-                            'account_name': account_name
-                        })
-                        logger.info(f"Found property: {property.get('displayName')} in account: {account_name}")
+                    while True:
+                        # List properties for this account with pagination
+                        request_params = {
+                            'filter': f'parent:{account_id}',
+                            'pageSize': 200  # Maximum allowed page size
+                        }
+                        if page_token:
+                            request_params['pageToken'] = page_token
+                            
+                        properties_request = analytics.properties().list(**request_params).execute()
+                        
+                        for property in properties_request.get('properties', []):
+                            property_id = property['name']
+                            property_name = property.get('displayName', 'Unknown Property')
+                            
+                            accounts.append({
+                                'property_id': property_id,
+                                'property_name': property_name,
+                                'account_name': account_name
+                            })
+                            properties_count += 1
+                        
+                        # Check if there are more pages
+                        page_token = properties_request.get('nextPageToken')
+                        if not page_token:
+                            break
+                            
+                        page_num += 1
+                    
+                    logger.info(f"Found {properties_count} properties in account: {account_name}")
+                        
                 except Exception as e:
                     logger.error(f"Error listing properties for account {account_id}: {str(e)}", exc_info=True)
                     continue
             
-            logger.info(f"Found {len(accounts)} GA4 properties")
+            logger.info(f"Total GA4 properties found across all accounts: {len(accounts)}")
             return accounts
             
         except Exception as e:
