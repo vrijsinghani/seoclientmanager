@@ -41,6 +41,10 @@
                     Edit
                   </a>
                   |
+                  <a href="#" class="text-primary font-weight-bold text-xs test-tool-btn" data-tool-id="{{ tool.id }}" data-bs-toggle="modal" data-bs-target="#testToolModal">
+                    Test
+                  </a>
+                  |
                   <a href="{% url 'agents:delete_tool' tool.id %}" class="text-danger font-weight-bold text-xs" data-toggle="tooltip" data-original-title="Delete tool">
                     Delete
                   </a>
@@ -57,9 +61,74 @@
       </div>
     </div>
   </div>
-
-  {% include 'includes/footer.html' %}
 </div>
+
+<!-- Test Tool Modal -->
+<div class="modal fade" id="testToolModal" tabindex="-1" aria-labelledby="testToolModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="testToolModalLabel">Test Tool</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="toolTestForm">
+          {% csrf_token %}
+          <div id="toolInputs" class="mb-3">
+            <!-- Tool inputs will be dynamically added here -->
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Output:</label>
+            <div id="toolOutput" class="border rounded p-3 bg-light overflow-auto" style="min-height: 100px; max-height: 400px;">
+              <!-- Tool output will appear here -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="testToolBtn">Test</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Ensure modal doesn't exceed viewport height */
+.modal-dialog-scrollable {
+  max-height: 90vh;
+  margin-top: 5vh;
+  margin-bottom: 5vh;
+}
+
+/* Style for pre-formatted output */
+#toolOutput pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Custom scrollbar styling for better visibility */
+#toolOutput::-webkit-scrollbar {
+  width: 8px;
+}
+
+#toolOutput::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+#toolOutput::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+#toolOutput::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+</style>
+
+{% include 'includes/footer.html' %}
 {% endblock content %}
 
 {% block extra_js %}
@@ -72,4 +141,195 @@
       pageLength: [25, 50, 100, 200]
     });
   </script>
-{% endblock extra_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const toolInputs = document.getElementById('toolInputs');
+      const toolOutput = document.getElementById('toolOutput');
+      const testToolBtn = document.getElementById('testToolBtn');
+      const testToolModal = document.getElementById('testToolModal');
+      let currentToolId = null;
+
+      // Function to fetch tool schema
+      async function fetchToolSchema(toolId) {
+        try {
+          const response = await fetch(`/agents/tool-schema/${toolId}/`, {
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new TypeError("Oops, we haven't got JSON!");
+          }
+          
+          const data = await response.json();
+          console.log('Received schema:', data);  // Debug log
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          toolInputs.innerHTML = '';
+          
+          // Create input fields based on schema
+          // The schema is directly in data, not in data.schema
+          Object.entries(data.properties || {}).forEach(([key, prop]) => {
+            const div = document.createElement('div');
+            div.className = 'mb-3';
+            
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.textContent = prop.title || key;  // Use title if available, fallback to key
+            
+            if (prop.description) {  // Add description if available
+              const description = document.createElement('small');
+              description.className = 'form-text text-muted d-block';
+              description.textContent = prop.description;
+              div.appendChild(label);
+              div.appendChild(description);
+            } else {
+              div.appendChild(label);
+            }
+            
+            const input = document.createElement('input');
+            input.className = 'form-control';
+            input.name = key;
+            input.type = prop.type === 'number' ? 'number' : 'text';
+            input.required = (data.required || []).includes(key);
+            
+            div.appendChild(input);
+            toolInputs.appendChild(div);
+          });
+          
+          toolOutput.innerHTML = '';
+        } catch (error) {
+          console.error('Error fetching schema:', error);
+          toolInputs.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+      }
+
+      // Handle test button click in the table
+      document.querySelectorAll('.test-tool-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          currentToolId = this.dataset.toolId;
+          fetchToolSchema(currentToolId);
+        });
+      });
+
+      // Handle test button click in modal
+      testToolBtn.addEventListener('click', async function() {
+        if (!currentToolId) return;
+        
+        const formData = new FormData(document.getElementById('toolTestForm'));
+        toolOutput.innerHTML = `
+          <div class="d-flex align-items-center">
+            <div class="spinner-border text-primary me-2" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <span>Testing tool...</span>
+          </div>
+        `;
+        
+        try {
+          const response = await fetch(`/agents/test-tool/${currentToolId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new TypeError("Oops, we haven't got JSON!");
+          }
+          
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          // Start polling for status
+          const taskId = data.task_id;
+          pollStatus(taskId);
+          
+        } catch (error) {
+          console.error('Error testing tool:', error);
+          toolOutput.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+      });
+
+      // Function to poll task status
+      async function pollStatus(taskId) {
+        try {
+          const response = await fetch(`/agents/tool-status/${taskId}/`, {
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new TypeError("Oops, we haven't got JSON!");
+          }
+          
+          const data = await response.json();
+          console.log('Task status:', data);  // Debug log
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          if (data.status === 'PENDING' || data.status === 'STARTED') {
+            toolOutput.innerHTML = `
+              <div class="d-flex align-items-center">
+                <div class="spinner-border text-primary me-2" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Tool is running... (Status: ${data.status})</span>
+              </div>
+            `;
+            setTimeout(() => pollStatus(taskId), 1000);
+          } else if (data.status === 'SUCCESS') {
+            const result = data.result;
+            if (result === undefined || result === null) {
+              toolOutput.textContent = 'Task completed successfully (no output)';
+            } else if (typeof result === 'string') {
+              toolOutput.textContent = result;
+            } else if (typeof result === 'object') {
+              toolOutput.innerHTML = `<pre class="bg-light p-3 rounded"><code>${JSON.stringify(result, null, 2)}</code></pre>`;
+            } else {
+              toolOutput.textContent = String(result);
+            }
+          } else if (data.status === 'FAILURE') {
+            throw new Error(data.error || 'Task failed');
+          } else {
+            throw new Error(`Unknown status: ${data.status}`);
+          }
+        } catch (error) {
+          console.error('Error polling status:', error);
+          toolOutput.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+        }
+      }
+    });
+  </script>
+{% endblock %}

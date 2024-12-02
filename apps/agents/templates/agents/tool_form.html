@@ -427,70 +427,80 @@
         testToolBtn.addEventListener('click', function() {
             console.log('Test button clicked');
             const formData = new FormData(document.getElementById('toolTestForm'));
-            toolOutput.textContent = 'Testing tool...';
-            tokenCountSpan.textContent = 'Token Count: ...';
-
+            
+            // Show loading state
+            toolOutput.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span>Testing tool...</span>
+                </div>
+            `;
+            
             fetch(`/agents/test_tool/{{ tool.id }}/`, {
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-CSRFToken': '{{ csrf_token }}'
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 }
             })
             .then(response => response.json())
             .then(data => {
-                console.log('Received data:', data);
                 if (data.error) {
-                    toolOutput.textContent = 'Error: ' + data.error;
-                    tokenCountSpan.textContent = 'Token Count: 0';
-                    if (outputTableContainer) outputTableContainer.style.display = 'none';
-                } else {
-                    toolOutput.textContent = data.result;
-                    tokenCountSpan.textContent = `Token Count: ${data.token_count || 0}`;
-                    
-                    // Destroy existing DataTables
-                    outputTables.forEach(table => table.destroy());
-                    outputTables = [];
-
-                    if (isCSV(data.result)) {
-                        console.log('Data is CSV');
-                        const tableData = parseCSV(data.result);
-                        displayTable(tableData);
-                    } else {
-                        try {
-                            // Parse the string representation of the Python dictionary
-                            const parsedResult = eval('(' + data.result + ')');
-                            console.log('Parsed result:', parsedResult);
-                            
-                            const finalResult = {};
-                            for (const [key, value] of Object.entries(parsedResult)) {
-                                try {
-                                    finalResult[key] = JSON.parse(value);
-                                } catch (e) {
-                                    finalResult[key] = value;
-                                }
-                            }
-                            console.log('Final parsed result:', finalResult);
-                            
-                            if (typeof finalResult === 'object' && finalResult !== null) {
-                                console.log('Data is an object');
-                                displayMultipleTables(finalResult);
-                            } else {
-                                console.log('Parsed data is not an object');
-                                if (outputTableContainer) outputTableContainer.style.display = 'none';
-                            }
-                        } catch (e) {
-                            console.error('Failed to parse result:', e);
-                            if (outputTableContainer) outputTableContainer.style.display = 'none';
-                        }
-                    }
+                    throw new Error(data.error);
                 }
+                
+                // Tool execution started successfully
+                console.log('Tool execution started:', data);
+                const taskId = data.task_id;
+                
+                // Function to check task status
+                function checkStatus() {
+                    fetch(`/agents/tool-status/${taskId}/`)
+                        .then(response => response.json())
+                        .then(statusData => {
+                            console.log('Task status:', statusData);
+                            
+                            if (statusData.error) {
+                                throw new Error(statusData.error);
+                            }
+                            
+                            if (statusData.status === 'PENDING' || statusData.status === 'STARTED') {
+                                // Still running, update UI and check again in 1 second
+                                toolOutput.innerHTML = `
+                                    <div class="d-flex align-items-center">
+                                        <div class="spinner-border text-primary me-2" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span>Tool is running...</span>
+                                    </div>
+                                `;
+                                setTimeout(checkStatus, 1000);
+                            } else if (statusData.status === 'SUCCESS') {
+                                // Task completed successfully
+                                const result = statusData.result;
+                                if (typeof result === 'string') {
+                                    toolOutput.textContent = result;
+                                } else if (result && typeof result === 'object') {
+                                    toolOutput.textContent = JSON.stringify(result, null, 2);
+                                } else {
+                                    toolOutput.textContent = 'Task completed successfully';
+                                }
+                            } else if (statusData.status === 'FAILURE') {
+                                throw new Error(statusData.error || 'Task failed');
+                            }
+                        })
+                        .catch(error => {
+                            toolOutput.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+                        });
+                }
+                
+                // Start checking status
+                checkStatus();
             })
             .catch(error => {
-                console.error('Fetch error:', error);
-                toolOutput.textContent = 'Error: ' + error.message;
-                tokenCountSpan.textContent = 'Token Count: 0';
-                if (outputTableContainer) outputTableContainer.style.display = 'none';
+                toolOutput.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
             });
         });
 
@@ -509,4 +519,3 @@
     });
 </script>
 {% endblock extra_js %}
-

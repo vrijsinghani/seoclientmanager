@@ -14,6 +14,8 @@ import json
 import tiktoken
 import csv
 from io import StringIO
+import asyncio
+from asgiref.sync import sync_to_async
 
 logger = logging.getLogger(__name__)
 
@@ -192,43 +194,60 @@ def get_tool_schema(request, tool_id):
 @user_passes_test(is_admin)
 @require_http_methods(["POST"])
 def test_tool(request, tool_id):
+    """Run a tool test using Celery for both sync and async tools"""
     tool = get_object_or_404(Tool, id=tool_id)
-    tool_instance = load_tool(tool)
-
-    if tool_instance is None:
-        return JsonResponse({'error': 'Failed to load tool'}, status=400)
-
+    
+    # Get inputs from request
     inputs = {key: value for key, value in request.POST.items() if key != 'csrfmiddlewaretoken'}
-
+    
     try:
-        # Check if the tool has an args_schema
-        if hasattr(tool_instance, 'args_schema'):
-            # Pre-process inputs
-            processed_inputs = {}
-            for key, value in inputs.items():
-                if value != '':
-                    try:
-                        # Try to parse as JSON (for lists and dicts)
-                        processed_inputs[key] = json.loads(value)
-                    except json.JSONDecodeError:
-                        # If it's not valid JSON, keep the original string
-                        processed_inputs[key] = value
-
-            # Validate and convert inputs using the args_schema
-            validated_inputs = tool_instance.args_schema(**processed_inputs)
-            result = tool_instance._run(**validated_inputs.dict())
-        else:
-            # If no args_schema, pass inputs directly
-            result = tool_instance._run(**inputs)
+        # Start Celery task
+        from .tasks.tools import run_tool
+        task = run_tool.delay(tool_id, inputs)
         
-        # Convert result to string if it's not already
-        if not isinstance(result, str):
-            result = str(result)
+        return JsonResponse({
+            'status': 'started',
+            'task_id': task.id,
+            'message': f'Tool execution started. Task ID: {task.id}'
+        })
         
-        # Count tokens
-        token_count = count_tokens(result)
-        
-        return JsonResponse({'result': result, 'token_count': token_count})
     except Exception as e:
-        logger.error(f"Error testing tool: {str(e)}")
-        return JsonResponse({'error': str(e), 'token_count': 0}, status=400)
+        logger.error(f"Error starting tool execution: {str(e)}\n{traceback.format_exc()}")
+        return JsonResponse({
+            'error': str(e)
+        }, status=400)
+
+@login_required
+@user_passes_test(is_admin)
+def get_tool_status(request, task_id):
+    """Get the status of a tool execution"""
+    from celery.result import AsyncResult
+    
+    task = AsyncResult(task_id)
+    
+    response = {
+        'status': task.status,  # This will be one of: PENDING, STARTED, SUCCESS, FAILURE
+    }
+    
+    if task.ready():
+        if task.successful():
+            try:
+                result = task.get()
+                if isinstance(result, dict):
+                    response.update({
+                        'result': result.get('result', ''),
+                        'error': result.get('error')
+                    })
+                else:
+                    response['result'] = str(result)
+            except Exception as e:
+                response.update({
+                    'status': 'FAILURE',
+                    'error': str(e)
+                })
+        else:
+            response.update({
+                'error': str(task.result)
+            })
+    
+    return JsonResponse(response)

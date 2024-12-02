@@ -71,6 +71,26 @@ class Tool(models.Model):
 
         super().save(*args, **kwargs)
 
+class ToolRun(models.Model):
+    """Model to track tool executions"""
+    TOOL_RUN_STATUS = (
+        ('pending', 'Pending'),
+        ('running', 'Running'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+    
+    tool = models.ForeignKey(Tool, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=TOOL_RUN_STATUS, default='pending')
+    inputs = models.JSONField()
+    result = models.JSONField(null=True, blank=True)
+    error = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+
 class Agent(models.Model):
     name = models.CharField(max_length=255)
     role = models.CharField(max_length=100)

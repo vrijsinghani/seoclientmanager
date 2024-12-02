@@ -41,10 +41,12 @@ urlpatterns = [
     path('manage/tools/add/', views_tools.add_tool, name='add_tool'),
     path('manage/tools/edit/<int:tool_id>/', views_tools.edit_tool, name='edit_tool'),
     path('manage/tools/delete/<int:tool_id>/', views_tools.delete_tool, name='delete_tool'),
+    path('tool-schema/<int:tool_id>/', views_tools.get_tool_schema, name='get_tool_schema'),
+    path('test-tool/<int:tool_id>/', views_tools.test_tool, name='test_tool'),
+    path('tool-status/<str:task_id>/', views_tools.get_tool_status, name='get_tool_status'),
     path('get_tool_info/', views_tools.get_tool_info, name='get_tool_info'),
     path('get_tool_schema/<int:tool_id>/', views_tools.get_tool_schema, name='get_tool_schema'),
-    path('test_tool/<int:tool_id>/', views_tools.test_tool, name='test_tool'),
-
+    path('test_tool/<int:tool_id>/', views_tools.test_tool, name='test_tool'),  # Django 3.1+ automatically handles async views
     path('manage/crews/', views_crews.manage_crews, name='manage_crews'),
     path('manage/crews/add/', views_crews.crew_create_or_update, name='add_crew'),
     path('manage/crews/edit/<int:crew_id>/', views_crews.crew_create_or_update, name='edit_crew'),

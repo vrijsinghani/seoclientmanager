@@ -52,7 +52,9 @@ class BrowserTool(BaseTool):
       website = self.normalize_url(website)
       logger.info(f"Scraping website: {website} with output type: {output_type}")
       content = self.get_content(website, output_type)
-      return f'\nContent of {website}: {content}\n'
+      if output_type == "raw":
+          return content  # Return raw HTML directly
+      return content  # Return processed text directly
 
   def normalize_url(self, url: str) -> str:
       """Normalize the URL by adding the protocol if missing."""
@@ -154,7 +156,7 @@ class BrowserTool(BaseTool):
       """Scrape website content with retry mechanism."""
       payload = {
           "url": url,
-          "elements": [{"selector": "body"}]
+          "elements": [{"selector": "html"}]  # Changed from 'body' to 'html' to get full document
       }
       headers = {'cache-control': 'no-cache', 'content-type': 'application/json'}
       
@@ -166,6 +168,10 @@ class BrowserTool(BaseTool):
           response.raise_for_status()
           data = response.json()
           html_content = data['data'][0]['results'][0]['html']
+
+          # Add doctype if missing to ensure proper parsing
+          if not html_content.lower().startswith('<!doctype'):
+              html_content = '<!DOCTYPE html>\n' + html_content
 
           # Return raw HTML if requested
           if output_type.lower() == "raw":
