@@ -187,26 +187,26 @@ class SEOAuditTool(BaseTool):
                     "value": meta_desc
                 })
             
-            # Meta keywords check
-            meta_keywords = page.get("meta_keywords", [])
-            if not meta_keywords:
-                meta_issues.append({
-                    "type": "meta_keywords",
-                    "issue": "Missing meta keywords",
-                    "value": None
-                })
-            elif len(meta_keywords) < 3:
-                meta_issues.append({
-                    "type": "meta_keywords",
-                    "issue": f"Too few meta keywords ({len(meta_keywords)})",
-                    "value": meta_keywords
-                })
-            elif len(meta_keywords) > 10:
-                meta_issues.append({
-                    "type": "meta_keywords",
-                    "issue": f"Too many meta keywords ({len(meta_keywords)})",
-                    "value": meta_keywords
-                })
+            # # Meta keywords check
+            # meta_keywords = page.get("meta_keywords", [])
+            # if not meta_keywords:
+            #     meta_issues.append({
+            #         "type": "meta_keywords",
+            #         "issue": "Missing meta keywords",
+            #         "value": None
+            #     })
+            # elif len(meta_keywords) < 3:
+            #     meta_issues.append({
+            #         "type": "meta_keywords",
+            #         "issue": f"Too few meta keywords ({len(meta_keywords)})",
+            #         "value": meta_keywords
+            #     })
+            # elif len(meta_keywords) > 10:
+            #     meta_issues.append({
+            #         "type": "meta_keywords",
+            #         "issue": f"Too many meta keywords ({len(meta_keywords)})",
+            #         "value": meta_keywords
+            #     })
             
             # H1 tag checks
             h1_tags = page.get("h1_tags", [])

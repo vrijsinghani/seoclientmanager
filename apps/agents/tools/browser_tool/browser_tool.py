@@ -154,6 +154,13 @@ class BrowserTool(BaseTool):
 #  @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
   def get_content(self, url: str, output_type: str = "text") -> str:
       """Scrape website content with retry mechanism."""
+      # Check if URL is an image or other non-HTML content
+      parsed_url = urlparse(url)
+      path = parsed_url.path.lower()
+      if any(path.endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.ico', '.pdf']):
+          logger.info(f"Skipping content extraction for non-HTML file: {url}")
+          return f"Non-HTML content: {url}"
+
       payload = {
           "url": url,
           "elements": [{"selector": "html"}]  # Changed from 'body' to 'html' to get full document

@@ -200,8 +200,22 @@ class URLDeduplicator:
         if self._is_cms_page(parsed.query):
             return True
             
-        # Then check for filter patterns
+        # For filter URLs, check both the filtered URL and the base URL
         if self._is_filter_url(parsed.query):
+            # Create base URL without query parameters
+            base_url = urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                parsed.path,
+                '',
+                '',
+                ''
+            ))
+            # Add base URL to seen URLs to avoid duplicate processing
+            normalized_base = self._normalize_url(base_url)
+            if normalized_base not in self._seen_urls:
+                self._seen_urls.add(normalized_base)
+                return True
             return False
             
         # If unclear, normalize and check if we've seen it
