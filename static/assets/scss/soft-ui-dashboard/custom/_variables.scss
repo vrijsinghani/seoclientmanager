@@ -1,24 +1,76 @@
-$darkblue:      #1a2c4c ;// EDIT for customization
-$darkbronze:    #af7657 ;// EDIT for customization
-$lightbronze:   #e1c08e ;// EDIT for customization
-$steelgrey:     #90a4ae ;// EDIT for customization
-$cream:         #f4edd5 ;// EDIT for customization
-$green:         #1f7713 !default;
-$red:           #F56565 !default;
+// Brand Core Colors
+$darkblue:      #1a2c4c;    
+$darkbronze:    #af7657;    
+$lightbronze:   #e1c08e;    
+$steelgrey:     #4a5b66;    // Darkened from #90a4ae for better contrast
+$cream:         #f4edd5;    
 
-$primary:       $darkblue !default; // EDIT for customization
-$secondary:     $steelgrey !default; // EDIT for customization
-$info:          $darkbronze !default; // EDIT for customization
-$success:       $green !default; // EDIT for customization
-// $warning:       #e1c08e !default; // EDIT for customization
-$danger:        $red !default; // EDIT for customization
-$light:         $steelgrey !default;
-$dark:          $darkblue !default;
+// System Colors
+$info:          #2b4b7c;    // Darkened info color
+$success:       #2f6e4a;    
+$warning:       darken($lightbronze, 15%);    
+$danger:        #943b2f;    
+$white:         #ffffff !default;
+$black:         #141727 !default;
 
-$primary-gradient: $darkblue !default;
-$primary-gradient-state: $darkbronze !default;
+// Main Theme Colors
+$primary:       $darkblue !default;
+$secondary:     $steelgrey !default;  // Using darker steel grey
+$warning:       darken($lightbronze, 15%) !default;
+$light:         $cream !default;
+$dark:          darken($darkblue, 10%) !default;
 
-$soft-background-color: #bdb4b4 !default; // Testing
-$blue:    #1a24b3 !default;
-$enable-shadows:              true;
-$enable-gradients:            true;
+// Text Contrast Colors
+$primary-text:      $white !default;
+$secondary-text:    $white !default;  // Ensuring white text on darker backgrounds
+$info-text:         $white !default;
+$success-text:      $white !default;
+$warning-text:      $darkblue !default;  // Dark text on light backgrounds
+$danger-text:       $white !default;
+$light-text:        $darkblue !default;
+$dark-text:         $white !default;
+
+// Gradient Colors
+$primary-gradient:        $darkblue !default;
+$secondary-gradient:      $steelgrey !default;
+$info-gradient:          $info !default;
+$success-gradient:       $success !default;
+$warning-gradient:       darken($lightbronze, 15%) !default;
+$danger-gradient:        $danger !default;
+$light-gradient:         $cream !default;
+$dark-gradient:          $dark !default;
+
+// Gradient State Colors
+$primary-gradient-state:     darken($darkblue, 10%) !default;
+$secondary-gradient-state:   darken($steelgrey, 10%) !default;
+$info-gradient-state:       darken($info, 10%) !default;
+$success-gradient-state:    darken($success, 10%) !default;
+$warning-gradient-state:    $darkbronze !default;
+$danger-gradient-state:     darken($danger, 10%) !default;
+$light-gradient-state:      darken($cream, 10%) !default;
+$dark-gradient-state:       darken($dark, 15%) !default;
+
+// Button Colors Override
+$btn-secondary-bg:          $steelgrey !default;
+$btn-secondary-color:       $white !default;
+$btn-secondary-border:      $steelgrey !default;
+
+// Sweet Alert specific overrides
+$swal2-success:             $success !default;
+$swal2-error:              $danger !default;
+$swal2-warning:            darken($lightbronze, 15%) !default;
+$swal2-info:               $info !default;
+$swal2-question:           $darkblue !default;
+
+// Additional Bootstrap Overrides
+$theme-colors: (
+  "primary":    $primary,
+  "secondary":  $steelgrey,
+  "success":    $success,
+  "info":       $info,
+  "warning":    $warning,
+  "danger":     $danger,
+  "light":      $light,
+  "dark":       $dark
+) !default;
+
