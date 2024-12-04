@@ -1,0 +1,135 @@
+Google Analytics API Guide for LLM Agent
+
+1. Core Dimensions & Metrics
+
+1.1. User Acquisition
+Dimensions:
+- source – Source of traffic (e.g., google, facebook)
+- medium – Marketing medium (e.g., organic, CPC)
+- campaign – Campaign name
+- firstUserSourceMedium – Initial acquisition source/medium
+Metrics:
+- newUsers – Users visiting for the first time
+- totalUsers – Total distinct users
+- activeUsers – Active distinct users
+
+1.2. Session Metrics
+Dimensions:
+- sessionSourceMedium – Source/medium for the session
+- sessionCampaign – Campaign name for the session
+- deviceCategory – Device type (Desktop, Mobile, Tablet)
+- platform – Platform used (Web, iOS, Android)
+Metrics:
+- sessions – Total sessions
+- bounceRate – % of single-page sessions
+- averageSessionDuration – Avg duration of sessions in seconds
+- sessionsPerUser – Avg sessions per user
+
+1.3. Behavior Metrics
+Dimensions:
+- pagePath – URL path of pages
+- pageTitle – Title of pages
+- eventName – Name of events triggered
+- browser – Browser used by users
+Metrics:
+- pageViews – Total page views
+- uniquePageViews – Unique page views
+- eventCount – Total events
+- eventsPerSession – Avg events per session
+
+1.4. Conversion & Ecommerce
+Dimensions:
+- transactionId – ID of transactions
+- itemCategory – Category of items
+- currencyCode – Currency used in transactions
+Metrics:
+- ecommercePurchases – Number of purchases
+- purchaseRevenue – Total revenue from purchases
+- conversionRate – % of sessions that resulted in a purchase
+- returnOnAdSpend – ROAS (Revenue / Ad Spend)
+
+1.5. Technology & Device
+Dimensions:
+- operatingSystem – OS used by users
+- deviceModel – Model of device
+- screenResolution – User's screen resolution
+Metrics:
+- screenPageViews – Total screen/page views
+- userEngagementDuration – Total engagement time
+
+1.6. Geographic Data
+Dimensions:
+- country – User's country
+- region – User's region/state
+- city – User's city
+Metrics:
+- totalUsers – Users per region
+- sessions – Sessions per country
+
+2. Key API Usage References
+
+2.1. Request Structure
+Dimensions: Use 'name' field with API Name (e.g., 'source', 'medium')
+Metrics: Use 'name' field with API Name (e.g., 'sessions', 'bounceRate')
+
+2.2. Combining Dimensions & Metrics
+Pair acquisition dimensions with relevant metrics for insights:
+Example: 'source', 'medium' with 'sessions', 'bounceRate', 'conversionRate'
+
+2.3. Filtering & Segmentation
+Use dimensions like 'country', 'deviceCategory' to segment metrics
+Example Filter: country = "United States" and deviceCategory = "Mobile"
+
+2.4. Custom Dimensions & Metrics
+Syntax:
+Dimensions: customEvent:parameter_name or customUser:parameter_name
+Metrics: customEvent:parameter_name (sum by default)
+
+3. Essential Reporting Strategies
+
+3.1. Acquisition Analysis
+Dimensions: source, medium, campaign
+Metrics: sessions, newUsers, bounceRate
+Usage: Identify top traffic sources and their quality
+
+3.2. Behavior Analysis
+Dimensions: pagePath, eventName
+Metrics: pageViews, eventCount, averageSessionDuration
+Usage: Determine popular content and user interactions
+
+3.3. Conversion Funnel Analysis
+Dimensions: transactionId, itemCategory
+Metrics: ecommercePurchases, purchaseRevenue, conversionRate
+Usage: Track sales performance and identify drop-off points
+
+3.4. Revenue Optimization
+Dimensions: currencyCode, itemCategory
+Metrics: purchaseRevenue, averagePurchaseRevenuePerUser, returnOnAdSpend
+Usage: Maximize revenue through targeted campaigns and product optimization
+
+3.5. User Retention & Engagement
+Dimensions: cohort, firstUserSourceMedium
+Metrics: activeUsers, userEngagementDuration, dauPerMau
+Usage: Measure retention rates and enhance user engagement strategies
+
+4. Advanced Analytics
+
+4.1. Segmentation
+Combine multiple dimensions (e.g., source, deviceCategory) with key metrics to uncover detailed insights
+
+4.2. Cohort Analysis
+Dimensions: cohort, cohortNthDay
+Metrics: cohortActiveUsers, cohortTotalUsers
+Usage: Analyze user behavior over specific timeframes since acquisition
+
+4.3. Attribution Modeling
+Utilize firstUserSourceMedium and sessionSourceMedium to understand user journey and assign credit to marketing channels
+
+5. Best Practices for API Usage
+
+- Limit Dimensions & Metrics: Focus on essential ones to stay within context window limits
+- Use Date Ranges: Specify startDate and endDate to control data scope
+- Leverage Filters: Narrow down data for precise analysis (e.g., specific campaigns, devices)
+- Optimize Queries: Only request necessary fields to enhance performance
+
+This guide provides a concise overview of the most valuable dimensions and metrics from the Google Analytics API for initial and deep-dive analyses. Use the provided API names and structures to construct effective queries, enabling comprehensive website performance insights and actionable marketing strategies.
