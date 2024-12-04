@@ -172,7 +172,7 @@ class CompressionTool(BaseTool):
                 })
 
             # Calculate chunk size based on max_tokens
-            chunk_size = max_tokens // 2
+            chunk_size = max_tokens 
             
             # Create semantic chunks
             chunks = self._create_semantic_chunks(content, chunk_size)

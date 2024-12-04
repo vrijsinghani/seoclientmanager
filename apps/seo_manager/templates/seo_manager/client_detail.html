@@ -12,8 +12,11 @@
     <div class="col-md-5">
       <div class="card mb-4">
         <div class="card-header pb-0 d-flex justify-content-between align-items-center">
-          <h6>Client Details: {{ client.name }}</h6>
-          <a href="#" class="btn btn-xxs btn-primary" data-bs-toggle="modal" data-bs-target="#edit-client">Edit</a>
+          <div class="d-flex align-items-center">
+            <h6 class="mb-0 me-3">Client Details:</h6>
+            <h6 class="mb-0 text-primary">{{ client.name }}</h6>
+          </div>
+          <a href="{% url 'seo_manager:edit_client' client.id %}" class="btn btn-xxs btn-primary ms-3">Edit</a>
         </div>
         <div class="card-body px-0 pt-0 pb-2">
           <div class="table-responsive p-0">
@@ -521,6 +524,7 @@
         </div>
       </div>
     </div>
+  </div>
 
     <div class="col-md-6">
       {% if client.ga_credentials %}
@@ -653,71 +657,6 @@
 </div>
 
 <!-- Add this after the existing cards in client_detail.html -->
-
-<!-- Add this modal markup before the closing content block -->
-<div class="modal fade" id="edit-client" tabindex="-1" role="dialog" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Edit Client: {{ client.name }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <form method="post" action="{% url 'seo_manager:edit_client' client.id %}" id="editClientForm">
-        {% csrf_token %}
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="{{ form.name.id_for_label }}" class="form-control-label">Client Name</label>
-            {{ form.name }}
-            {% if form.name.errors %}
-            <div class="text-danger text-xs">{{ form.name.errors }}</div>
-            {% endif %}
-          </div>
-          
-          <div class="form-group mt-3">
-            <label for="{{ form.website_url.id_for_label }}" class="form-control-label">Website URL</label>
-            {{ form.website_url }}
-            {% if form.website_url.errors %}
-            <div class="text-danger text-xs">{{ form.website_url.errors }}</div>
-            {% endif %}
-          </div>
-          
-          <div class="row mt-3">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label for="{{ form.status.id_for_label }}" class="form-control-label">Status</label>
-                {{ form.status }}
-                {% if form.status.errors %}
-                <div class="text-danger text-xs">{{ form.status.errors }}</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label for="{{ form.group.id_for_label }}" class="form-control-label">Group</label>
-                {{ form.group }}
-                {% if form.group.errors %}
-                <div class="text-danger text-xs">{{ form.group.errors }}</div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-          
-          <div class="form-group mt-3">
-            <label for="{{ form.target_audience.id_for_label }}" class="form-control-label">Target Audience</label>
-            {{ form.target_audience }}
-            {% if form.target_audience.errors %}
-            <div class="text-danger text-xs">{{ form.target_audience.errors }}</div>
-            {% endif %}
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn bg-gradient-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn bg-gradient-primary">Update Client</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
 <!-- Add Business Objective Modal -->
 <div class="modal fade" id="add-objective" tabindex="-1" role="dialog" aria-hidden="true">
@@ -1024,7 +963,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('{% url "seo_manager:collect_rankings" client.id %}', {
       method: 'POST',
       headers: {
-        'X-CSRFToken': '{{ csrf_token }}'
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
       }
     })
     .then(response => response.json())
@@ -1061,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('{% url "seo_manager:generate_report" client.id %}', {
       method: 'POST',
       headers: {
-        'X-CSRFToken': '{{ csrf_token }}'
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
       }
     })
     .then(response => response.json())
@@ -1105,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('{% url "seo_manager:backfill_rankings" client.id %}', {
           method: 'POST',
           headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
           }
         })
         .then(response => response.json())
@@ -1125,6 +1064,13 @@ document.addEventListener('DOMContentLoaded', function() {
               text: data.error
             });
           }
+        })
+        .catch(error => {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'An error occurred while collecting historical data.'
+          });
         });
       }
     });
@@ -1183,26 +1129,83 @@ document.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('DOMContentLoaded', function() {
     // Add handler for Magically Fill In button
     document.getElementById('magicallyFillBtn').addEventListener('click', function() {
-      let timerInterval;
       const swalInstance = Swal.fire({
         title: 'Generating Client Profile',
         html: 'This may take a few minutes...',
-        timer: 0,
         timerProgressBar: true,
         allowOutsideClick: false,
         showCancelButton: true,
         cancelButtonText: 'Cancel',
         didOpen: () => {
           Swal.showLoading();
-        },
-        willClose: () => {
-          clearInterval(timerInterval);
         }
       });
   
       const controller = new AbortController();
       const signal = controller.signal;
   
+      // Make the request to generate profile
+      fetch('{% url "seo_manager:generate_magic_profile" client.id %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        signal: signal
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Start polling for task status
+          const pollInterval = setInterval(() => {
+            const toolStatusUrl = "{% url 'agents:get_tool_status' 'TASK_ID' %}".replace('TASK_ID', data.task_id);
+            fetch(toolStatusUrl)
+              .then(response => response.json())
+              .then(statusData => {
+                if (statusData.status === 'SUCCESS') {
+                  clearInterval(pollInterval);
+                  Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: 'Profile generated successfully'
+                  }).then(() => {
+                    window.location.reload();
+                  });
+                } else if (statusData.status === 'FAILURE') {
+                  clearInterval(pollInterval);
+                  Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: statusData.error || 'Failed to generate profile'
+                  });
+                }
+                // else task is still running, continue polling
+              })
+              .catch(error => {
+                clearInterval(pollInterval);
+                Swal.fire({
+                  icon: 'error',
+                  title: 'Error',
+                  text: 'Failed to check task status'
+                });
+              });
+          }, 2000); // Poll every 2 seconds
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: data.error || 'Failed to start profile generation'
+          });
+        }
+      })
+      .catch(error => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to generate profile'
+        });
+      });
+
       swalInstance.then((result) => {
         if (result.dismiss === Swal.DismissReason.cancel) {
           controller.abort();
@@ -1213,99 +1216,10 @@ document.addEventListener('DOMContentLoaded', function() {
           });
         }
       });
-  
-      fetch('{% url "seo_manager:generate_magic_profile" client.id %}', {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': '{{ csrf_token }}'
-        },
-        signal: signal
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          Swal.fire({
-            icon: 'success',
-            title: 'Success!',
-            text: 'Client profile has been generated successfully.'
-          }).then(() => {
-            window.location.reload();
-          });
-        } else {
-          Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.error || 'An error occurred while generating the profile.'
-          });
-        }
-      })
-      .catch(error => {
-        if (error.name === 'AbortError') {
-          return;
-        }
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'An error occurred while generating the profile.'
-        });
-      });
     });
   });
   </script>
 
-<!-- Add this to your extra_js block -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const editClientForm = document.getElementById('editClientForm');
-    if (editClientForm) {
-        editClientForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            fetch(this.action, {
-                method: 'POST',
-                body: new FormData(this),
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success message and reload page
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success!',
-                        text: data.message,
-                        showConfirmButton: false,
-                        timer: 1500
-                    }).then(() => {
-                        window.location.reload();
-                    });
-                } else {
-                    // Show error messages
-                    let errorMessage = '';
-                    for (const [field, errors] of Object.entries(data.errors)) {
-                        errorMessage += `${field}: ${errors.join(', ')}\n`;
-                    }
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: errorMessage
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'An error occurred while updating the client.'
-                });
-            });
-        });
-    }
-});
-</script>
 
 <!-- Add this to your extra_js block -->
 <script>
@@ -1378,7 +1292,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         html: 'Please wait',
                         allowOutsideClick: false,
                         didOpen: () => {
-                            Swal.showLoading();
+                            Swal.showLoading()
                         }
                     });
 
@@ -1386,7 +1300,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     fetch(`{% url 'seo_manager:delete_client' client.id %}`, {
                         method: 'POST',
                         headers: {
-                            'X-CSRFToken': '{{ csrf_token }}',
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
                             'Content-Type': 'application/json'
                         }
                     })

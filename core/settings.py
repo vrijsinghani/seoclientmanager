@@ -236,6 +236,8 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR,'static'),
+    os.path.join(BASE_DIR, "apps/agents/static"),
+
 ]
 
 MEDIA_URL = 'media/'
@@ -374,8 +376,11 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'clean': {
-            'format': '%(asctime)s [%(levelname)s] %(message)s',
+            'format': '%(asctime)s [%(levelname)s] %(name)s.%(funcName)s: %(message)s',
             'datefmt': '%H:%M:%S'
+        },
+        'minimal': {
+            'format': '%(asctime)s [%(funcName)s] %(message)s'
         },
     },
     'handlers': {
@@ -383,15 +388,66 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'clean',
         },
+        'minimal_console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'minimal',
+        },
     },
     'loggers': {
+        # Root logger
+        '': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': True,
+        },
+        # Django's built-in logging
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
         },
-        'apps.agents': {
+        # Celery logging
+        'celery': {
+            'handlers': ['minimal_console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'celery.worker.strategy': {
+            'level': 'ERROR',
+        },
+        'celery.worker.consumer': {
+            'level': 'ERROR',
+        },
+        'celery.app.trace': {
+            'level': 'ERROR',
+        },
+        # Your apps logging
+        'apps': {
             'handlers': ['console'],
             'level': 'DEBUG',
+            'propagate': False,
+        },
+        # 'apps.agents.tools.async_crawl_website_tool': {
+        #     'handlers': ['console'],
+        #     'level': 'INFO',
+        #     'propagate': False,
+        # },
+        # Specific modules you want to see more from
+        'apps.seo_manager': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # Silence noisy modules
+        'httpx': {
+            'level': 'ERROR',
+        },
+        'httpcore': {
+            'level': 'ERROR',
+        },
+        'ForkPoolWorker': {
+            'handlers': ['minimal_console'],
+            'level': 'ERROR',
             'propagate': False,
         },
     },

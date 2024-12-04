@@ -265,8 +265,8 @@ def cancel_execution(request, execution_id):
     
     if execution.task_id:
         # Revoke the Celery task
-        from celery.task.control import revoke
-        revoke(execution.task_id, terminate=True)
+        from celery import current_app
+        revoke = current_app.control.revoke(task_id=execution.task_id, terminate=True)
         
         # Update execution status
         execution.status = 'cancelled'

@@ -2,202 +2,17 @@
 {% load static %}
 
 {% block title %} Crew Kanban {% endblock %}
-
 {% block extrastyle %}
 {{ block.super }}
-<!-- jKanban styles -->
-<!-- <link rel="stylesheet" href="{% static 'assets/css/plugins/jkanban/jkanban.min.css' %}"/> -->
-<style>
-.kanban-container {
-  padding: 1.25rem;
-  display: flex;
-  overflow-x: auto;
-}
 
-.kanban-board {
-  min-width: 320px;
-  max-width: 640px;
-  margin: 0 0.9375rem;
-  background-color: #f8f9fa;  /* Light gray background */
-}
-
-.kanban-board header {
-  background: linear-gradient(87deg, #11cdef, #1171ef) !important;
-}
-
-.kanban-drag {
-  min-height: 200px;
-  padding: 1.25rem;
-  background-color: #edf0f5;  /* Slightly darker background for contrast */
-  border-radius: 0 0 0.5rem 0.5rem;
-}
-
-.kanban-item {
-  margin-bottom: 0.9375rem;
-}
-
-/* Custom scrollbar for better visibility */
-.kanban-container::-webkit-scrollbar {
-  height: 0.5rem;
-}
-
-.kanban-container::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.kanban-container::-webkit-scrollbar-thumb {
-  background: var(--bs-primary);
-  border-radius: 0.25rem;
-}
-
-.kanban-container::-webkit-scrollbar-thumb:hover {
-  background: var(--bs-primary-darker);
-}
-
-/* Stage status indicators */
-.stage-item {
-  border: 1px solid #e9ecef;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  background-color: white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  transition: all 0.3s ease;
-}
-.stage-item:hover {
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  transform: translateY(-2px);
-}
-.stage-content {
-  margin-top: 1rem;
-}
-.stage-metadata {
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: #6c757d;
-}
-.stage-status {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    line-height: 1;
-    text-transform: lowercase;
-    white-space: nowrap;
-}
-
-.status-pending { 
-    background-color: #6c757d;  /* gray */
-    color: white;
-}
-
-.status-in_progress,
-.status-running { 
-    background-color: #0d6efd;  /* blue */
-    color: white;
-}
-
-.status-completed { 
-    background-color: #198754;  /* green */
-    color: white;
-}
-
-.status-error { 
-    background-color: #dc3545;  /* red */
-    color: white;
-}
-/* Time stamp styling */
-.time-stamp {
-  color: #6c757d;
-  font-size: 0.875rem;
-}
-
-/* Title styling */
-.stage-title {
-  color: #344767;
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin: 0.75rem 0;
-}
-
-/* Content styling */
-.stage-content {
-  color: #67748e;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-/* Agent info styling */
-.stage-agent {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 1rem;
-  color: #67748e;
-  font-size: 0.75rem;
-}
-
-.stage-agent i {
-  margin-right: 0.5rem;
-  font-size: 0.875rem;
-}
-
-/* Show more button styling */
-.toggle-content {
-  color: #0d6efd;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-decoration: none;
-  margin-top: 0.5rem;
-  display: inline-block;
-}
-
-.toggle-content:hover {
-  color: #0a58ca;
-}
-
-.btn-group .btn-link {
-    color: #6c757d;
-    text-decoration: none;
-    transition: color 0.2s;
-}
-
-.btn-group .btn-link:hover {
-    color: #344767;
-}
-
-.gap-2 {
-    gap: 0.5rem;
-}
-</style>
+<link rel="stylesheet" type="text/css" href="{% static 'agents/css/crew_kanban.css' %}?v=29" crossorigin="anonymous"/>
 {% endblock extrastyle %}
-
-{% block extra_css %}
-{{ block.super }}
-<style>
-  .task-description {
-    cursor: pointer;
-  }
-  .task-description:hover {
-    opacity: 0.9;
-  }
-  .task-description::after {
-    content: '\f078';  /* FontAwesome chevron-down icon */
-    font-family: "Font Awesome 5 Free";
-    font-weight: 900;
-    margin-left: 0.5rem;
-    font-size: 0.75rem;
-    transition: transform 0.2s;
-  }
-  .task-description[aria-expanded="true"]::after {
-    transform: rotate(180deg);
-  }
-</style>
-{% endblock extra_css %}
 
 {% block content %}
 {% csrf_token %}
+
+
+
 <div class="container-fluid py-4">
     <!-- Header Card -->
     <div class="row mb-4">
@@ -222,7 +37,7 @@
                         
                         <!-- Right side with buttons -->
                         <div class="d-flex gap-2">
-                            <button id="cancelExecutionBtn" class="btn btn-danger" style="visibility: visible;">
+                            <button id="cancelExecutionBtn" class="btn btn-danger" style="display: none;">
                                 <i class="fas fa-stop-circle me-2"></i>Cancel Execution
                             </button>
                             <button class="btn btn-primary" onclick="showStartExecutionModal()">
@@ -250,7 +65,7 @@
               {% for task in tasks %}
             <!-- Task Board -->
             <div class="kanban-board" data-task-id="{{ task.id }}">
-              <header class="kanban-board-header bg-gradient-primary rounded-top p-3">
+              <header class="kanban-board-header rounded-top p-3">
                 <div class="text-white">
                   <div class="task-description" data-bs-toggle="collapse" 
                        href="#taskDesc{{ task.id }}" role="button" 
@@ -384,6 +199,11 @@
             }
             const data = await response.json();
             
+            // Update cancel button based on active executions
+            const hasActiveExecution = data.executions && data.executions.length > 0;
+            const activeExecutionId = hasActiveExecution ? data.executions[0].execution_id : null;
+            updateCancelButton(hasActiveExecution, activeExecutionId);
+            
             // Clear boards first
             document.querySelectorAll('.kanban-drag').forEach(board => {
                 board.innerHTML = '';
@@ -399,8 +219,11 @@
                     stages: execution.stages
                 });
             });
+            
+            return data;
         } catch (error) {
             console.error('Error fetching active executions:', error);
+            return null;
         }
     }
 
@@ -458,6 +281,9 @@
                             break;
                         case 'human_input_request':
                             handleHumanInputRequest(data);
+                            break;
+                        case 'execution_status_update':
+                            handleWebSocketMessage(data);
                             break;
                         default:
                             console.log('Unknown message type:', data.type);
@@ -576,6 +402,12 @@
             return;
         }
         
+        // Update cancel button based on execution status
+        if (data.execution_id && data.status) {
+            const isActive = ['PENDING', 'RUNNING'].includes(data.status.toUpperCase());
+            updateCancelButton(isActive, isActive ? data.execution_id : null);
+        }
+        
         // Update execution number in header
         const executionSpan = document.getElementById('execution-number');
         if (executionSpan) {
@@ -632,16 +464,6 @@
                     header.className = 'card-header bg-gradient-success text-white p-2';
                 }
             });
-        }
-
-        // Update cancel button visibility based on status
-        console.log('Current status:', data.status);  // Debug log
-        if (data.status === 'RUNNING' || data.status === 'IN_PROGRESS' || data.status === 'PENDING') {
-            console.log('Showing cancel button');  // Debug log
-            updateCancelButton(true, data.execution_id);
-        } else {
-            console.log('Hiding cancel button');  // Debug log
-            updateCancelButton(false);
         }
     }
 
@@ -891,7 +713,7 @@
             console.error('Cancel button not found');  // Debug log
             return;
         }
-        cancelBtn.style.visibility = hasActiveExecution ? 'visible' : 'hidden';
+        cancelBtn.style.display = hasActiveExecution ? 'block' : 'none';
         if (hasActiveExecution) {
             cancelBtn.setAttribute('data-execution-id', executionId);
         } else {
@@ -931,27 +753,20 @@
         }
     });
 
-    // Update WebSocket message handling to handle cancellation
-    if (socket) {
-        const originalOnMessage = socket.onmessage;
-        socket.onmessage = function(e) {
-            try {
-                const data = JSON.parse(e.data);
-                console.log('WebSocket message received:', data);
-                
-                // Handle cancellation status
-                if (data.type === 'status_update' && data.status?.toUpperCase() === 'CANCELLED') {
-                    updateCancelButton(false);
-                }
-                
-                // Call original message handler
-                if (originalOnMessage) {
-                    originalOnMessage.call(socket, e);
-                }
-            } catch (error) {
-                console.error('Error processing WebSocket message:', error);
-            }
-        };
+    function handleWebSocketMessage(data) {
+        if (data.type === 'execution_status_update' || data.type === 'execution_update') {
+            // Update cancel button based on execution status
+            const isActive = ['PENDING', 'RUNNING'].includes(data.status.toUpperCase());
+            updateCancelButton(isActive, isActive ? data.execution_id : null);
+        }
     }
+
+    // Initial fetch of active executions and setup of cancel button
+    document.addEventListener('DOMContentLoaded', async function() {
+        const data = await fetchActiveExecutions();
+        const hasActiveExecution = data && data.executions && data.executions.length > 0;
+        const activeExecutionId = hasActiveExecution ? data.executions[0].execution_id : null;
+        updateCancelButton(hasActiveExecution, activeExecutionId);
+    });
 </script>
 {% endblock extra_js %}

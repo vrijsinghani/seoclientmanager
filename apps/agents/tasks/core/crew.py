@@ -290,6 +290,10 @@ def execute_crew(self, execution_id):
         execution = CrewExecution.objects.get(id=execution_id)
         logger.debug(f"Attempting to start crew execution for id: {execution_id} (task_id: {self.request.id})")
         
+        # Save the Celery task ID
+        execution.task_id = self.request.id
+        execution.save()
+        
         # Create initial stage
         ExecutionStage.objects.create(
             execution=execution,

@@ -118,7 +118,7 @@ def ranking_data_management(request, client_id):
     )
     
     latest_collection_date = ranking_stats['latest_date']
-    
+
     # Calculate data coverage in months
     data_coverage_months = 0
     if ranking_stats['earliest_date'] and ranking_stats['latest_date']:

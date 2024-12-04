@@ -11,12 +11,12 @@ from ..models import Client, KeywordRankingHistory, UserActivity
 from ..forms import ClientForm, BusinessObjectiveForm, TargetedKeywordForm, KeywordBulkUploadForm, SEOProjectForm, ClientProfileForm
 from apps.common.tools.user_activity_tool import user_activity_tool
 from apps.agents.tools.client_profile_tool.client_profile_tool import ClientProfileTool
+from apps.agents.models import Tool
 from datetime import datetime
 from markdown_it import MarkdownIt  # Import markdown-it
 from django.urls import reverse
 
-logger = logging.getLogger('apps.seo_manager.google_auth')
-
+logger = logging.getLogger(__name__)
 __all__ = [
     'dashboard',
     'client_list',
@@ -70,6 +70,8 @@ def add_client(request):
 
 @login_required
 def client_detail(request, client_id):
+    logger.debug(f"Accessing client_detail view for client_id: {client_id}")
+
     client = get_object_or_404(Client.objects.prefetch_related(
         'targeted_keywords'
     ), id=client_id)
@@ -91,7 +93,7 @@ def client_detail(request, client_id):
         client=client,
         category__in=important_categories
     ).order_by('-timestamp')[:10]
-    
+
     business_objectives = client.business_objectives
     
     keyword_form = TargetedKeywordForm()
@@ -114,14 +116,14 @@ def client_detail(request, client_id):
     )
     
     ranking_stats = KeywordRankingHistory.objects.filter(
-        keyword__client_id=client_id
+        client_id=client_id
     ).aggregate(
         earliest_date=Min('date'),
         latest_date=Max('date')
     )
     
     latest_collection_date = ranking_stats['latest_date']
-    
+    logger.debug(f"Latest collection date: {latest_collection_date}")
     data_coverage_months = 0
     if ranking_stats['earliest_date'] and ranking_stats['latest_date']:
         date_diff = ranking_stats['latest_date'] - ranking_stats['earliest_date']
@@ -130,12 +132,12 @@ def client_detail(request, client_id):
     tracked_keywords_count = KeywordRankingHistory.objects.filter(
         client_id=client_id
     ).values('keyword_text').distinct().count()
-    
+
     context = {
         'client': client,
         'client_activities': client_activities,
         'business_objectives': business_objectives,
-        'form': business_objective_form,
+        'business_objective_form': business_objective_form,
         'keyword_form': keyword_form,
         'import_form': import_form,
         'project_form': project_form,
@@ -147,9 +149,7 @@ def client_detail(request, client_id):
         'latest_collection_date': latest_collection_date,
         'data_coverage_months': data_coverage_months,
         'tracked_keywords_count': tracked_keywords_count,
-        'form': edit_form,
     }
-    
     return render(request, 'seo_manager/client_detail.html', context)
 
 @login_required
@@ -160,25 +160,33 @@ def edit_client(request, client_id):
         if form.is_valid():
             form.save()
             user_activity_tool.run(request.user, 'update', f"Updated client details: {client.name}", client=client)
-            messages.success(request, f"Client '{client.name}' has been updated successfully.")
             
+            # Check if request is AJAX
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': True,
                     'message': f"Client '{client.name}' has been updated successfully.",
-                    'redirect_url': reverse('seo_manager:client_detail', args=[client.id])
                 })
             
+            messages.success(request, f"Client '{client.name}' has been updated successfully.")
             return redirect('seo_manager:client_detail', client_id=client.id)
         else:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
                     'success': False,
-                    'errors': form.errors
+                    'errors': {field: [str(error) for error in errors] 
+                              for field, errors in form.errors.items()}
                 })
+            
     else:
         form = ClientForm(instance=client)
     
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': False,
+            'errors': {'form': ['Invalid form submission']}
+        })
+        
     return render(request, 'seo_manager/edit_client.html', {'form': form, 'client': client})
 
 @login_required
@@ -216,25 +224,18 @@ def update_client_profile(request, client_id):
 def generate_magic_profile(request, client_id):
     if request.method == 'POST':
         try:
-            client = get_object_or_404(Client, id=client_id)
+            # Get the tool ID
+            tool = get_object_or_404(Tool, tool_subclass='ClientProfileTool')
             
-            profile_tool = ClientProfileTool()
-            result = profile_tool._run(client_id=client_id)
-            result_data = json.loads(result)
+            # Start Celery task
+            from apps.agents.tasks import run_tool
+            task = run_tool.delay(tool.id, {'client_id': str(client_id)})
             
-            if result_data.get('success'):
-                user_activity_tool.run(
-                    request.user,
-                    'update',
-                    f"Generated magic profile for: {client.name}",
-                    client=client
-                )
-                return JsonResponse({'success': True})
-            else:
-                return JsonResponse({
-                    'success': False,
-                    'error': result_data.get('message', 'Failed to generate profile')
-                })
+            return JsonResponse({
+                'success': True,
+                'task_id': task.id,
+                'message': 'Profile generation started'
+            })
                 
         except Exception as e:
             logger.error(f"Error generating magic profile: {str(e)}")
